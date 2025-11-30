@@ -1,0 +1,28 @@
+# Visual Studio 垃圾
+.vs/
+Debug/
+Release/
+x64/
+x86/
+*.sdf
+*.opensdf
+*.suo
+*.user
+
+# Cocos 编译目录
+build/
+bin/
+obj/
+temp/
+library/
+local/
+
+# Windows 编译生成的垃圾
+proj.win32/Debug.win32/
+proj.win32/Release.win32/
+*.ipch
+*.apk
+*.ap_
+
+# Mac/系统垃圾
+.DS_Store
