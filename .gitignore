@@ -33,7 +33,6 @@ proj.win32/Release.win32/
 *.vcxproj.user
 
 # 忽略 编译文件夹
-proj.win32/
 build/
 bin/
 
