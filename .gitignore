@@ -26,3 +26,17 @@ proj.win32/Release.win32/
 
 # Mac/系统垃圾
 .DS_Store
+
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# 忽略 编译文件夹
+proj.win32/
+build/
+bin/
+
+# 忽略 CMake 缓存
+CMakeCache.txt
+CMakeFiles/
