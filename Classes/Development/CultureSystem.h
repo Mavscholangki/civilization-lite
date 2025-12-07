@@ -1,0 +1,115 @@
+#ifndef CULTURE_SYSTEM_H
+#define CULTURE_SYSTEM_H
+
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <algorithm>
+
+// 政体枚举
+enum class GovernmentType {
+	CHIEFDOM,           // 酋邦
+	AUTOCRACY,          // 独裁统治  
+	OLIGARCHY,          // 寡头政体
+	CLASSICAL_REPUBLIC, // 古典共和
+	MONARCHY,           // 君主制
+	THEOCRACY,          // 神权政治
+	MERCHANT_REPUBLIC,  // 商人共和国
+	DEMOCRACY,          // 民主制
+	COMMUNISM,          // 共产主义
+	FASCISM,            // 法西斯主义
+	CORPORATE_LIBERTY,  // 公司自由制
+	DIGITAL_DEMOCRACY   // 数字民主
+};
+
+// 市政节点结构
+struct CultureNode {
+	int id;
+	std::string name;
+	int progress;						// 解锁进度
+	bool activated;						// 解锁状态
+	std::vector<int> srcCultureList;	// 前置市政ID
+	std::vector<int> dstCultureList;	// 后继市政ID
+	std::string effectDescription;		// 效果描述
+
+	// 市政解锁的政体
+	std::vector<GovernmentType> unlockedGovernmentList;
+	// 市政解锁的政策卡槽位
+	int policySlotCount[4]; // 4个索引依次是[军事,经济,外交,通用]
+
+	CultureNode() = default;// 防止系统调用出错
+	CultureNode(int id, const std::string& name, const std::vector<int>& prereqs, const std::string& effect = "");
+};
+
+// 市政事件监听器接口
+class CultureEventListener {
+public:
+	virtual ~CultureEventListener() {}
+
+	// 市政被解锁
+	virtual void onCultureUnlocked(int cultureId, const std::string& cultureName,
+		const std::string& effect) = 0;
+
+	// 文化进度更新
+	virtual void onCultureProgress(int cultureId, int currentProgress) = 0;
+
+	// 灵感被触发
+	virtual void onInspirationTriggered(int cultureId, const std::string& cultureName) = 0;
+};
+
+// 市政树管理类
+class CultureTree {
+private:
+	std::unordered_map<int, CultureNode> cultureList;	// ID到节点的映射
+	std::vector<int> activatedCultureList;				// 已激活市政列表
+	GovernmentType currentGovernment;					// 当前政体
+	int activePolicySlots[4];							// 当前激活的政策槽位
+
+	std::vector<CultureEventListener*> listeners;
+
+public:
+	CultureTree() {
+		initializeCultureTree();
+		currentGovernment = GovernmentType::CHIEFDOM;
+		std::fill(activePolicySlots, activePolicySlots + 4, 0);
+	}
+
+	~CultureTree() {
+		listeners.clear();
+	}
+
+	// 写操作
+	void initializeCultureTree();
+	bool updateProgress(int cultureId, int progress);
+	bool updateProgress_Inspiration(int cultureId);
+
+	// 政体相关
+	bool switchGovernment(GovernmentType newGovernment);
+	GovernmentType getCurrentGovernment() const { return currentGovernment; }
+
+	// 是非查询
+	bool isUnlockable(int cultureId) const;
+	bool isActivated(int cultureId) const;
+	bool isGovernmentUnlocked(GovernmentType government) const;
+
+	// 读操作
+	std::vector<int> getUnlockableCultureList() const;
+	std::vector<int> getActivatedCultureList() const;
+	const CultureNode* getCultureInfo(int cultureId) const;
+	int getCultureProgress(int cultureId) const;
+	const int* getActivePolicySlots() const { return activePolicySlots; }
+
+	// 事件监听器管理
+	void addEventListener(CultureEventListener* listener);
+	void removeEventListener(CultureEventListener* listener);
+
+private:
+	void onCultureUnlocked_internal(int prereqCultureId);
+
+	// 通知监听器
+	void notifyCultureUnlocked(int cultureId, const std::string& cultureName, const std::string& effect);
+	void notifyCultureProgress(int cultureId, int progress);
+	void notifyInspirationTriggered(int cultureId, const std::string& cultureName);
+};
+
+#endif // CULTURE_SYSTEM_H
