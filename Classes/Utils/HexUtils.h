@@ -24,6 +24,13 @@ struct Hex {
     Hex operator+(const Hex& other) const {
         return Hex(q + other.q, r + other.r);
     }
+    int distance(const Hex& other) const {
+        int dq = std::abs(q - other.q);
+        int dr = std::abs(r - other.r);
+        int ds = std::abs(s - other.s);
+        // æ‡¿Î = (dq + dr + ds) / 2
+        return (dq + dr + ds) / 2;
+    }
 };
 
 class HexLayout {

@@ -1,6 +1,6 @@
 /*
-* 这是一个地图生成器。
-* 你不需要修改。
+* 散布式细长山脉生成器 (Scattered Strip Mountains)
+* 特点：山脉呈细条状，但分布稀疏且不连续，被随机打断
 */
 
 #include "MapGenerator.h"
@@ -11,10 +11,14 @@
 #include <queue>
 #include <vector>
 #include <random>
+#include <set>
 
 USING_NS_CC;
 
-// 辅助函数：获取周围 6 个邻居
+// ----------------------------------------------------------------------------
+// 辅助函数
+// ----------------------------------------------------------------------------
+
 std::vector<Hex> GetNeighbors(const Hex& center) {
     std::vector<Hex> neighbors;
     const int directions[6][2] = {
@@ -27,63 +31,44 @@ std::vector<Hex> GetNeighbors(const Hex& center) {
     return neighbors;
 }
 
-// 辅助函数：平滑插值
 float SmoothStep(float edge0, float edge1, float x) {
     x = std::max(0.0f, std::min(1.0f, (x - edge0) / (edge1 - edge0)));
     return x * x * (3 - 2 * x);
 }
 
-// Map Generation: The Compromise Solution (Balanced Continents)
-// 地图生成：折中方案 (平衡的大陆布局)
-// 结合了“宏观轮廓”和“微观细节”，生成 2-3 块形状自然的大陆。
+// ----------------------------------------------------------------------------
+// 主生成逻辑
+// ----------------------------------------------------------------------------
+
 std::map<Hex, TileData> MapGenerator::generate(int width, int height) {
     std::map<Hex, TileData> map_data;
 
-    // 1. Init Random Engine / 初始化随机引擎
+    // 1. 初始化随机数
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dist_seed(0, 10000);
-    // Offset range / 偏移范围
     std::uniform_real_distribution<> dist_offset(-50000.0, 50000.0);
 
-    // Initialize Noise / 初始化噪声
-    PerlinNoise macro_noise(dist_seed(gen));   // [核心] 宏观噪声：决定大陆位置
-    PerlinNoise detail_noise(dist_seed(gen));  // [核心] 细节噪声：决定海岸线形状
-    PerlinNoise warp_noise(dist_seed(gen));
-    PerlinNoise moisture_noise(dist_seed(gen));
+    // 2. 初始化噪声生成器
+    PerlinNoise continent_noise(dist_seed(gen)); // 大陆轮廓
+    PerlinNoise ridge_noise1(dist_seed(gen));    // 山脉层1 (横向)
+    PerlinNoise ridge_noise2(dist_seed(gen));    // 山脉层2 (纵向)
+    PerlinNoise warp_noise(dist_seed(gen));      // 坐标扭曲
+    PerlinNoise breakup_noise(dist_seed(gen));   // 打断噪声 (用于切断山脉)
+    PerlinNoise climate_noise(dist_seed(gen));   // 气候
+    PerlinNoise river_noise(dist_seed(gen));     // 河流
 
-    // --------------------------------------------------------------------------
-    // 2. Parameters for "The Compromise" / 折中方案的参数
-    // --------------------------------------------------------------------------
-
-    // [Macro Scale] 宏观缩放：非常小 (3.0~4.5)。
-    // 作用：在 120 宽的地图上，这只会生成 2-3 个巨大的白色波峰（即大陆雏形）。
-    std::uniform_real_distribution<> dist_macro_scale(3.0, 4.5);
-    const float kMacroScale = dist_macro_scale(gen);
-
-    // [Detail Scale] 细节缩放：中等 (10.0~14.0)。
-    // 作用：在宏观轮廓上叠加纹理，防止大陆变成圆球。
-    const float kDetailScale = 12.0f;
-
-    // [Sea Level] 海平面：适中 (0.38 ~ 0.45)。
-    // 保证陆地占比在 40%~60% 之间。
-    std::uniform_real_distribution<> dist_sea_level(0.38, 0.45);
-    const float kSeaLevel = dist_sea_level(gen);
-
-    // Offsets / 偏移量
     const float kOffsetX = dist_offset(gen);
     const float kOffsetY = dist_offset(gen);
 
-    // Aspect Ratio / 纵横比修正 (120/50 = 2.4)
-    float aspect_ratio = (float)width / height;
+    std::uniform_real_distribution<> dist_sea_level(0.36, 0.42);
+    const float kSeaLevel = dist_sea_level(gen);
 
-    // Temperature Bias / 气温偏差
-    std::uniform_real_distribution<> dist_temp_bias(-0.15, 0.15);
-    const float kTempBias = dist_temp_bias(gen);
+    // ========================================================================
+    // 步骤 1：生成海陆分布 (Continents)
+    // ========================================================================
+    std::map<Hex, bool> is_land;
 
-    // --------------------------------------------------------------------------
-    // 3. Pass 1: Terrain Generation / 第一遍：地形生成
-    // --------------------------------------------------------------------------
     for (int r = 0; r < height; r++) {
         for (int q = 0; q < width; q++) {
             int ax_r = r;
@@ -94,97 +79,220 @@ std::map<Hex, TileData> MapGenerator::generate(int width, int height) {
             float nx = static_cast<float>(q) / width;
             float ny = static_cast<float>(r) / height;
 
-            // --- Domain Warping / 域扭曲 ---
-            float q_warp = warp_noise.octaveNoise(nx * 3.0f + kOffsetX, ny * 3.0f + kOffsetY, 2, 0.5f);
-            float r_warp = warp_noise.octaveNoise(nx * 3.0f + 5.2f + kOffsetX, ny * 3.0f + 1.3f + kOffsetY, 2, 0.5f);
+            // 生成大陆噪声
+            float continent = continent_noise.octaveNoise(
+                nx * 3.6f * 2.4f + kOffsetX,
+                ny * 3.6f + kOffsetY,
+                4, 0.5f
+            );
 
-            // --- Coordinate Calculation / 坐标计算 ---
-            // Macro coordinates (Low Frequency)
-            float u_macro = (nx * kMacroScale * aspect_ratio) + kOffsetX + (q_warp * 0.1f);
-            float v_macro = (ny * kMacroScale) + kOffsetY + (r_warp * 0.1f);
+            // 边缘衰减
+            float dx = 2.0f * nx - 1.0f;
+            float dy = 2.0f * ny - 1.0f;
+            float edge_dist = std::max(std::abs(dx), std::abs(dy));
+            float edge_fade = SmoothStep(1.0f, 0.87f, edge_dist);
 
-            // Detail coordinates (High Frequency)
-            float u_detail = (nx * kDetailScale * aspect_ratio) + kOffsetX;
-            float v_detail = (ny * kDetailScale) + kOffsetY;
+            continent = continent * edge_fade;
+            continent = std::pow(continent, 1.18f);
 
-            // --- Height Blending / 高度混合 (折中核心) ---
-            float h_macro = macro_noise.octaveNoise(u_macro, v_macro, 4, 0.5f);
-            float h_detail = detail_noise.octaveNoise(u_detail, v_detail, 4, 0.5f);
+            tile.height = continent;
 
-            // Blend: 70% Macro Shape + 30% Detail Ruggedness
-            // 混合公式：70% 的宏观形状 + 30% 的细节粗糙度
-            float e = h_macro * 0.70f + h_detail * 0.30f;
-
-            // --- Vignette / 边缘遮罩 ---
-            // Rectangular mask to utilize the 120 width fully.
-            // 矩形遮罩，只切除最边缘。
-            float x_dist = std::abs(nx - 0.5f) * 2.0f;
-            float y_dist = std::abs(ny - 0.5f) * 2.0f;
-            float x_mask = SmoothStep(1.0f, 0.92f, x_dist); // Only fade last 8%
-            float y_mask = SmoothStep(1.0f, 0.88f, y_dist);
-            e = e * x_mask * y_mask;
-
-            // --- Redistribution / 重分布 ---
-            // Push down valleys to separate continents clearly.
-            // 稍微加强对比度，让海峡更清晰。
-            e = std::pow(e, 1.3f);
-
-            // --- Moisture & Temperature / 湿度与温度 ---
-            // (Same logic as before, works well)
-            float m = moisture_noise.octaveNoise(u_macro * 0.8f + 500, v_macro * 0.8f + 500, 3, 0.5f);
-            m += (1.0f - e) * 0.25f; // Oceans add moisture
-            m = std::max(0.0f, std::min(1.0f, m));
-
-            float temp = 1.0f - std::abs(ny - 0.5f) * 2.0f; // Latitude
-            temp += kTempBias;
-            temp -= e * 0.45f; // Height cooling
-            temp += warp_noise.octaveNoise(nx * 5 + kOffsetX, ny * 5 + kOffsetY, 1, 0.5f) * 0.15f;
-            temp = std::max(0.0f, std::min(1.0f, temp));
-
-            tile.height = e;
-            tile.moisture = m;
-            tile.temperature = temp;
-
-            // --- Classification / 地形分类 ---
-            if (e < kSeaLevel) {
-                tile.type = TerrainType::OCEAN; // BFS will fix coasts
+            if (continent < kSeaLevel) {
+                tile.type = TerrainType::OCEAN;
+                is_land[hex] = false;
             }
             else {
-                // Land logic
-                if (e > 0.90f) {
-                    tile.type = TerrainType::MOUNTAIN;
-                }
-                else {
-                    bool is_cold = (temp < 0.18f);
-                    bool is_dry = (m < 0.22f);
-
-                    if (is_cold) {
-                        tile.type = (temp < 0.08f) ? TerrainType::SNOW : TerrainType::TUNDRA;
-                    }
-                    else if (is_dry) {
-                        tile.type = TerrainType::DESERT;
-                    }
-                    else {
-                        // Greenery Balance
-                        if (m < 0.52f) {
-                            tile.type = TerrainType::PLAINS;
-                        }
-                        else if (temp > 0.72f) {
-                            tile.type = TerrainType::JUNGLE;
-                        }
-                        else {
-                            tile.type = TerrainType::GRASSLAND;
-                        }
-                    }
-                }
+                tile.type = TerrainType::GRASSLAND;
+                is_land[hex] = true;
             }
+
             map_data[hex] = tile;
         }
     }
 
-    // --------------------------------------------------------------------------
-    // 4. Pass 2: BFS Coastline (No changes needed, this part is solid)
-    // --------------------------------------------------------------------------
+    // ========================================================================
+    // 步骤 2：生成散开的条状山脉 (Scattered Strip Ridges)
+    // ========================================================================
+    std::map<Hex, float> ridge_value_map;
+
+    for (auto& pair : map_data) {
+        Hex hex = pair.first;
+        if (!is_land[hex]) {
+            ridge_value_map[hex] = 0.0f;
+            continue;
+        }
+
+        // --- 1. 强力坐标扭曲 (Stronger Warping) ---
+        // 增加扭曲力度，让山脉分布更不规则，模拟板块挤压的随机性
+        float nx = static_cast<float>(hex.q + (hex.r >> 1)) / width;
+        float ny = static_cast<float>(hex.r) / height;
+
+        float warp_strength = 0.12f;
+        float wx = nx + warp_noise.noise(nx * 2.5f, ny * 2.5f) * warp_strength;
+        float wy = ny + warp_noise.noise(nx * 2.5f + 100.0f, ny * 2.5f + 100.0f) * warp_strength;
+
+        // --- 2. 稀疏的各向异性生成 ---
+
+        // 组 A：倾向于横向延伸
+        // 频率降到 0.8 -> 山脉链之间的距离会非常远
+        // 压缩比 10.0 -> 保持条状
+        float ridge_h = ridge_noise1.noise(wx * 0.8f + kOffsetX, wy * 10.0f + kOffsetY);
+        ridge_h = 1.0f - std::abs(ridge_h - 0.5f) * 2.0f;
+        ridge_h = std::pow(ridge_h, 12.0f); // 极细锐化
+
+        // 组 B：倾向于纵向延伸
+        float ridge_v = ridge_noise2.noise(wx * 10.0f + kOffsetX + 500.0f, wy * 0.8f + kOffsetY + 500.0f);
+        ridge_v = 1.0f - std::abs(ridge_v - 0.5f) * 2.0f;
+        ridge_v = std::pow(ridge_v, 12.0f);
+
+        float final_ridge = std::max(ridge_h, ridge_v);
+
+        // --- 3. 关键：打断连续性 (The "Breakup" Pass) ---
+        // 生成一个高频噪声，如果在低值区，就强行把山脉抹掉
+        // 频率 4.0 意味着每隔一段距离就切一刀
+        float breakup = breakup_noise.noise(nx * 4.0f + kOffsetX, ny * 4.0f + kOffsetY);
+
+        // breakup < 0.4 的地方山脉会被切断
+        float breakup_mask = SmoothStep(0.35f, 0.55f, breakup);
+
+        final_ridge *= breakup_mask;
+
+        // --- 4. 区域限制 ---
+        // 依然保留大区域的空白，防止满屏都是碎山
+        float region_mask = continent_noise.noise(nx * 1.5f + kOffsetX, ny * 1.5f + kOffsetY);
+        region_mask = SmoothStep(0.2f, 0.6f, region_mask);
+
+        ridge_value_map[hex] = final_ridge * region_mask;
+    }
+
+    // ========================================================================
+    // 步骤 3：严格阈值化 (Thresholding)
+    // ========================================================================
+    for (auto& pair : map_data) {
+        if (!is_land[pair.first]) continue;
+
+        // 阈值设定：0.18
+        // 配合 pow(12) 和打断噪声，这会留下断断续续的细线
+        if (ridge_value_map[pair.first] > 0.18f) {
+            pair.second.type = TerrainType::MOUNTAIN;
+            pair.second.height = 0.85f + (static_cast<float>(dist_seed(gen)) / 10000.0f) * 0.15f;
+        }
+    }
+
+    // ========================================================================
+    // 步骤 4：形态学细化与去噪 (Morphological Cleaning)
+    // ========================================================================
+    std::map<Hex, TerrainType> temp_types;
+    for (auto& pair : map_data) temp_types[pair.first] = pair.second.type;
+
+    // --- 第一轮：腐蚀 (Erosion) ---
+    // 去除团块，保持条状
+    for (auto& pair : map_data) {
+        Hex hex = pair.first;
+        if (pair.second.type == TerrainType::MOUNTAIN) {
+            int mountain_neighbors = 0;
+            for (const auto& n : GetNeighbors(hex)) {
+                if (map_data.find(n) != map_data.end() && map_data[n].type == TerrainType::MOUNTAIN) {
+                    mountain_neighbors++;
+                }
+            }
+
+            // 如果被 >=5 个山脉包围，说明它是团块的中心，变成平地
+            if (mountain_neighbors >= 5) {
+                temp_types[hex] = TerrainType::GRASSLAND;
+            }
+        }
+    }
+    for (auto& pair : map_data) pair.second.type = temp_types[pair.first];
+
+    // --- 第二轮：去孤点 (Despeckle) ---
+    // 因为我们要散开的山脉，但不要单个格子的噪点
+    for (auto& pair : map_data) temp_types[pair.first] = pair.second.type;
+
+    for (auto& pair : map_data) {
+        Hex hex = pair.first;
+        if (pair.second.type == TerrainType::MOUNTAIN) {
+            int mountain_neighbors = 0;
+            for (const auto& n : GetNeighbors(hex)) {
+                if (map_data.find(n) != map_data.end() && map_data[n].type == TerrainType::MOUNTAIN) {
+                    mountain_neighbors++;
+                }
+            }
+            // 如果完全孤立，删掉
+            if (mountain_neighbors == 0) {
+                temp_types[hex] = TerrainType::GRASSLAND;
+            }
+        }
+        // 注意：这次我不做“填补断点”的操作了，因为你的需求是“散开”
+        // 所以我们允许断裂存在
+    }
+    for (auto& pair : map_data) pair.second.type = temp_types[pair.first];
+
+    // ========================================================================
+    // 步骤 5：生成气候 (Climate: Moisture & Temperature)
+    // ========================================================================
+    for (auto& pair : map_data) {
+        Hex hex = pair.first;
+        TileData& tile = pair.second;
+
+        if (!is_land[hex] || tile.type == TerrainType::MOUNTAIN) continue;
+
+        int offset_r = hex.r;
+        int offset_q = hex.q + (hex.r >> 1);
+        float nx = static_cast<float>(offset_q) / width;
+        float ny = static_cast<float>(offset_r) / height;
+
+        // 1. 湿度
+        float moisture = climate_noise.octaveNoise(
+            nx * 5.5f * 2.4f + kOffsetX + 500.0f,
+            ny * 5.5f + kOffsetY + 500.0f,
+            3, 0.5f
+        );
+
+        // 山脉阻挡效应
+        int mountain_neighbors = 0;
+        for (const auto& n : GetNeighbors(hex)) {
+            if (map_data.find(n) != map_data.end() && map_data[n].type == TerrainType::MOUNTAIN) {
+                mountain_neighbors++;
+            }
+        }
+        moisture += mountain_neighbors * 0.10f;
+        moisture += 0.30f;
+        moisture = std::max(0.0f, std::min(1.0f, moisture));
+
+        // 2. 温度
+        float temperature = 1.0f - std::abs(ny - 0.5f) * 2.0f;
+        temperature += climate_noise.octaveNoise(
+            nx * 4.0f * 2.4f + kOffsetX,
+            ny * 4.0f + kOffsetY,
+            2, 0.5f
+        ) * 0.15f - 0.075f;
+        temperature = std::max(0.0f, std::min(1.0f, temperature));
+
+        tile.moisture = moisture;
+        tile.temperature = temperature;
+
+        // 3. 确定地貌
+        if (temperature < 0.20f) {
+            tile.type = (temperature < 0.10f) ? TerrainType::SNOW : TerrainType::TUNDRA;
+        }
+        else if (moisture < 0.26f) {
+            tile.type = TerrainType::DESERT;
+        }
+        else if (moisture < 0.42f) {
+            tile.type = TerrainType::PLAINS;
+        }
+        else if (temperature > 0.82f && moisture > 0.78f) {
+            tile.type = TerrainType::JUNGLE;
+        }
+        else {
+            tile.type = TerrainType::GRASSLAND;
+        }
+    }
+
+    // ========================================================================
+    // 步骤 6：生成海岸线
+    // ========================================================================
     std::queue<std::pair<Hex, int>> frontier;
     std::map<Hex, bool> visited;
 
@@ -197,7 +305,8 @@ std::map<Hex, TileData> MapGenerator::generate(int width, int height) {
         for (const auto& n : GetNeighbors(current)) {
             if (map_data.find(n) != map_data.end()) {
                 if (map_data[n].type != TerrainType::OCEAN && map_data[n].type != TerrainType::COAST) {
-                    next_to_land = true; break;
+                    next_to_land = true;
+                    break;
                 }
             }
         }
@@ -208,7 +317,7 @@ std::map<Hex, TileData> MapGenerator::generate(int width, int height) {
         }
     }
 
-    const int kMaxCoastWidth = 2; // 2 tiles wide shallow water
+    const int kMaxCoastWidth = 2;
     while (!frontier.empty()) {
         auto t = frontier.front();
         frontier.pop();
@@ -221,6 +330,91 @@ std::map<Hex, TileData> MapGenerator::generate(int width, int height) {
                     visited[n] = true;
                     frontier.push({ n, t.second + 1 });
                 }
+            }
+        }
+    }
+
+    // ========================================================================
+    // 步骤 7：生成河流
+    // ========================================================================
+    std::vector<Hex> all_mountains;
+    std::set<Hex> river_tiles;
+
+    for (auto& pair : map_data) {
+        if (pair.second.type == TerrainType::MOUNTAIN) {
+            all_mountains.push_back(pair.first);
+        }
+    }
+
+    std::uniform_real_distribution<> dist_river_chance(0.0, 1.0);
+
+    for (const auto& mountain_hex : all_mountains) {
+        if (dist_river_chance(gen) > 0.35f) continue;
+
+        std::vector<Hex> start_candidates;
+        for (const auto& n : GetNeighbors(mountain_hex)) {
+            if (map_data.find(n) != map_data.end()) {
+                if (map_data[n].type != TerrainType::MOUNTAIN &&
+                    map_data[n].type != TerrainType::OCEAN &&
+                    map_data[n].type != TerrainType::COAST) {
+                    start_candidates.push_back(n);
+                }
+            }
+        }
+
+        if (start_candidates.empty()) continue;
+
+        std::uniform_int_distribution<> dist_start(0, start_candidates.size() - 1);
+        Hex current = start_candidates[dist_start(gen)];
+
+        std::set<Hex> path_visited;
+        int max_steps = 50;
+
+        for (int step = 0; step < max_steps; step++) {
+            if (path_visited.count(current)) break;
+            path_visited.insert(current);
+
+            if (map_data[current].type == TerrainType::OCEAN ||
+                map_data[current].type == TerrainType::COAST) {
+                break;
+            }
+
+            if (map_data[current].type != TerrainType::MOUNTAIN) {
+                river_tiles.insert(current);
+            }
+
+            Hex next = current;
+            float min_height = map_data[current].height;
+
+            auto neighbors = GetNeighbors(current);
+            for (const auto& n : neighbors) {
+                if (map_data.find(n) != map_data.end() && !path_visited.count(n)) {
+                    float height_with_noise = map_data[n].height +
+                        river_noise.noise(n.q * 0.1f, n.r * 0.1f) * 0.05f;
+
+                    if (height_with_noise < min_height) {
+                        min_height = height_with_noise;
+                        next = n;
+                    }
+                }
+            }
+
+            if (next == current) break;
+            current = next;
+        }
+    }
+
+    // 河流效果
+    for (const auto& river_hex : river_tiles) {
+        if (map_data[river_hex].type == TerrainType::DESERT) map_data[river_hex].type = TerrainType::GRASSLAND;
+        map_data[river_hex].moisture = std::min(1.0f, map_data[river_hex].moisture + 0.22f);
+
+        for (const auto& n : GetNeighbors(river_hex)) {
+            if (map_data.find(n) != map_data.end()) {
+                if (map_data[n].type == TerrainType::DESERT) map_data[n].type = TerrainType::GRASSLAND;
+                else if (map_data[n].type == TerrainType::PLAINS) map_data[n].type = TerrainType::GRASSLAND;
+
+                map_data[n].moisture = std::min(1.0f, map_data[n].moisture + 0.16f);
             }
         }
     }
