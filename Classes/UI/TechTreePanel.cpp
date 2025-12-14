@@ -1,176 +1,332 @@
 #include "TechTreePanel.h"
 #include <sstream>
 
+// TechTreePanelEventListener 实现
+void TechTreePanelEventListener::onTechActivated(int techId, const std::string& techName,
+    const std::string& effect) {
+    if (_owner) {
+        _owner->handleTechActivated(techId, techName, effect);
+    }
+}
+
+void TechTreePanelEventListener::onResearchProgress(int techId, int currentProgress, int totalCost) {
+    if (_owner) {
+        _owner->handleResearchProgress(techId, currentProgress, totalCost);
+    }
+}
+
+void TechTreePanelEventListener::onEurekaTriggered(int techId, const std::string& techName) {
+    if (_owner) {
+        _owner->handleEurekaTriggered(techId, techName);
+    }
+}
+
 bool TechTreePanel::init() {
     if (!Layer::init()) {
         return false;
     }
 
+    // 设置触摸监听器，确保我们能处理触摸事件
+    auto listener = EventListenerTouchOneByOne::create();
+    listener->setSwallowTouches(false);
+    listener->onTouchBegan = [this](Touch* touch, Event* event) -> bool {
+        // 返回false，让触摸事件继续传递
+        return false;
+        };
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, this);
+
+    _eventListener = new TechTreePanelEventListener(this);
     // 获取屏幕尺寸
     auto visibleSize = Director::getInstance()->getVisibleSize();
-    auto origin = Director::getInstance()->getVisibleOrigin();
 
     // 创建背景
-    background = LayerColor::create(Color4B(20, 20, 30, 230));
-    background->setContentSize(visibleSize);
-    background->setPosition(Vec2::ZERO);
-    this->addChild(background, -1);
+    _background = LayerColor::create(Color4B(15, 15, 25, 240));
+    _background->setContentSize(visibleSize);
+    this->addChild(_background, -1);
 
     // 创建标题
-    auto title = Label::createWithTTF("科技树", "fonts/arial.ttf", 36);
-    title->setPosition(Vec2(visibleSize.width / 2, visibleSize.height - 60));
-    title->setColor(Color3B(255, 220, 100));
+    auto title = Label::createWithTTF("科技树", "fonts/arial.ttf", 40);
+    title->setPosition(Vec2(visibleSize.width / 2, visibleSize.height - 50));
+    title->setColor(Color3B(255, 230, 100));
     this->addChild(title);
 
     // 创建滚动视图
-    scrollView = ScrollView::create();
-    scrollView->setContentSize(Size(visibleSize.width - 40, visibleSize.height - 250));
-    scrollView->setPosition(Vec2(20, 120));
-    scrollView->setDirection(ScrollView::Direction::BOTH);
-    scrollView->setBounceEnabled(true);
-    scrollView->setSwallowTouches(true);
-    this->addChild(scrollView);
+    _scrollView = ScrollView::create();
+    _scrollView->setContentSize(Size(visibleSize.width - 40, visibleSize.height - 250));
+    _scrollView->setPosition(Vec2(20, 120));
+    _scrollView->setDirection(ScrollView::Direction::BOTH);
+    _scrollView->setBounceEnabled(true);
+    _scrollView->setSwallowTouches(true);
+    this->addChild(_scrollView);
 
     // 创建内容节点
-    contentNode = Node::create();
-    contentNode->setAnchorPoint(Vec2::ANCHOR_BOTTOM_LEFT);
-    scrollView->addChild(contentNode);
+    _contentNode = Node::create();
+    _contentNode->setAnchorPoint(Vec2::ANCHOR_BOTTOM_LEFT);
+    _scrollView->addChild(_contentNode);
 
     // 设置滚动区域
-    scrollView->setInnerContainerSize(Size(2400, 1400));
-    contentNode->setPosition(0, 0);
+    _scrollView->setInnerContainerSize(Size(ERA_SPACING * 10, visibleSize.height - 200));
+    _contentNode->setPosition(0, 0);
 
     // 创建底部控制面板
-    controlPanel = LayerColor::create(Color4B(40, 40, 50, 200), visibleSize.width - 40, 100);
-    controlPanel->setPosition(Vec2(20, 20));
-    this->addChild(controlPanel);
+    _controlPanel = LayerColor::create(Color4B(30, 30, 40, 220), visibleSize.width - 40, 100);
+    _controlPanel->setPosition(Vec2(20, 20));
+    this->addChild(_controlPanel);
 
     // 当前研究标签
-    currentResearchLabel = Label::createWithTTF("当前研究：无", "fonts/arial.ttf", 20);
-    currentResearchLabel->setPosition(Vec2(visibleSize.width / 2, 70));
-    currentResearchLabel->setColor(Color3B(255, 255, 200));
-    controlPanel->addChild(currentResearchLabel);
+    _currentResearchLabel = Label::createWithTTF("当前研究：无", "fonts/arial.ttf", 22);
+    _currentResearchLabel->setPosition(Vec2(visibleSize.width / 2, 70));
+    _currentResearchLabel->setColor(Color3B(255, 255, 200));
+    _controlPanel->addChild(_currentResearchLabel);
 
     // 研究进度条背景
-    auto progressBg = LayerColor::create(Color4B(50, 50, 50, 255), 300, 20);
-    progressBg->setPosition(Vec2(visibleSize.width / 2 - 150, 40));
-    controlPanel->addChild(progressBg);
+    auto progressBg = LayerColor::create(Color4B(40, 40, 40, 255), 400, 24);
+    progressBg->setPosition(Vec2(visibleSize.width / 2 - 200, 35));
+    _controlPanel->addChild(progressBg);
 
     // 研究进度条
     auto progressSprite = Sprite::create();
     auto progressDrawNode = DrawNode::create();
-    progressDrawNode->drawSolidRect(Vec2::ZERO, Vec2(300, 20), Color4F(0.2f, 0.6f, 0.2f, 1.0f));
+    progressDrawNode->drawSolidRect(Vec2::ZERO, Vec2(400, 24), Color4F(0.1f, 0.6f, 0.1f, 1.0f));
     progressSprite->addChild(progressDrawNode);
 
-    researchProgressBar = ProgressTimer::create(progressSprite);
-    researchProgressBar->setType(ProgressTimer::Type::BAR);
-    researchProgressBar->setMidpoint(Vec2(0, 0));
-    researchProgressBar->setBarChangeRate(Vec2(1, 0));
-    researchProgressBar->setPercentage(0);
-    researchProgressBar->setPosition(Vec2(visibleSize.width / 2, 50));
-    controlPanel->addChild(researchProgressBar);
+    _researchProgressBar = ProgressTimer::create(progressSprite);
+    _researchProgressBar->setType(ProgressTimer::Type::BAR);
+    _researchProgressBar->setMidpoint(Vec2(0, 0));
+    _researchProgressBar->setBarChangeRate(Vec2(1, 0));
+    _researchProgressBar->setPercentage(0);
+    _researchProgressBar->setPosition(Vec2(visibleSize.width / 2, 47));
+    _controlPanel->addChild(_researchProgressBar);
 
     // 每回合科研标签
-    sciencePerTurnLabel = Label::createWithTTF("每回合科研：0", "fonts/arial.ttf", 18);
-    sciencePerTurnLabel->setPosition(Vec2(visibleSize.width / 2, 20));
-    sciencePerTurnLabel->setColor(Color3B(150, 220, 255));
-    controlPanel->addChild(sciencePerTurnLabel);
+    _sciencePerTurnLabel = Label::createWithTTF("每回合科研：0", "fonts/arial.ttf", 18);
+    _sciencePerTurnLabel->setPosition(Vec2(visibleSize.width / 2, 20));
+    _sciencePerTurnLabel->setColor(Color3B(150, 220, 255));
+    _controlPanel->addChild(_sciencePerTurnLabel);
 
-    // 添加关闭按钮
-    auto closeButton = Button::create();
-    closeButton->setTitleText("关闭");
-    closeButton->setTitleFontSize(24);
-    closeButton->setTitleColor(Color3B::WHITE);
-    closeButton->setColor(Color3B(200, 100, 100));
+    // 创建关闭按钮 - 使用Layout作为按钮
+    auto closeButton = Layout::create();
     closeButton->setContentSize(Size(100, 40));
+    closeButton->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
+    closeButton->setBackGroundColor(Color3B(180, 60, 60));
+    closeButton->setBackGroundColorOpacity(200);
+    closeButton->setTouchEnabled(true);
     closeButton->setPosition(Vec2(visibleSize.width - 70, visibleSize.height - 40));
+
+    // 添加关闭按钮文字
+    auto closeLabel = Label::createWithTTF("关闭", "fonts/arial.ttf", 24);
+    closeLabel->setPosition(Vec2(50, 20));
+    closeLabel->setColor(Color3B::WHITE);
+    closeButton->addChild(closeLabel);
+
+    // 关闭按钮事件
     closeButton->addTouchEventListener([this](Ref* sender, Widget::TouchEventType type) {
         if (type == Widget::TouchEventType::ENDED) {
-            this->removeFromParent();
+            // 发送关闭事件
+            auto event = EventCustom("tech_tree_closed");
+            this->getEventDispatcher()->dispatchEvent(&event);
         }
         });
     this->addChild(closeButton);
-
-    // 初始化详情面板
-    detailPanel = nullptr;
 
     return true;
 }
 
 void TechTreePanel::setTechTree(TechTree* tree) {
-    if (techTree) {
-        techTree->removeEventListener(this);
+    if (_techTree) {
+        // 移除旧的事件监听器
+        _techTree->removeEventListener(_eventListener);
     }
 
-    techTree = tree;
+    _techTree = tree;
 
-    if (techTree) {
-        techTree->addEventListener(this);
+    if (_techTree) {
+        // 添加新的事件监听器
+        _techTree->addEventListener(_eventListener);
         refreshUI();
         updateControlPanel();
     }
 }
 
 void TechTreePanel::setSciencePerTurn(int science) {
-    if (sciencePerTurnLabel) {
+    if (_sciencePerTurnLabel) {
         std::string text = "每回合科研：" + std::to_string(science);
-        sciencePerTurnLabel->setString(text);
+        _sciencePerTurnLabel->setString(text);
     }
 }
 
+Node* TechTreePanel::createTechNodeUI(const TechNode* techData) {
+    if (!techData) return nullptr;
+
+    // 创建容器节点
+    auto container = Node::create();
+    container->setContentSize(Size(NODE_WIDTH, NODE_HEIGHT));
+
+    // 创建背景Layout（用于显示颜色）
+    auto background = Layout::create();
+    background->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
+    background->setBackGroundColor(Color3B(64, 64, 89));
+    background->setBackGroundColorOpacity(255);
+    background->setContentSize(Size(NODE_WIDTH, NODE_HEIGHT));
+    background->setTouchEnabled(false);
+    background->setTag(100);
+    container->addChild(background, -1);
+
+    // 使用MenuItem代替Button
+    auto menuItem = MenuItem::create();
+    menuItem->setContentSize(Size(NODE_WIDTH, NODE_HEIGHT));
+    menuItem->setTag(techData->id);
+
+    // 设置回调函数
+    menuItem->setCallback([this, techId = techData->id](Ref* sender) {
+        CCLOG("Tech node clicked: %d", techId);
+        this->showTechDetail(techId);
+
+        if (this->_techTree &&
+            this->_techTree->isResearchable(techId) &&
+            !this->_techTree->isActivated(techId)) {
+            this->setAsCurrentResearch(techId);
+        }
+        });
+
+    // 创建Menu（每个节点一个）
+    auto menu = Menu::create(menuItem, nullptr);
+    menu->setPosition(Vec2::ZERO);
+    container->addChild(menu);
+
+    // 添加边框（使用DrawNode）
+    auto border = DrawNode::create();
+    border->drawRect(Vec2(0, 0), Vec2(NODE_WIDTH, NODE_HEIGHT),
+        Color4F(1.0f, 1.0f, 1.0f, 0.5f));
+    border->setTag(106);
+    container->addChild(border);
+
+    // ... 其他UI元素保持不变 ...
+    // 科技图标
+    auto iconLabel = Label::createWithTTF(techData->name.substr(0, 2), "fonts/arial.ttf", 20);
+    iconLabel->setPosition(Vec2(NODE_WIDTH / 2, NODE_HEIGHT / 2 + 10));
+    iconLabel->setColor(Color3B::WHITE);
+    iconLabel->setTag(101);
+    container->addChild(iconLabel);
+
+    // 科技名称
+    auto nameLabel = Label::createWithTTF(techData->name, "fonts/arial.ttf", 12);
+    nameLabel->setPosition(Vec2(NODE_WIDTH / 2, NODE_HEIGHT / 2 - 15));
+    nameLabel->setColor(Color3B::YELLOW);
+    nameLabel->setTag(102);
+    container->addChild(nameLabel);
+
+    // 科技成本
+    auto costLabel = Label::createWithTTF(std::to_string(techData->cost), "fonts/arial.ttf", 10);
+    costLabel->setPosition(Vec2(NODE_WIDTH / 2, 10));
+    costLabel->setColor(Color3B(180, 180, 255));
+    costLabel->setTag(103);
+    container->addChild(costLabel);
+
+    // 进度条背景
+    auto progressBg = DrawNode::create();
+    progressBg->drawSolidRect(Vec2(5, NODE_HEIGHT - 8),
+        Vec2(NODE_WIDTH - 5, NODE_HEIGHT - 4),
+        Color4F(0.2f, 0.2f, 0.2f, 1.0f));
+    progressBg->setTag(104);
+    container->addChild(progressBg);
+
+    // 进度条
+    auto progressBar = DrawNode::create();
+    progressBar->setTag(105);
+    container->addChild(progressBar);
+
+    return container;
+}
+
+void TechTreePanel::drawRoundedRect(DrawNode* drawNode, const Rect& rect, float radius, const Color4F& color) {
+    float x = rect.getMinX();
+    float y = rect.getMinY();
+    float width = rect.size.width;
+    float height = rect.size.height;
+
+    // 绘制四个圆角
+    drawNode->drawSolidCircle(Vec2(x + radius, y + radius), radius,
+        CC_DEGREES_TO_RADIANS(360), 16, color);
+    drawNode->drawSolidCircle(Vec2(x + width - radius, y + radius), radius,
+        CC_DEGREES_TO_RADIANS(360), 16, color);
+    drawNode->drawSolidCircle(Vec2(x + radius, y + height - radius), radius,
+        CC_DEGREES_TO_RADIANS(360), 16, color);
+    drawNode->drawSolidCircle(Vec2(x + width - radius, y + height - radius), radius,
+        CC_DEGREES_TO_RADIANS(360), 16, color);
+
+    // 绘制四个矩形区域
+    drawNode->drawSolidRect(Vec2(x + radius, y),
+        Vec2(x + width - radius, y + height), color);
+    drawNode->drawSolidRect(Vec2(x, y + radius),
+        Vec2(x + width, y + height - radius), color);
+}
+
 void TechTreePanel::refreshUI() {
-    if (!techTree) return;
+    if (!_techTree) return;
 
     // 清除旧UI
-    contentNode->removeAllChildren();
-    nodeUIMap.clear();
+    _contentNode->removeAllChildren();
+    _nodeUIMap.clear();
+    _techPositions.clear();
+    _techDepth.clear();
+    _techRow.clear();
+    _techByDepth.clear();
 
-    // 创建所有科技节点
-    auto allTechs = techTree->getActivatedTechList();
-    auto researchableTechs = techTree->getResearchableTechList();
-    int currentResearch = techTree->getCurrentResearch();
+    // 第一步：拓扑排序
+    std::vector<int> sortedTechs = topologicalSort();
 
-    // 创建节点
-    for (int i = 1; i <= 24; i++) {
-        auto techInfo = techTree->getTechInfo(i);
+    // 第二步：计算科技深度
+    calculateTechDepths();
+
+    // 第三步：布局算法
+    layoutTechTree();
+
+    // 第四步：创建节点
+    for (int techId : sortedTechs) {
+        auto techInfo = _techTree->getTechInfo(techId);
         if (techInfo) {
             Node* nodeUI = createTechNodeUI(techInfo);
             if (nodeUI) {
-                nodeUIMap[i] = nodeUI;
-                contentNode->addChild(nodeUI);
+                _nodeUIMap[techId] = nodeUI;
+                _contentNode->addChild(nodeUI);
 
-                // 设置位置
-                Vec2 pos = calculateNodePosition(i);
+                // 设置计算好的位置
+                Vec2 pos = _techPositions[techId];
                 nodeUI->setPosition(pos);
             }
         }
     }
 
-    // 创建连接线
-    for (const auto& pair : nodeUIMap) {
-        auto techInfo = techTree->getTechInfo(pair.first);
+    // 第五步：绘制列背景
+    drawColumnBackgrounds();
+
+    // 第六步：创建连接线
+    for (const auto& pair : _nodeUIMap) {
+        int fromTechId = pair.first;
+        auto techInfo = _techTree->getTechInfo(fromTechId);
         if (techInfo) {
-            for (int dstId : techInfo->dstTechList) {
-                createConnectionLine(pair.first, dstId);
+            for (int toTechId : techInfo->dstTechList) {
+                createSplineConnection(fromTechId, toTechId);
             }
         }
     }
 
-    // 更新连接线状态
-    updateConnectionLines();
+    // 第七步：更新节点状态
+    auto researchableTechs = _techTree->getResearchableTechList();
+    int currentResearch = _techTree->getCurrentResearch();
 
-    // 更新节点状态
-    for (const auto& pair : nodeUIMap) {
+    for (const auto& pair : _nodeUIMap) {
         int techId = pair.first;
 
         TechNodeState state = TechNodeState::LOCKED;
-        if (techTree->isActivated(techId)) {
+        if (_techTree->isActivated(techId)) {
             state = TechNodeState::ACTIVATED;
         }
         else if (currentResearch == techId) {
             state = TechNodeState::RESEARCHING;
         }
-        else if (techTree->getTechProgress(techId) > 0) {
+        else if (_techTree->getTechProgress(techId) > 0) {
             state = TechNodeState::IN_PROGRESS;
         }
         else if (std::find(researchableTechs.begin(), researchableTechs.end(), techId) != researchableTechs.end()) {
@@ -181,475 +337,804 @@ void TechTreePanel::refreshUI() {
     }
 }
 
-Node* TechTreePanel::createTechNodeUI(const TechNode* techData) {
-    if (!techData) return nullptr;
+// === 计算科技深度（列数） ===
+void TechTreePanel::calculateTechDepths() {
+    if (!_techTree) return;
 
-    // 创建节点容器
-    auto container = Node::create();
-    container->setContentSize(Size(NODE_SIZE, NODE_SIZE));
+    // 计算每个科技的深度（最大先决路径长度）
+    bool changed = true;
+    int maxIterations = 20;
 
-    // 创建背景按钮
-    auto button = Button::create();
-    button->setContentSize(Size(NODE_SIZE, NODE_SIZE));
-    button->setTag(techData->id);
-    button->addTouchEventListener(CC_CALLBACK_2(TechTreePanel::onTechNodeClicked, this));
+    // 初始化：根节点深度为0，其他为-1
+    for (int i = 1; i <= 24; i++) {
+        auto techInfo = _techTree->getTechInfo(i);
+        if (techInfo && techInfo->srcTechList.empty()) {
+            _techDepth[i] = 0;
+            _techByDepth[0].push_back(i);
+        }
+        else if (techInfo) {
+            _techDepth[i] = -1; // 未计算
+        }
+    }
 
-    // 创建圆形背景
-    auto drawNode = DrawNode::create();
-    drawNode->setTag(100); // 背景标签
-    drawNode->drawSolidCircle(Vec2(NODE_SIZE / 2, NODE_SIZE / 2), NODE_SIZE / 2 - 5,
-        CC_DEGREES_TO_RADIANS(360), 30, Color4F(0.3f, 0.3f, 0.4f, 1.0f));
-    button->addChild(drawNode, -1);
+    // 迭代计算深度
+    for (int iter = 0; iter < maxIterations && changed; iter++) {
+        changed = false;
 
-    // 创建科技图标（用前两个字符表示）
-    auto iconLabel = Label::createWithTTF(techData->name.substr(0, 2), "fonts/arial.ttf", 18);
-    iconLabel->setPosition(Vec2(NODE_SIZE / 2, NODE_SIZE / 2 + 12));
-    iconLabel->setColor(Color3B::WHITE);
-    iconLabel->setTag(101); // 图标标签
-    button->addChild(iconLabel);
+        for (int i = 1; i <= 24; i++) {
+            auto techInfo = _techTree->getTechInfo(i);
+            if (!techInfo || _techDepth[i] != -1) continue;
 
-    // 创建科技名称标签
-    auto nameLabel = Label::createWithTTF(techData->name, "fonts/arial.ttf", 14);
-    nameLabel->setPosition(Vec2(NODE_SIZE / 2, NODE_SIZE / 2 - 20));
-    nameLabel->setColor(Color3B::YELLOW);
-    nameLabel->setTag(102); // 名称标签
-    button->addChild(nameLabel);
+            // 检查所有先决科技是否都有深度
+            bool allParentsHaveDepth = true;
+            int maxParentDepth = -1;
 
-    // 创建成本标签
-    auto costLabel = Label::createWithTTF(std::to_string(techData->cost), "fonts/arial.ttf", 12);
-    costLabel->setPosition(Vec2(NODE_SIZE / 2, 15));
-    costLabel->setColor(Color3B(200, 200, 255));
-    costLabel->setTag(103); // 成本标签
-    button->addChild(costLabel);
+            for (int parentId : techInfo->srcTechList) {
+                if (_techDepth.find(parentId) == _techDepth.end() || _techDepth[parentId] == -1) {
+                    allParentsHaveDepth = false;
+                    break;
+                }
+                maxParentDepth = std::max(maxParentDepth, _techDepth[parentId]);
+            }
 
-    // 创建进度条背景
-    auto progressBg = DrawNode::create();
-    progressBg->drawSolidRect(Vec2(5, 5), Vec2(NODE_SIZE - 5, 10), Color4F(0.2f, 0.2f, 0.2f, 1.0f));
-    progressBg->setTag(104); // 进度条背景标签
-    button->addChild(progressBg);
+            if (allParentsHaveDepth && maxParentDepth != -1) {
+                _techDepth[i] = maxParentDepth + 1;
+                _techByDepth[_techDepth[i]].push_back(i);
+                changed = true;
+            }
+        }
+    }
 
-    // 创建进度条
-    auto progressBar = DrawNode::create();
-    progressBar->setTag(105); // 进度条标签
-    button->addChild(progressBar);
-
-    container->addChild(button);
-    return container;
+    // 确保所有科技都有深度
+    for (int i = 1; i <= 24; i++) {
+        if (_techDepth.find(i) == _techDepth.end() || _techDepth[i] == -1) {
+            // 找不到先决关系的孤立节点，放在第一列
+            _techDepth[i] = 0;
+            _techByDepth[0].push_back(i);
+        }
+    }
 }
 
-void TechTreePanel::createConnectionLine(int fromTechId, int toTechId) {
-    auto fromNode = nodeUIMap[fromTechId];
-    auto toNode = nodeUIMap[toTechId];
+// === 文明6风格的布局算法 ===
+void TechTreePanel::layoutTechTree() {
+    const float COLUMN_SPACING = 200.0f;   // 列间距
+    const float ROW_SPACING = 100.0f;      // 行间距
+    const float BASE_X = 80.0f;            // 起始X坐标
+    const float BASE_Y = 300.0f;           // 起始Y坐标（提高基准位置）
+
+    // 第一步：确定每列的科技并排序
+    std::unordered_map<int, std::vector<int>> columnTechs = _techByDepth;
+
+    // 按先决关系对每列的科技进行排序
+    for (auto& columnPair : columnTechs) {
+        std::sort(columnPair.second.begin(), columnPair.second.end(),
+            [this](int a, int b) {
+                auto infoA = _techTree->getTechInfo(a);
+                auto infoB = _techTree->getTechInfo(b);
+                if (!infoA || !infoB) return a < b;
+
+                // 优先按子节点数量排序（子节点多的在上）
+                int childrenA = infoA->dstTechList.size();
+                int childrenB = infoB->dstTechList.size();
+                if (childrenA != childrenB) {
+                    return childrenA > childrenB;
+                }
+
+                // 其次按父节点数量排序（父节点多的在下）
+                int parentsA = infoA->srcTechList.size();
+                int parentsB = infoB->srcTechList.size();
+                if (parentsA != parentsB) {
+                    return parentsA < parentsB;
+                }
+
+                return a < b;
+            });
+    }
+
+    // 第二步：为每个科技分配行号
+    for (const auto& columnPair : columnTechs) {
+        int column = columnPair.first;
+        const auto& techsInColumn = columnPair.second;
+
+        // 修正：使用正确的中心行计算
+        int totalNodes = techsInColumn.size();
+        float centerRow = (totalNodes - 1) / 2.0f; // 使用浮点数确保精确
+
+        for (size_t i = 0; i < techsInColumn.size(); i++) {
+            int techId = techsInColumn[i];
+
+            // 修正：使用浮点数计算行偏移
+            float rowOffset = static_cast<float>(i) - centerRow;
+
+            // 计算基础位置
+            float x = BASE_X + column * COLUMN_SPACING;
+            float y = BASE_Y + rowOffset * ROW_SPACING;
+
+            // 确保Y坐标在合理范围内（避免超出屏幕）
+            y = std::max(100.0f, std::min(y, 600.0f));
+
+            _techPositions[techId] = Vec2(x, y);
+        }
+    }
+
+    // 第三步：调整位置避免重叠并优化连接线
+    adjustPositionsForConnections();
+}
+
+// === 调整位置优化连接线 ===
+void TechTreePanel::adjustPositionsForConnections() {
+    if (!_techTree) return;
+
+    const float MAX_ADJUSTMENT = 60.0f;
+    const int MAX_ITERATIONS = 50;
+    const float MIN_Y = 100.0f;    // 最小Y坐标
+    const float MAX_Y = 600.0f;    // 最大Y坐标
+
+    for (int iter = 0; iter < MAX_ITERATIONS; iter++) {
+        bool adjusted = false;
+
+        // 收集所有连接线
+        std::vector<std::pair<int, int>> connections;
+        for (const auto& pair : _nodeUIMap) {
+            int fromTechId = pair.first;
+            auto techInfo = _techTree->getTechInfo(fromTechId);
+            if (techInfo) {
+                for (int toTechId : techInfo->dstTechList) {
+                    connections.push_back({ fromTechId, toTechId });
+                }
+            }
+        }
+
+        // 调整连接线交叉
+        for (size_t i = 0; i < connections.size(); i++) {
+            for (size_t j = i + 1; j < connections.size(); j++) {
+                auto& conn1 = connections[i];
+                auto& conn2 = connections[j];
+
+                Vec2 start1 = _techPositions[conn1.first];
+                Vec2 end1 = _techPositions[conn1.second];
+                Vec2 start2 = _techPositions[conn2.first];
+                Vec2 end2 = _techPositions[conn2.second];
+
+                // 检查连接线是否交叉
+                if (doLinesCross(start1, end1, start2, end2)) {
+                    // 调整后一个连接的节点位置
+                    int adjustTech = conn2.second;
+                    Vec2 pos = _techPositions[adjustTech];
+
+                    // 尝试向上或向下调整
+                    if (iter % 2 == 0) {
+                        pos.y += MAX_ADJUSTMENT / 2;
+                    }
+                    else {
+                        pos.y -= MAX_ADJUSTMENT / 2;
+                    }
+
+                    // 确保调整后的位置在合理范围内
+                    pos.y = std::max(MIN_Y, std::min(pos.y, MAX_Y));
+
+                    _techPositions[adjustTech] = pos;
+                    adjusted = true;
+                }
+            }
+        }
+
+        // 如果没有调整或调整次数达到上限，退出
+        if (!adjusted) break;
+    }
+
+    // 第四步：确保同一列中的节点不会重叠
+    for (const auto& columnPair : _techByDepth) {
+        int column = columnPair.first;
+        const auto& techsInColumn = columnPair.second;
+
+        // 按Y坐标排序
+        std::vector<int> sortedTechs = techsInColumn;
+        std::sort(sortedTechs.begin(), sortedTechs.end(),
+            [this](int a, int b) {
+                return _techPositions[a].y < _techPositions[b].y;
+            });
+
+        // 检查并调整重叠的节点
+        for (size_t i = 1; i < sortedTechs.size(); i++) {
+            int prevId = sortedTechs[i - 1];
+            int currId = sortedTechs[i];
+
+            Vec2 prevPos = _techPositions[prevId];
+            Vec2 currPos = _techPositions[currId];
+
+            // 如果两个节点太接近，调整位置
+            float minSpacing = NODE_HEIGHT + 40.0f; // 最小间距
+            if (currPos.y - prevPos.y < minSpacing) {
+                // 平均分配空间
+                float newPrevY = (prevPos.y + currPos.y - minSpacing) / 2.0f;
+                float newCurrY = (prevPos.y + currPos.y + minSpacing) / 2.0f;
+
+                // 确保不超出边界
+                newPrevY = std::max(MIN_Y, std::min(newPrevY, MAX_Y - minSpacing));
+                newCurrY = std::max(MIN_Y + minSpacing, std::min(newCurrY, MAX_Y));
+
+                _techPositions[prevId].y = newPrevY;
+                _techPositions[currId].y = newCurrY;
+            }
+        }
+    }
+}
+
+// === 检查两条线段是否相交 ===
+bool TechTreePanel::doLinesCross(const Vec2& p1, const Vec2& p2,
+    const Vec2& q1, const Vec2& q2) {
+    // 简化实现：检查边界框是否相交
+    Rect rect1(std::min(p1.x, p2.x), std::min(p1.y, p2.y),
+        abs(p1.x - p2.x), abs(p1.y - p2.y));
+    Rect rect2(std::min(q1.x, q2.x), std::min(q1.y, q2.y),
+        abs(q1.x - q2.x), abs(q1.y - q2.y));
+
+    return rect1.intersectsRect(rect2);
+}
+
+// === 创建样条曲线连接 ===
+void TechTreePanel::createSplineConnection(int fromTechId, int toTechId) {
+    auto fromNode = _nodeUIMap[fromTechId];
+    auto toNode = _nodeUIMap[toTechId];
 
     if (!fromNode || !toNode) return;
 
-    // 计算起始和结束位置
-    Vec2 startPos = fromNode->getPosition() + Vec2(NODE_SIZE / 2, NODE_SIZE / 2);
-    Vec2 endPos = toNode->getPosition() + Vec2(NODE_SIZE / 2, NODE_SIZE / 2);
+    Vec2 startPos = fromNode->getPosition() + Vec2(NODE_WIDTH, NODE_HEIGHT / 2);
+    Vec2 endPos = toNode->getPosition() + Vec2(0, NODE_HEIGHT / 2);
 
-    // 创建线条
     auto drawNode = DrawNode::create();
-    drawNode->drawSegment(startPos, endPos, LINE_WIDTH, LINE_COLOR);
 
-    // 将线条添加到内容节点（在节点下面）
-    contentNode->addChild(drawNode, -1);
+    // 文明6风格的连线：水平-垂直-水平 折线
+    float midX = (startPos.x + endPos.x) / 2;
 
-    // 标记线条，用于后续更新
-    std::string tag = "line_" + std::to_string(fromTechId) + "_" + std::to_string(toTechId);
-    drawNode->setName(tag);
+    // 根据状态决定连线颜色
+    Color4F lineColor = Color4F(0.3f, 0.3f, 0.4f, 0.6f); // 默认灰色
+
+    bool fromActivated = _techTree->isActivated(fromTechId);
+    bool toActivated = _techTree->isActivated(toTechId);
+    int currentResearch = _techTree->getCurrentResearch();
+
+    if (fromActivated && toActivated) {
+        lineColor = Color4F(0.0f, 0.8f, 0.0f, 0.8f); // 绿色：都已激活
+    }
+    else if ((fromActivated && toTechId == currentResearch) ||
+        (fromTechId == currentResearch && toActivated)) {
+        lineColor = Color4F(0.9f, 0.7f, 0.1f, 0.9f); // 金色：与当前研究相关
+    }
+    else if (_techTree->getTechProgress(toTechId) > 0) {
+        lineColor = Color4F(0.2f, 0.6f, 0.2f, 0.7f); // 浅绿：有进度
+    }
+
+    // 绘制三段线：水平-垂直-水平
+    drawNode->drawSegment(startPos, Vec2(midX, startPos.y), 2.0f, lineColor);
+    drawNode->drawSegment(Vec2(midX, startPos.y), Vec2(midX, endPos.y), 2.0f, lineColor);
+    drawNode->drawSegment(Vec2(midX, endPos.y), endPos, 2.0f, lineColor);
+
+    // 在拐角处添加圆点
+    drawNode->drawSolidCircle(Vec2(midX, startPos.y), 4.0f,
+        CC_DEGREES_TO_RADIANS(360), 8, lineColor);
+    drawNode->drawSolidCircle(Vec2(midX, endPos.y), 4.0f,
+        CC_DEGREES_TO_RADIANS(360), 8, lineColor);
+
+    //// 添加箭头（指向子节点）
+    //Vec2 dir = (endPos - Vec2(midX, endPos.y)).getNormalized();
+    //Vec2 arrowTip = endPos - dir * 10.0f; // 稍微回退一点
+    //Vec2 wing1 = arrowTip - dir * 8.0f + Vec2(-dir.y, dir.x) * 5.0f;
+    //Vec2 wing2 = arrowTip - dir * 8.0f + Vec2(dir.y, -dir.x) * 5.0f;
+    //drawNode->drawSolidTriangle(arrowTip, wing1, wing2, lineColor);
+
+    _contentNode->addChild(drawNode, -5);
+}
+
+// === 绘制列背景 ===
+void TechTreePanel::drawColumnBackgrounds() {
+    // 找到最大列数
+    int maxColumn = 0;
+    for (const auto& pair : _techDepth) {
+        maxColumn = std::max(maxColumn, pair.second);
+    }
+
+    // 绘制列背景
+    const float COLUMN_WIDTH = 180.0f;
+    const float PADDING = 20.0f;
+    const float BACKGROUND_HEIGHT = 700.0f; // 增加背景高度
+    const float BACKGROUND_BOTTOM = 50.0f;   // 背景底部位置
+
+    for (int col = 0; col <= maxColumn; col++) {
+        float x = 60 + col * 200 - PADDING;
+        float width = COLUMN_WIDTH + PADDING * 2;
+
+        auto columnBg = DrawNode::create();
+        Color4F bgColor = Color4F(0.05f, 0.05f, 0.08f, 0.3f);
+
+        // 绘制圆角矩形列背景
+        Rect columnRect(x, BACKGROUND_BOTTOM, width, BACKGROUND_HEIGHT);
+        drawRoundedRect(columnBg, columnRect, 10.0f, bgColor);
+
+        _contentNode->addChild(columnBg, -10);
+
+        // 添加列标签（时代名称）
+        std::string columnLabel;
+        if (col == 0) columnLabel = "远古时代";
+        else if (col == 1) columnLabel = "古典时代";
+        else if (col == 2) columnLabel = "中世纪";
+        else if (col == 3) columnLabel = "文艺复兴";
+        else if (col == 4) columnLabel = "工业时代";
+        else if (col == 5) columnLabel = "现代";
+        else columnLabel = "未来时代";
+
+        auto label = Label::createWithTTF(columnLabel, "fonts/arial.ttf", 18);
+        label->setPosition(Vec2(x + width / 2, BACKGROUND_BOTTOM + BACKGROUND_HEIGHT + 20));
+        label->setColor(Color3B(220, 220, 255));
+        _contentNode->addChild(label, -5);
+    }
+}
+
+// === 修改拓扑排序函数（优化版） ===
+std::vector<int> TechTreePanel::topologicalSort() {
+    std::vector<int> result;
+    if (!_techTree) return result;
+
+    // 收集所有科技ID
+    std::vector<int> allTechs;
+    for (int i = 1; i <= 24; i++) {
+        if (_techTree->getTechInfo(i)) {
+            allTechs.push_back(i);
+        }
+    }
+
+    // 计算入度
+    std::unordered_map<int, int> inDegree;
+    std::queue<int> zeroInDegree;
+
+    for (int techId : allTechs) {
+        auto techInfo = _techTree->getTechInfo(techId);
+        if (techInfo) {
+            inDegree[techId] = techInfo->srcTechList.size();
+            if (inDegree[techId] == 0) {
+                zeroInDegree.push(techId);
+            }
+        }
+    }
+
+    // 拓扑排序（Kahn算法）
+    while (!zeroInDegree.empty()) {
+        int current = zeroInDegree.front();
+        zeroInDegree.pop();
+        result.push_back(current);
+
+        auto techInfo = _techTree->getTechInfo(current);
+        if (techInfo) {
+            for (int childId : techInfo->dstTechList) {
+                if (--inDegree[childId] == 0) {
+                    zeroInDegree.push(childId);
+                }
+            }
+        }
+    }
+
+    return result;
 }
 
 void TechTreePanel::updateNodeUIState(int techId, TechNodeState state) {
-    auto nodeUI = nodeUIMap[techId];
-    if (!nodeUI) return;
+    auto container = _nodeUIMap[techId];
+    if (!container) return;
 
-    auto button = dynamic_cast<Button*>(nodeUI->getChildren().at(0));
-    if (!button) return;
+    // 获取正确的菜单项
+    Menu* menu = nullptr;
+    MenuItem* menuItem = nullptr;
 
-    auto drawNode = dynamic_cast<DrawNode*>(button->getChildByTag(100));
-    auto iconLabel = dynamic_cast<Label*>(button->getChildByTag(101));
-    auto nameLabel = dynamic_cast<Label*>(button->getChildByTag(102));
-    auto costLabel = dynamic_cast<Label*>(button->getChildByTag(103));
-    auto progressBar = dynamic_cast<DrawNode*>(button->getChildByTag(105));
+    // 查找 Menu
+    for (auto child : container->getChildren()) {
+        menu = dynamic_cast<Menu*>(child);
+        if (menu) break;
+    }
 
-    if (!drawNode || !iconLabel || !nameLabel || !costLabel || !progressBar) return;
+    if (menu && menu->getChildrenCount() > 0) {
+        menuItem = dynamic_cast<MenuItem*>(menu->getChildren().at(0));
+    }
 
-    Color4F bgColor;
+    // 根据状态设置 MenuItem
+    if (menuItem) {
+        switch (state) {
+            case TechNodeState::LOCKED:
+                menuItem->setEnabled(false);
+                // MenuItem没有setBright方法，所以不需要调用
+                break;
+            case TechNodeState::RESEARCHABLE:
+            case TechNodeState::RESEARCHING:
+            case TechNodeState::IN_PROGRESS:
+                menuItem->setEnabled(true);
+                break;
+            case TechNodeState::ACTIVATED:
+                menuItem->setEnabled(false); // 已激活的科技不可点击
+                break;
+        }
+    }
+
+    // 获取背景（Layout）
+    auto background = dynamic_cast<Layout*>(container->getChildByTag(100));
+    auto iconLabel = dynamic_cast<Label*>(container->getChildByTag(101));
+    auto nameLabel = dynamic_cast<Label*>(container->getChildByTag(102));
+    auto costLabel = dynamic_cast<Label*>(container->getChildByTag(103));
+    auto border = dynamic_cast<DrawNode*>(container->getChildByTag(106));
+    auto progressBar = dynamic_cast<DrawNode*>(container->getChildByTag(105));
+
+    if (!background || !iconLabel || !nameLabel || !costLabel || !border) {
+        CCLOG("ERROR: Failed to get UI elements for tech %d", techId);
+        return;
+    }
+
+    Color3B bgColor;
     Color3B iconColor = Color3B::WHITE;
     Color3B nameColor = Color3B::YELLOW;
-    Color3B costColor = Color3B(200, 200, 255);
+    Color3B costColor = Color3B(180, 180, 255);
+    Color4F borderColor = Color4F(1.0f, 1.0f, 1.0f, 0.3f);
 
     // 根据状态设置颜色
     switch (state) {
         case TechNodeState::LOCKED:
-            bgColor = Color4F(0.3f, 0.3f, 0.4f, 1.0f);
-            button->setEnabled(false);
-            iconColor = Color3B(150, 150, 150);
+            bgColor = Color3B(64, 64, 89); // 保持原来的深蓝色
+            iconColor = Color3B(120, 120, 120);
             nameColor = Color3B(150, 150, 100);
-            costColor = Color3B(150, 150, 200);
+            costColor = Color3B(120, 120, 180);
+            borderColor = Color4F(0.5f, 0.5f, 0.5f, 0.3f);
             break;
         case TechNodeState::RESEARCHABLE:
-            bgColor = Color4F(0.4f, 0.4f, 0.6f, 1.0f);
-            button->setEnabled(true);
+            bgColor = Color3B(89, 89, 127); // 更亮的蓝色
+            borderColor = Color4F(0.8f, 0.8f, 0.2f, 0.8f); // 金色边框
             break;
         case TechNodeState::RESEARCHING:
-            bgColor = Color4F(0.8f, 0.6f, 0.2f, 1.0f); // 金色表示当前研究
-            button->setEnabled(true);
-            nameColor = Color3B(255, 200, 100);
+            bgColor = Color3B(204, 153, 25); // 金色
+            nameColor = Color3B(255, 230, 100);
+            borderColor = Color4F(1.0f, 0.9f, 0.2f, 1.0f);
             break;
         case TechNodeState::IN_PROGRESS:
-            bgColor = Color4F(0.5f, 0.5f, 0.3f, 1.0f); // 土黄色表示有进度但未研究
-            button->setEnabled(true);
+            bgColor = Color3B(127, 127, 76); // 土黄色
             break;
         case TechNodeState::ACTIVATED:
-            bgColor = Color4F(0.3f, 0.6f, 0.3f, 1.0f);
-            button->setEnabled(false);
+            bgColor = Color3B(51, 127, 51); // 绿色
             iconColor = Color3B(200, 255, 200);
-            nameColor = Color3B(200, 255, 100);
-            costColor = Color3B(180, 220, 255);
+            nameColor = Color3B(180, 255, 180);
+            borderColor = Color4F(0.2f, 0.8f, 0.2f, 1.0f);
             break;
     }
 
-    // 更新背景颜色
-    drawNode->clear();
-    drawNode->drawSolidCircle(Vec2(NODE_SIZE / 2, NODE_SIZE / 2), NODE_SIZE / 2 - 5,
-        CC_DEGREES_TO_RADIANS(360), 30, bgColor);
+    // 更新背景颜色（使用Layout的setBackGroundColor）
+    background->setBackGroundColor(bgColor);
 
-    // 添加边框
-    drawNode->drawCircle(Vec2(NODE_SIZE / 2, NODE_SIZE / 2), NODE_SIZE / 2 - 5,
-        CC_DEGREES_TO_RADIANS(360), 30, false, Color4F(1.0f, 1.0f, 1.0f, 0.5f));
+    // 更新边框
+    border->clear();
+    border->drawRect(Vec2(2, 2), Vec2(NODE_WIDTH - 2, NODE_HEIGHT - 2), borderColor);
 
     // 更新文本颜色
     iconLabel->setColor(iconColor);
     nameLabel->setColor(nameColor);
     costLabel->setColor(costColor);
 
-    // 更新进度条
-    if (techTree) {
-        int progress = techTree->getTechProgress(techId);
-        int cost = techTree->getTechCost(techId);
+    // 更新进度条（如果有）
+    if (progressBar && _techTree) {
+        int progress = _techTree->getTechProgress(techId);
+        int cost = _techTree->getTechCost(techId);
 
         if (cost > 0 && progress > 0) {
-            float width = (NODE_SIZE - 10) * ((float)progress / cost);
+            float width = (NODE_WIDTH - 10) * ((float)progress / cost);
             progressBar->clear();
 
-            // 根据状态使用不同颜色的进度条
             Color4F progressColor;
             if (state == TechNodeState::RESEARCHING) {
-                progressColor = Color4F(0.9f, 0.7f, 0.1f, 1.0f); // 金色进度条
+                progressColor = Color4F(0.9f, 0.7f, 0.1f, 1.0f); // 金色
             }
             else if (state == TechNodeState::ACTIVATED) {
-                progressColor = Color4F(0.2f, 0.8f, 0.2f, 1.0f); // 绿色进度条
+                progressColor = Color4F(0.1f, 0.8f, 0.1f, 1.0f); // 绿色
             }
             else {
-                progressColor = Color4F(0.2f, 0.6f, 0.2f, 1.0f); // 普通绿色
+                progressColor = Color4F(0.2f, 0.6f, 0.2f, 1.0f); // 深绿
             }
 
-            progressBar->drawSolidRect(Vec2(5, 5), Vec2(5 + width, 10), progressColor);
-        }
-        else {
-            progressBar->clear();
-        }
+            progressBar->drawSolidRect(Vec2(5, NODE_HEIGHT - 8),
+                Vec2(5 + width, NODE_HEIGHT - 4), progressColor);
 
-        // 更新成本显示（显示进度/成本）
-        if (progress > 0) {
+            // 更新成本显示为进度
             std::string progressText = std::to_string(progress) + "/" + std::to_string(cost);
             costLabel->setString(progressText);
         }
-    }
-}
-
-Vec2 TechTreePanel::calculateNodePosition(int techId) {
-    // 根据科技ID和时代计算位置
-    int era = getTechEra(techId);
-    int indexInEra = 0;
-
-    // 计算同一时代中的索引
-    std::vector<int> eraTechs;
-    switch (era) {
-        case 1: eraTechs = { 1, 2 }; break;
-        case 2: eraTechs = { 3, 4 }; break;
-        case 3: eraTechs = { 5, 6, 7 }; break;
-        case 4: eraTechs = { 8, 9, 10, 11 }; break;
-        case 5: eraTechs = { 12, 13 }; break;
-        case 6: eraTechs = { 14, 15 }; break;
-        case 7: eraTechs = { 16, 17, 18, 19 }; break;
-        case 8: eraTechs = { 20, 21 }; break;
-        case 9: eraTechs = { 22, 23, 24 }; break;
-    }
-
-    // 找到在时代中的位置
-    for (size_t i = 0; i < eraTechs.size(); i++) {
-        if (eraTechs[i] == techId) {
-            indexInEra = static_cast<int>(i);
-            break;
+        else {
+            progressBar->clear();
+            // 如果没有进度，显示原始成本
+            auto techInfo = _techTree->getTechInfo(techId);
+            if (techInfo) {
+                costLabel->setString(std::to_string(techInfo->cost));
+            }
         }
     }
-
-    // 计算位置
-    float x = 200 + era * 200;
-    float y = 400 + (indexInEra - eraTechs.size() / 2.0f + 0.5f) * 180;
-
-    return Vec2(x, y);
-}
-
-int TechTreePanel::getTechEra(int techId) const {
-    // 根据之前的分层确定时代
-    if (techId <= 2) return 1;
-    else if (techId <= 4) return 2;
-    else if (techId <= 7) return 3;
-    else if (techId <= 11) return 4;
-    else if (techId <= 13) return 5;
-    else if (techId <= 15) return 6;
-    else if (techId <= 19) return 7;
-    else if (techId <= 21) return 8;
-    else return 9;
-}
-
-void TechTreePanel::layoutTechTree() {
-    // 使用calculateNodePosition自动布局
-    // 这个函数现在可以保持为空，或者用于额外的布局调整
 }
 
 void TechTreePanel::onTechNodeClicked(Ref* sender, Widget::TouchEventType type) {
     if (type != Widget::TouchEventType::ENDED) return;
 
     auto button = dynamic_cast<Button*>(sender);
-    if (!button || !techTree) return;
+    if (!button || !_techTree) return;
 
     int techId = button->getTag();
-
-    // 显示科技详情
     showTechDetail(techId);
 
-    // 如果可研究且未激活，提供设置为当前研究的选项
-    if (techTree->isResearchable(techId) && !techTree->isActivated(techId)) {
+    //CCLOG("==========================================");
+    //CCLOG("TECH NODE CLICK EVENT");
+    //CCLOG("Button clicked for tech ID: %d", techId);
+    //CCLOG("Calling showTechDetail...");
+
+    //// 添加一个直接的测试，确保函数被调用
+    //auto testLabel = Label::createWithTTF("TEST DIRECT - Before showDetail",
+    //    "fonts/arial.ttf", 20);
+    //testLabel->setPosition(Vec2(200, 300));
+    //testLabel->setColor(Color3B::RED);
+    //this->addChild(testLabel, 1000);
+    //testLabel->runAction(Sequence::create(
+    //    DelayTime::create(1.0f),
+    //    FadeOut::create(0.5f),
+    //    RemoveSelf::create(),
+    //    nullptr
+    //));
+
+    //// 然后调用 showDetail
+    //this->showTechDetail(techId);
+
+    //// 再添加一个测试标签
+    //auto testLabel2 = Label::createWithTTF("TEST DIRECT - After showDetail",
+    //    "fonts/arial.ttf", 20);
+    //testLabel2->setPosition(Vec2(200, 250));
+    //testLabel2->setColor(Color3B::GREEN);
+    //this->addChild(testLabel2, 1000);
+    //testLabel2->runAction(Sequence::create(
+    //    DelayTime::create(1.0f),
+    //    FadeOut::create(0.5f),
+    //    RemoveSelf::create(),
+    //    nullptr
+    //));
+
+    //CCLOG("showTechDetail called");
+
+    if (_techTree->isResearchable(techId) && !_techTree->isActivated(techId)) {
         setAsCurrentResearch(techId);
     }
 }
 
 void TechTreePanel::showTechDetail(int techId) {
-    auto techInfo = techTree->getTechInfo(techId);
-    if (!techInfo) return;
+
+    CCLOG("showTechDetail called for tech: %d", techId);
+
+    if (!_techTree) {
+        CCLOG("ERROR: _techTree is null!");
+        return;
+    }
+
+    auto techInfo = _techTree->getTechInfo(techId);
+    if (!techInfo) {
+        CCLOG("ERROR: No tech info for id: %d", techId);
+        return;
+    }
+
+    CCLOG("Tech name: %s", techInfo->name.c_str());
 
     // 隐藏旧的详情面板
     hideTechDetail();
 
-    // 创建新的详情面板
+    // 确保在主线程创建UI
     auto visibleSize = Director::getInstance()->getVisibleSize();
 
-    detailPanel = LayerColor::create(Color4B(0, 0, 0, 220), 350, 250);
-    detailPanel->setPosition(Vec2(visibleSize.width - 370, 150));
-    detailPanel->setName("detail_panel");
+    // 创建详情面板 - 确保位置在可见区域内
+    _detailPanel = LayerColor::create(Color4B(0, 0, 0, 220), 350, 250);
+
+    // 计算位置，确保不超出屏幕
+    float panelX = visibleSize.width - 370;
+    float panelY = 150;
+
+    // 如果超出右边界，调整位置
+    if (panelX < 20) {
+        panelX = 20;
+    }
+
+    // 如果超出上边界，调整位置
+    if (panelY + 250 > visibleSize.height - 100) {
+        panelY = visibleSize.height - 350;
+    }
+
+    _detailPanel->setPosition(Vec2(panelX, panelY));
+    _detailPanel->setName("detail_panel");
+
+    // 添加详情面板到TechTreePanel，而不是场景
+    this->addChild(_detailPanel, 10);
 
     // 科技名称
     auto nameLabel = Label::createWithTTF(techInfo->name, "fonts/arial.ttf", 28);
     nameLabel->setPosition(Vec2(175, 200));
     nameLabel->setColor(Color3B::YELLOW);
-    detailPanel->addChild(nameLabel);
+    _detailPanel->addChild(nameLabel);
 
-    // 成本信息
-    int progress = techTree->getTechProgress(techId);
-    int cost = techTree->getTechCost(techId);
-    int percent = (cost > 0) ? (progress * 100 / cost) : 0;
-
-    std::string costText = "科技值: " + std::to_string(progress) + "/" + std::to_string(cost);
-    costText += " (" + std::to_string(percent) + "%)";
-
-    auto costLabel = Label::createWithTTF(costText, "fonts/arial.ttf", 20);
-    costLabel->setPosition(Vec2(175, 160));
-    costLabel->setColor(Color3B(150, 220, 255));
-    detailPanel->addChild(costLabel);
-
-    // 效果描述
+    // 科技效果
     auto effectLabel = Label::createWithTTF(techInfo->effectDescription, "fonts/arial.ttf", 18);
-    effectLabel->setPosition(Vec2(175, 100));
+    effectLabel->setPosition(Vec2(175, 120));
     effectLabel->setDimensions(320, 120);
     effectLabel->setAlignment(TextHAlignment::LEFT);
     effectLabel->setVerticalAlignment(TextVAlignment::TOP);
     effectLabel->setColor(Color3B::WHITE);
-    detailPanel->addChild(effectLabel);
+    _detailPanel->addChild(effectLabel);
 
     // 研究状态
     std::string statusText;
-    if (techTree->isActivated(techId)) {
-        statusText = "已研发";
+    if (_techTree->isActivated(techId)) {
+        statusText = "Already researched";
     }
-    else if (techTree->getCurrentResearch() == techId) {
-        statusText = "研究中...";
+    else if (_techTree->getCurrentResearch() == techId) {
+        statusText = "Researching...";
     }
-    else if (progress > 0) {
-        statusText = "有进度";
+    else if (_techTree->getTechProgress(techId) > 0) {
+        statusText = "Has progress";
     }
-    else if (techTree->isResearchable(techId)) {
-        statusText = "可研究";
+    else if (_techTree->isResearchable(techId)) {
+        statusText = "Researchable";
+
+        // 添加研究按钮
+        auto researchButton = Button::create();
+        researchButton->setTitleText("Set as current research");
+        researchButton->setTitleFontSize(18);
+        researchButton->setTitleColor(Color3B::WHITE);
+        researchButton->setContentSize(Size(200, 40));
+        researchButton->setPosition(Vec2(175, 60));
+        researchButton->setTag(techId);
+        researchButton->addClickEventListener([this](Ref* sender) {
+            auto button = dynamic_cast<Button*>(sender);
+            if (button) {
+                int techId = button->getTag();
+                CCLOG("Set research button clicked for tech: %d", techId);
+                this->setAsCurrentResearch(techId);
+                this->hideTechDetail();
+            }
+            });
+        _detailPanel->addChild(researchButton);
     }
     else {
-        // 检查缺少的前置科技
-        std::string missingPrereqs;
-        auto techData = techTree->getTechInfo(techId);
-        if (techData) {
-            for (int prereqId : techData->srcTechList) {
-                if (!techTree->isActivated(prereqId)) {
-                    auto prereqInfo = techTree->getTechInfo(prereqId);
-                    if (prereqInfo) {
-                        if (!missingPrereqs.empty()) missingPrereqs += ", ";
-                        missingPrereqs += prereqInfo->name;
-                    }
-                }
-            }
-        }
-        statusText = "需要: " + missingPrereqs;
+        statusText = "Locked";
     }
 
     auto statusLabel = Label::createWithTTF(statusText, "fonts/arial.ttf", 18);
     statusLabel->setPosition(Vec2(175, 30));
     statusLabel->setColor(Color3B(255, 200, 100));
-    detailPanel->addChild(statusLabel);
+    _detailPanel->addChild(statusLabel);
 
-    // 如果可研究且未激活，添加研究按钮
-    if (techTree->isResearchable(techId) && !techTree->isActivated(techId)) {
-        auto researchButton = Button::create();
-        researchButton->setTitleText("设为当前研究");
-        researchButton->setTitleFontSize(18);
-        researchButton->setTitleColor(Color3B::WHITE);
-        researchButton->setColor(Color3B(100, 180, 100));
-        researchButton->setContentSize(Size(150, 40));
-        researchButton->setPosition(Vec2(175, 70));
-        researchButton->setTag(techId);
-        researchButton->addTouchEventListener([this](Ref* sender, Widget::TouchEventType type) {
-            if (type == Widget::TouchEventType::ENDED) {
-                auto button = dynamic_cast<Button*>(sender);
-                if (button) {
-                    setAsCurrentResearch(button->getTag());
-                    hideTechDetail();
-                }
-            }
-            });
-        detailPanel->addChild(researchButton);
-    }
-
-    this->addChild(detailPanel, 10);
+    CCLOG("Detail panel created and shown");
 }
 
 void TechTreePanel::hideTechDetail() {
-    if (detailPanel) {
-        detailPanel->removeFromParent();
-        detailPanel = nullptr;
+    if (_detailPanel) {
+        _detailPanel->removeFromParent();
+        _detailPanel = nullptr;
     }
 }
 
 void TechTreePanel::setAsCurrentResearch(int techId) {
-    if (!techTree) return;
+    if (!_techTree) return;
 
-    if (techTree->setCurrentResearch(techId)) {
-        // 更新UI
+    if (_techTree->setCurrentResearch(techId)) {
         refreshUI();
         updateControlPanel();
-
-        // 显示提示
-        auto techInfo = techTree->getTechInfo(techId);
-        if (techInfo) {
-            auto notification = Label::createWithTTF("已开始研究: " + techInfo->name,
-                "fonts/arial.ttf", 20);
-            notification->setColor(Color3B(100, 255, 100));
-            notification->setPosition(Vec2(getContentSize().width / 2, 180));
-            notification->setOpacity(0);
-
-            auto fadeIn = FadeIn::create(0.5f);
-            auto delay = DelayTime::create(1.5f);
-            auto fadeOut = FadeOut::create(0.5f);
-            auto remove = CallFunc::create([notification]() {
-                notification->removeFromParent();
-                });
-            notification->runAction(Sequence::create(fadeIn, delay, fadeOut, remove, nullptr));
-
-            this->addChild(notification, 20);
-        }
     }
 }
 
 void TechTreePanel::updateControlPanel() {
-    if (!techTree) return;
+    if (!_techTree) return;
 
-    int currentResearch = techTree->getCurrentResearch();
+    int currentResearch = _techTree->getCurrentResearch();
 
     if (currentResearch > 0) {
-        auto techInfo = techTree->getTechInfo(currentResearch);
+        auto techInfo = _techTree->getTechInfo(currentResearch);
         if (techInfo) {
-            // 更新当前研究标签
-            std::string researchText = "当前研究: " + techInfo->name;
-            currentResearchLabel->setString(researchText);
+            std::string researchText = "当前研究：" + techInfo->name;
+            _currentResearchLabel->setString(researchText);
 
-            // 更新进度条
-            int progress = techTree->getTechProgress(currentResearch);
-            int cost = techTree->getTechCost(currentResearch);
+            int progress = _techTree->getTechProgress(currentResearch);
+            int cost = _techTree->getTechCost(currentResearch);
             int percent = (cost > 0) ? (progress * 100 / cost) : 0;
-            researchProgressBar->setPercentage(percent);
-
-            // 更新进度条上的文本
-            auto progressText = Label::createWithTTF(std::to_string(percent) + "%",
-                "fonts/arial.ttf", 14);
-            progressText->setPosition(Vec2(researchProgressBar->getContentSize().width / 2,
-                researchProgressBar->getContentSize().height / 2));
-            progressText->setColor(Color3B::WHITE);
-
-            // 移除旧的文本
-            researchProgressBar->removeChildByName("progress_text");
-            progressText->setName("progress_text");
-            researchProgressBar->addChild(progressText);
+            _researchProgressBar->setPercentage(percent);
         }
     }
     else {
-        currentResearchLabel->setString("当前研究：无");
-        researchProgressBar->setPercentage(0);
-        researchProgressBar->removeChildByName("progress_text");
+        _currentResearchLabel->setString("当前研究：无");
+        _researchProgressBar->setPercentage(0);
     }
 }
 
+// 更新连接线状态
 void TechTreePanel::updateConnectionLines() {
-    if (!techTree) return;
+    if (!_techTree) return;
 
-    // 更新所有连接线的状态
-    for (const auto& pair : nodeUIMap) {
-        auto techInfo = techTree->getTechInfo(pair.first);
+    // 清除所有旧的连接线
+    std::vector<Node*> toRemove;
+    for (auto child : _contentNode->getChildren()) {
+        if (child->getName().find("line_") == 0) {
+            toRemove.push_back(child);
+        }
+    }
+
+    for (auto node : toRemove) {
+        node->removeFromParent();
+    }
+
+    // 重新创建所有连接线
+    for (const auto& pair : _nodeUIMap) {
+        int fromTechId = pair.first;
+        auto techInfo = _techTree->getTechInfo(fromTechId);
         if (techInfo) {
-            for (int dstId : techInfo->dstTechList) {
-                std::string tag = "line_" + std::to_string(pair.first) + "_" + std::to_string(dstId);
-                auto line = contentNode->getChildByName(tag);
-                if (line) {
-                    auto drawNode = dynamic_cast<DrawNode*>(line);
-                    if (drawNode) {
-                        drawNode->clear();
-
-                        auto fromNode = nodeUIMap[pair.first];
-                        auto toNode = nodeUIMap[dstId];
-                        if (fromNode && toNode) {
-                            Vec2 startPos = fromNode->getPosition() + Vec2(NODE_SIZE / 2, NODE_SIZE / 2);
-                            Vec2 endPos = toNode->getPosition() + Vec2(NODE_SIZE / 2, NODE_SIZE / 2);
-
-                            // 判断线条颜色
-                            Color4F lineColor = LINE_COLOR;
-                            if (techTree->isActivated(pair.first) && techTree->isActivated(dstId)) {
-                                lineColor = LINE_ACTIVE_COLOR; // 已激活
-                            }
-                            else if (techTree->getCurrentResearch() == pair.first ||
-                                techTree->getCurrentResearch() == dstId) {
-                                lineColor = LINE_CURRENT_COLOR; // 当前研究相关
-                            }
-
-                            drawNode->drawSegment(startPos, endPos, LINE_WIDTH, lineColor);
-                        }
-                    }
-                }
+            for (int toTechId : techInfo->dstTechList) {
+                createSplineConnection(fromTechId, toTechId);
             }
         }
     }
 }
 
-// TechEventListener接口实现
-void TechTreePanel::onTechActivated(int techId, const std::string& techName,
-    const std::string& effect) {
+// 创建尤里卡特效
+void TechTreePanel::createEurekaEffect(int techId) {
+    auto node = _nodeUIMap[techId];
+    if (!node) return;
+
+    // 获取节点位置
+    Vec2 nodePos = node->getPosition();
+    Vec2 centerPos = nodePos + Vec2(NODE_WIDTH / 2, NODE_HEIGHT / 2);
+
+    // 创建闪光效果
+    auto flash = Sprite::create();
+
+    // 使用DrawNode创建圆形闪光
+    auto drawNode = DrawNode::create();
+    drawNode->drawSolidCircle(Vec2::ZERO, NODE_WIDTH / 2 + 10,
+        CC_DEGREES_TO_RADIANS(360), 30,
+        Color4F(1.0f, 1.0f, 0.5f, 0.8f)); // 金色闪光
+    flash->addChild(drawNode);
+    flash->setPosition(centerPos);
+    flash->setScale(0.5f);
+
+    // 动画：放大并淡出
+    auto scaleUp = ScaleTo::create(0.3f, 1.8f);
+    auto fadeOut = FadeOut::create(0.3f);
+    auto spawn = Spawn::create(scaleUp, fadeOut, nullptr);
+    auto remove = CallFunc::create([flash]() { flash->removeFromParent(); });
+    flash->runAction(Sequence::create(spawn, remove, nullptr));
+
+    _contentNode->addChild(flash, 5);
+
+    // 创建"尤里卡!"文字效果
+    auto eurekaLabel = Label::createWithTTF("尤里卡!", "fonts/arial.ttf", 28);
+    eurekaLabel->setColor(Color3B(255, 255, 0)); // 金色文字
+    eurekaLabel->enableShadow(Color4B(0, 0, 0, 128), Size(2, -2));
+    eurekaLabel->setPosition(centerPos + Vec2(0, 80));
+    eurekaLabel->setOpacity(0);
+
+    // 文字动画：淡入、上浮、淡出
+    auto fadeIn = FadeIn::create(0.2f);
+    auto moveUp = MoveBy::create(0.8f, Vec2(0, 50));
+    auto fadeOut2 = FadeOut::create(0.3f);
+    auto remove2 = CallFunc::create([eurekaLabel]() { eurekaLabel->removeFromParent(); });
+    eurekaLabel->runAction(Sequence::create(fadeIn, moveUp, fadeOut2, remove2, nullptr));
+
+    _contentNode->addChild(eurekaLabel, 10);
+
+    // 创建粒子效果（如果支持）
+    /*
+    if (ParticleSystemQuad::create("particles/eureka.plist")) {
+        auto particles = ParticleSystemQuad::create("particles/eureka.plist");
+        particles->setPosition(centerPos);
+        particles->setAutoRemoveOnFinish(true);
+        _contentNode->addChild(particles, 3);
+    }
+    */
+
+    // 添加音效提示（如果有音频系统）
+    // SimpleAudioEngine::getInstance()->playEffect("sounds/eureka.mp3");
+}
+
+void TechTreePanel::handleTechActivated(int techId, const std::string& techName, const std::string& effect) {
     // 更新节点状态
     updateNodeUIState(techId, TechNodeState::ACTIVATED);
 
@@ -659,11 +1144,11 @@ void TechTreePanel::onTechActivated(int techId, const std::string& techName,
     // 更新控制面板
     updateControlPanel();
 
-    // 播放激活特效
-    auto node = nodeUIMap[techId];
+    // 播放激活特效（比尤里卡特效更简单）
+    auto node = _nodeUIMap[techId];
     if (node) {
         // 简单闪光效果
-        auto flash = LayerColor::create(Color4B(100, 255, 100, 100), NODE_SIZE, NODE_SIZE);
+        auto flash = LayerColor::create(Color4B(100, 255, 100, 100), NODE_WIDTH, NODE_HEIGHT);
         flash->setPosition(node->getPosition());
         flash->setOpacity(0);
 
@@ -672,65 +1157,66 @@ void TechTreePanel::onTechActivated(int techId, const std::string& techName,
         auto remove = CallFunc::create([flash]() { flash->removeFromParent(); });
         flash->runAction(Sequence::create(fadeIn, fadeOut, remove, nullptr));
 
-        contentNode->addChild(flash, 5);
+        _contentNode->addChild(flash, 5);
     }
 }
 
-void TechTreePanel::onResearchProgress(int techId, int currentProgress, int totalCost) {
+// 处理研究进度事件
+void TechTreePanel::handleResearchProgress(int techId, int currentProgress, int totalCost) {
     // 更新节点进度条
-    auto nodeUI = nodeUIMap[techId];
-    if (nodeUI) {
-        auto button = dynamic_cast<Button*>(nodeUI->getChildren().at(0));
-        if (button) {
-            auto progressBar = dynamic_cast<DrawNode*>(button->getChildByTag(105));
-            if (progressBar && totalCost > 0) {
-                float width = (NODE_SIZE - 10) * ((float)currentProgress / totalCost);
-                progressBar->clear();
+    auto container = _nodeUIMap[techId];
+    if (!container) return;
 
-                // 判断是否为当前研究
-                Color4F progressColor;
-                if (techTree->getCurrentResearch() == techId) {
-                    progressColor = Color4F(0.9f, 0.7f, 0.1f, 1.0f);
-                }
-                else {
-                    progressColor = Color4F(0.2f, 0.6f, 0.2f, 1.0f);
-                }
+    // 直接获取进度条，不需要通过Button
+    auto progressBar = dynamic_cast<DrawNode*>(container->getChildByTag(105));
+    auto costLabel = dynamic_cast<Label*>(container->getChildByTag(103));
 
-                progressBar->drawSolidRect(Vec2(5, 5), Vec2(5 + width, 10), progressColor);
+    if (progressBar && totalCost > 0) {
+        float width = (NODE_WIDTH - 10) * ((float)currentProgress / totalCost);
+        progressBar->clear();
 
-                // 更新成本标签显示进度
-                auto costLabel = dynamic_cast<Label*>(button->getChildByTag(103));
-                if (costLabel) {
-                    std::string progressText = std::to_string(currentProgress) + "/" + std::to_string(totalCost);
-                    costLabel->setString(progressText);
-                }
-            }
+        Color4F progressColor;
+        if (_techTree && _techTree->getCurrentResearch() == techId) {
+            progressColor = Color4F(0.9f, 0.7f, 0.1f, 1.0f); // 金色进度条
+        }
+        else {
+            progressColor = Color4F(0.2f, 0.6f, 0.2f, 1.0f); // 绿色进度条
+        }
+
+        progressBar->drawSolidRect(Vec2(5, NODE_HEIGHT - 8),
+            Vec2(5 + width, NODE_HEIGHT - 4), progressColor);
+
+        // 更新成本标签显示进度
+        if (costLabel) {
+            std::string progressText = std::to_string(currentProgress) + "/" + std::to_string(totalCost);
+            costLabel->setString(progressText);
         }
     }
 
-    // 如果这是当前研究的科技，更新控制面板
-    if (techTree->getCurrentResearch() == techId) {
+    // 如果是当前研究，更新控制面板
+    if (_techTree && _techTree->getCurrentResearch() == techId) {
         updateControlPanel();
     }
 }
 
-void TechTreePanel::onEurekaTriggered(int techId, const std::string& techName) {
+// 处理尤里卡事件
+void TechTreePanel::handleEurekaTriggered(int techId, const std::string& techName) {
     // 播放尤里卡特效
     createEurekaEffect(techId);
 
-    // 更新节点状态（可能会有进度变化）
-    if (techTree) {
+    // 更新节点状态（可能有进度变化）
+    if (_techTree) {
         TechNodeState state = TechNodeState::LOCKED;
-        if (techTree->isActivated(techId)) {
+        if (_techTree->isActivated(techId)) {
             state = TechNodeState::ACTIVATED;
         }
-        else if (techTree->getCurrentResearch() == techId) {
+        else if (_techTree->getCurrentResearch() == techId) {
             state = TechNodeState::RESEARCHING;
         }
-        else if (techTree->getTechProgress(techId) > 0) {
+        else if (_techTree->getTechProgress(techId) > 0) {
             state = TechNodeState::IN_PROGRESS;
         }
-        else if (techTree->isResearchable(techId)) {
+        else if (_techTree->isResearchable(techId)) {
             state = TechNodeState::RESEARCHABLE;
         }
 
@@ -738,47 +1224,18 @@ void TechTreePanel::onEurekaTriggered(int techId, const std::string& techName) {
     }
 }
 
-void TechTreePanel::createEurekaEffect(int techId) {
-    auto node = nodeUIMap[techId];
-    if (!node) return;
-
-    // 创建闪光特效
-    auto flash = Sprite::create();
-    auto drawNode = DrawNode::create();
-    drawNode->drawSolidCircle(Vec2::ZERO, NODE_SIZE / 2, CC_DEGREES_TO_RADIANS(360), 30,
-        Color4F(1.0f, 1.0f, 0.5f, 0.8f));
-    flash->addChild(drawNode);
-    flash->setPosition(node->getPosition() + Vec2(NODE_SIZE / 2, NODE_SIZE / 2));
-    flash->setScale(0.5f);
-
-    auto scaleUp = ScaleTo::create(0.3f, 1.5f);
-    auto fadeOut = FadeOut::create(0.3f);
-    auto spawn = Spawn::create(scaleUp, fadeOut, nullptr);
-    auto remove = CallFunc::create([flash]() { flash->removeFromParent(); });
-    flash->runAction(Sequence::create(spawn, remove, nullptr));
-
-    contentNode->addChild(flash, 10);
-
-    // 显示"尤里卡!"文字
-    auto eurekaLabel = Label::createWithTTF("尤里卡!", "fonts/arial.ttf", 28);
-    eurekaLabel->setColor(Color3B::YELLOW);
-    eurekaLabel->setPosition(node->getPosition() + Vec2(NODE_SIZE / 2, NODE_SIZE / 2 + 60));
-    eurekaLabel->setOpacity(0);
-
-    auto fadeIn = FadeIn::create(0.2f);
-    auto moveUp = MoveBy::create(1.0f, Vec2(0, 60));
-    auto fadeOut2 = FadeOut::create(0.3f);
-    auto remove2 = CallFunc::create([eurekaLabel]() { eurekaLabel->removeFromParent(); });
-    eurekaLabel->runAction(Sequence::create(fadeIn, moveUp, fadeOut2, remove2, nullptr));
-
-    contentNode->addChild(eurekaLabel, 10);
-}
-
 void TechTreePanel::onExit() {
     hideTechDetail();
 
-    if (techTree) {
-        techTree->removeEventListener(this);
+    if (_techTree && _eventListener) {
+        _techTree->removeEventListener(_eventListener);
     }
+
+    // 清理事件监听器
+    if (_eventListener) {
+        delete _eventListener;
+        _eventListener = nullptr;
+    }
+
     Layer::onExit();
 }
