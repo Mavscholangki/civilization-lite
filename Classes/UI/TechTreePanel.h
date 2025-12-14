@@ -91,12 +91,12 @@ private:
     std::unordered_map<int, Node*> _nodeUIMap;
 
     // UI常量
-    const float NODE_WIDTH = 120.0f;
-    const float NODE_HEIGHT = 60.0f;
-    const float NODE_CORNER_RADIUS = 8.0f;
-    const float ERA_SPACING = 200.0f;
-    const float NODE_SPACING = 80.0f;
-    const float LINE_WIDTH = 3.0f;
+    const float NODE_WIDTH = 180.0f;
+    const float NODE_HEIGHT = 110.0f;
+    const float NODE_CORNER_RADIUS = 10.0f;
+    const float ERA_SPACING = 280.0f;
+    const float NODE_SPACING = 120.0f;
+    const float LINE_WIDTH = 4.0f;
 
     // 私有方法
     Node* createTechNodeUI(const TechNode* techData);
