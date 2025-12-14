@@ -25,9 +25,9 @@ bool HUDLayer::init() {
     // --- 2. 下一回合按钮 ---
     auto btnNext = Button::create();
     btnNext->setTitleText("[ NEXT TURN ]");
-    btnNext->setTitleFontSize(24);
+    btnNext->setTitleFontSize(30);
     btnNext->setTitleColor(Color3B::GREEN);
-    btnNext->setPosition(Vec2(visibleSize.width - 100, 60));
+    btnNext->setPosition(Vec2(visibleSize.width * 6 / 7 - 100, 60));
     btnNext->addClickEventListener([this](Ref*) {
         if (_onNextTurn) _onNextTurn();
         });

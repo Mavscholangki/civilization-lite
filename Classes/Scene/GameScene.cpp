@@ -1,6 +1,7 @@
 #include "GameScene.h"
 #include "../Map/GameMapLayer.h"
 #include "../UI/HUDLayer.h" // 引用 UI 头文件
+#include "../UI/CityProductionPanel.h"
 
 USING_NS_CC;
 
@@ -16,6 +17,9 @@ bool GameScene::init() {
 
     auto hudLayer = HUDLayer::create();
     this->addChild(hudLayer, 100);
+
+    auto productionPanelLayer = CityProductionPanel::create();
+    this->addChild(productionPanelLayer, 120);
 
     // --- 核心联动 ---
     // 当地图层汇报“选中了单位”时 -> 让 HUD 层显示面板

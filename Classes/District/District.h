@@ -51,11 +51,11 @@ public:
 		DistrictTypeName typeName;
 		int cost;
 		DistrictYield baseYield;
-		const TileData tileRequirement;
-		const int scienceRequirement;
+		TileData tileRequirement;
+		int scienceRequirement;
 
 		DistrictType() :
-			typeName(DistrictTypeName::TO_BE_DEFINED), cost(0), baseYield({ 0,0,0,0,0 })
+			typeName(DistrictTypeName::TO_BE_DEFINED), cost(0), baseYield({ 0,0,0,0,0 }), scienceRequirement(0)
 		{
 		};
 
