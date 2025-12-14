@@ -45,7 +45,7 @@ bool TechTreePanel::init() {
     this->addChild(_background, -1);
 
     // 创建标题
-    auto title = Label::createWithTTF("科技树", "fonts/arial.ttf", 40);
+    auto title = Label::createWithSystemFont(u8"科技树", "Arial", 40);
     title->setPosition(Vec2(visibleSize.width / 2, visibleSize.height - 50));
     title->setColor(Color3B(255, 230, 100));
     this->addChild(title);
@@ -54,7 +54,7 @@ bool TechTreePanel::init() {
     _scrollView = ScrollView::create();
     _scrollView->setContentSize(Size(visibleSize.width - 40, visibleSize.height - 250));
     _scrollView->setPosition(Vec2(20, 120));
-    _scrollView->setDirection(ScrollView::Direction::BOTH);
+    _scrollView->setDirection(ScrollView::Direction::HORIZONTAL);
     _scrollView->setBounceEnabled(true);
     _scrollView->setSwallowTouches(true);
     this->addChild(_scrollView);
@@ -64,30 +64,30 @@ bool TechTreePanel::init() {
     _contentNode->setAnchorPoint(Vec2::ANCHOR_BOTTOM_LEFT);
     _scrollView->addChild(_contentNode);
 
-    // 设置滚动区域
-    _scrollView->setInnerContainerSize(Size(ERA_SPACING * 10, visibleSize.height - 200));
+    // 设置滚动区域 - 增大宽度以容纳更多列，减少高度以限制上下滚动
+    _scrollView->setInnerContainerSize(Size(ERA_SPACING * 10, visibleSize.height - 150)); // 减少内部高度
     _contentNode->setPosition(0, 0);
 
     // 创建底部控制面板
-    _controlPanel = LayerColor::create(Color4B(30, 30, 40, 220), visibleSize.width - 40, 100);
+    _controlPanel = LayerColor::create(Color4B(30, 30, 40, 220), visibleSize.width - 40, 120); // 增加高度
     _controlPanel->setPosition(Vec2(20, 20));
     this->addChild(_controlPanel);
 
-    // 当前研究标签
-    _currentResearchLabel = Label::createWithTTF("当前研究：无", "fonts/arial.ttf", 22);
-    _currentResearchLabel->setPosition(Vec2(visibleSize.width / 2, 70));
+    // 当前研究标签 - 增大字体
+    _currentResearchLabel = Label::createWithSystemFont(u8"当前研究：无", "Arial", 26);
+    _currentResearchLabel->setPosition(Vec2(visibleSize.width / 2, 85));
     _currentResearchLabel->setColor(Color3B(255, 255, 200));
     _controlPanel->addChild(_currentResearchLabel);
 
-    // 研究进度条背景
-    auto progressBg = LayerColor::create(Color4B(40, 40, 40, 255), 400, 24);
-    progressBg->setPosition(Vec2(visibleSize.width / 2 - 200, 35));
+    // 研究进度条背景 - 增大尺寸
+    auto progressBg = LayerColor::create(Color4B(40, 40, 40, 255), 500, 30);
+    progressBg->setPosition(Vec2(visibleSize.width / 2 - 250, 45));
     _controlPanel->addChild(progressBg);
 
     // 研究进度条
     auto progressSprite = Sprite::create();
     auto progressDrawNode = DrawNode::create();
-    progressDrawNode->drawSolidRect(Vec2::ZERO, Vec2(400, 24), Color4F(0.1f, 0.6f, 0.1f, 1.0f));
+    progressDrawNode->drawSolidRect(Vec2::ZERO, Vec2(500, 30), Color4F(0.1f, 0.6f, 0.1f, 1.0f));
     progressSprite->addChild(progressDrawNode);
 
     _researchProgressBar = ProgressTimer::create(progressSprite);
@@ -95,29 +95,30 @@ bool TechTreePanel::init() {
     _researchProgressBar->setMidpoint(Vec2(0, 0));
     _researchProgressBar->setBarChangeRate(Vec2(1, 0));
     _researchProgressBar->setPercentage(0);
-    _researchProgressBar->setPosition(Vec2(visibleSize.width / 2, 47));
+    _researchProgressBar->setPosition(Vec2(visibleSize.width / 2, 60));
     _controlPanel->addChild(_researchProgressBar);
 
-    // 每回合科研标签
-    _sciencePerTurnLabel = Label::createWithTTF("每回合科研：0", "fonts/arial.ttf", 18);
-    _sciencePerTurnLabel->setPosition(Vec2(visibleSize.width / 2, 20));
+    // 每回合科研标签 - 增大字体
+    _sciencePerTurnLabel = Label::createWithSystemFont(u8"每回合科研：0", "Arial", 22);
+    _sciencePerTurnLabel->setPosition(Vec2(visibleSize.width / 2, 25));
     _sciencePerTurnLabel->setColor(Color3B(150, 220, 255));
     _controlPanel->addChild(_sciencePerTurnLabel);
 
-    // 创建关闭按钮 - 使用Layout作为按钮
+    // 创建关闭按钮 - 使用Layout作为按钮，增大按钮
     auto closeButton = Layout::create();
-    closeButton->setContentSize(Size(100, 40));
+    closeButton->setContentSize(Size(120, 50)); // 增大按钮
     closeButton->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
     closeButton->setBackGroundColor(Color3B(180, 60, 60));
     closeButton->setBackGroundColorOpacity(200);
     closeButton->setTouchEnabled(true);
-    closeButton->setPosition(Vec2(visibleSize.width - 70, visibleSize.height - 40));
+    closeButton->setPosition(Vec2(visibleSize.width - 140, visibleSize.height - 50)); // 调整位置
 
-    // 添加关闭按钮文字
-    auto closeLabel = Label::createWithTTF("关闭", "fonts/arial.ttf", 24);
-    closeLabel->setPosition(Vec2(50, 20));
+    // 添加关闭按钮文字 - 增大字体
+    auto closeLabel = Label::createWithSystemFont(u8"关闭", "Arial", 28);
+    closeLabel->setPosition(Vec2(60, 25));
     closeLabel->setColor(Color3B::WHITE);
     closeButton->addChild(closeLabel);
+
 
     // 关闭按钮事件
     closeButton->addTouchEventListener([this](Ref* sender, Widget::TouchEventType type) {
@@ -157,6 +158,9 @@ void TechTreePanel::setSciencePerTurn(int science) {
 
 Node* TechTreePanel::createTechNodeUI(const TechNode* techData) {
     if (!techData) return nullptr;
+
+    // 调试输出，检查数据
+    CCLOG("Creating UI for tech: %d, name: %s", techData->id, techData->name.c_str());
 
     // 创建容器节点
     auto container = Node::create();
@@ -201,40 +205,61 @@ Node* TechTreePanel::createTechNodeUI(const TechNode* techData) {
     border->setTag(106);
     container->addChild(border);
 
-    // ... 其他UI元素保持不变 ...
-    // 科技图标
-    auto iconLabel = Label::createWithTTF(techData->name.substr(0, 2), "fonts/arial.ttf", 20);
-    iconLabel->setPosition(Vec2(NODE_WIDTH / 2, NODE_HEIGHT / 2 + 10));
-    iconLabel->setColor(Color3B::WHITE);
-    iconLabel->setTag(101);
-    container->addChild(iconLabel);
+    // 科技名称（居中显示）
+    // 尝试不同的字体和设置
+    auto nameLabel = Label::create();
 
-    // 科技名称
-    auto nameLabel = Label::createWithTTF(techData->name, "fonts/arial.ttf", 12);
-    nameLabel->setPosition(Vec2(NODE_WIDTH / 2, NODE_HEIGHT / 2 - 15));
-    nameLabel->setColor(Color3B::YELLOW);
-    nameLabel->setTag(102);
-    container->addChild(nameLabel);
+    // 方法1：使用系统字体（确保支持中文）
+    nameLabel = Label::createWithSystemFont(techData->name, "Arial", 20);
 
-    // 科技成本
-    auto costLabel = Label::createWithTTF(std::to_string(techData->cost), "fonts/arial.ttf", 10);
-    costLabel->setPosition(Vec2(NODE_WIDTH / 2, 10));
+    // 如果方法1不行，尝试方法2：使用TTF字体
+    // nameLabel = Label::createWithTTF(techData->name, "fonts/arial.ttf", 20);
+
+    // 如果方法2不行，尝试方法3：创建一个简单的测试文本
+    // nameLabel = Label::createWithSystemFont("测试", "Arial", 20);
+
+    // 设置位置和颜色
+    nameLabel->setPosition(Vec2(NODE_WIDTH / 2, NODE_HEIGHT / 2 + 15));
+    nameLabel->setColor(Color3B::RED);  // 使用红色，更容易看到
+    nameLabel->setTag(101);
+
+    // 暂时移除自动换行设置，先确保能显示
+    // nameLabel->setDimensions(NODE_WIDTH - 20, 50);
+    // nameLabel->setHorizontalAlignment(TextHAlignment::CENTER);
+    // nameLabel->setVerticalAlignment(TextVAlignment::CENTER);
+    // nameLabel->setOverflow(Label::Overflow::SHRINK);
+
+    container->addChild(nameLabel, 10);  // 确保标签在较高层级
+
+    // 添加一个调试用的背景，确保标签位置正确
+    auto debugBg = LayerColor::create(Color4B(255, 0, 0, 50), NODE_WIDTH - 20, 30);
+    debugBg->setPosition(Vec2(10, NODE_HEIGHT / 2));
+    debugBg->setTag(999);  // 使用一个独特的tag，便于识别
+    container->addChild(debugBg, 5);
+
+    // 科技成本（显示在底部）
+    auto costLabel = Label::createWithSystemFont(std::to_string(techData->cost), "Arial", 16);
+    costLabel->setPosition(Vec2(NODE_WIDTH / 2, 20));
     costLabel->setColor(Color3B(180, 180, 255));
     costLabel->setTag(103);
-    container->addChild(costLabel);
+    container->addChild(costLabel, 10);
 
     // 进度条背景
     auto progressBg = DrawNode::create();
-    progressBg->drawSolidRect(Vec2(5, NODE_HEIGHT - 8),
+    progressBg->drawSolidRect(Vec2(5, NODE_HEIGHT - 12),
         Vec2(NODE_WIDTH - 5, NODE_HEIGHT - 4),
         Color4F(0.2f, 0.2f, 0.2f, 1.0f));
     progressBg->setTag(104);
-    container->addChild(progressBg);
+    container->addChild(progressBg, 5);
 
     // 进度条
     auto progressBar = DrawNode::create();
     progressBar->setTag(105);
-    container->addChild(progressBar);
+    container->addChild(progressBar, 6);
+
+    CCLOG("Created UI for tech %d: label text = %s, label pos = (%f, %f)",
+        techData->id, nameLabel->getString().c_str(),
+        NODE_WIDTH / 2, NODE_HEIGHT / 2 + 15);
 
     return container;
 }
@@ -397,10 +422,13 @@ void TechTreePanel::calculateTechDepths() {
 
 // === 文明6风格的布局算法 ===
 void TechTreePanel::layoutTechTree() {
-    const float COLUMN_SPACING = 200.0f;   // 列间距
-    const float ROW_SPACING = 100.0f;      // 行间距
-    const float BASE_X = 80.0f;            // 起始X坐标
-    const float BASE_Y = 300.0f;           // 起始Y坐标（提高基准位置）
+    const float COLUMN_SPACING = 280.0f;   // 与ERA_SPACING保持一致
+    const float ROW_SPACING = 150.0f;      // 增大行间距以避免重叠
+    const float BASE_X = 100.0f;           // 增加起始X坐标偏移
+    const float BASE_Y = 350.0f;
+
+    // 获取内容区域的实际高度（滚动视图的内部高度）
+    float contentHeight = _scrollView->getInnerContainerSize().height;
 
     // 第一步：确定每列的科技并排序
     std::unordered_map<int, std::vector<int>> columnTechs = _techByDepth;
@@ -436,22 +464,36 @@ void TechTreePanel::layoutTechTree() {
         int column = columnPair.first;
         const auto& techsInColumn = columnPair.second;
 
-        // 修正：使用正确的中心行计算
-        int totalNodes = techsInColumn.size();
-        float centerRow = (totalNodes - 1) / 2.0f; // 使用浮点数确保精确
+        if (techsInColumn.empty()) continue;
+
+        // 使用内容区域高度计算可用的垂直空间
+        float availableHeight = contentHeight - 200.0f;  // 留出上下边距
+        float totalRequiredHeight = techsInColumn.size() * (NODE_HEIGHT + 60.0f);
+
+        // 动态调整行间距，确保不会超出可用空间
+        float dynamicRowSpacing = ROW_SPACING;
+        if (totalRequiredHeight > availableHeight) {
+            dynamicRowSpacing = availableHeight / techsInColumn.size() - 40.0f;
+            dynamicRowSpacing = std::max(dynamicRowSpacing, NODE_HEIGHT + 40.0f);
+        }
+
+        // 计算中心行
+        float centerRow = (techsInColumn.size() - 1) / 2.0f;
 
         for (size_t i = 0; i < techsInColumn.size(); i++) {
             int techId = techsInColumn[i];
 
-            // 修正：使用浮点数计算行偏移
+            // 计算行偏移
             float rowOffset = static_cast<float>(i) - centerRow;
 
             // 计算基础位置
             float x = BASE_X + column * COLUMN_SPACING;
-            float y = BASE_Y + rowOffset * ROW_SPACING;
+            float y = BASE_Y + rowOffset * dynamicRowSpacing;
 
-            // 确保Y坐标在合理范围内（避免超出屏幕）
-            y = std::max(100.0f, std::min(y, 600.0f));
+            // 确保Y坐标在合理范围内（基于内容区域）
+            float minY = 100.0f;
+            float maxY = contentHeight - 100.0f;
+            y = std::max(minY, std::min(y, maxY));
 
             _techPositions[techId] = Vec2(x, y);
         }
@@ -465,10 +507,13 @@ void TechTreePanel::layoutTechTree() {
 void TechTreePanel::adjustPositionsForConnections() {
     if (!_techTree) return;
 
-    const float MAX_ADJUSTMENT = 60.0f;
-    const int MAX_ITERATIONS = 50;
-    const float MIN_Y = 100.0f;    // 最小Y坐标
-    const float MAX_Y = 600.0f;    // 最大Y坐标
+    // 获取内容区域的实际高度
+    float contentHeight = _scrollView->getInnerContainerSize().height;
+
+    const float MAX_ADJUSTMENT = 50.0f;
+    const int MAX_ITERATIONS = 30;
+    const float MIN_Y = 120.0f;    // 最小Y坐标，增加边距
+    const float MAX_Y = contentHeight - 120.0f;  // 基于内容区域的最大Y坐标
 
     for (int iter = 0; iter < MAX_ITERATIONS; iter++) {
         bool adjusted = false;
@@ -491,23 +536,32 @@ void TechTreePanel::adjustPositionsForConnections() {
                 auto& conn1 = connections[i];
                 auto& conn2 = connections[j];
 
+                // 跳过不是同一列的连接线
+                if (_techDepth[conn1.first] != _techDepth[conn2.first] ||
+                    _techDepth[conn1.second] != _techDepth[conn2.second]) {
+                    continue;
+                }
+
                 Vec2 start1 = _techPositions[conn1.first];
                 Vec2 end1 = _techPositions[conn1.second];
                 Vec2 start2 = _techPositions[conn2.first];
                 Vec2 end2 = _techPositions[conn2.second];
 
-                // 检查连接线是否交叉
+                // 检查连接线是否交叉（更精确的检查）
                 if (doLinesCross(start1, end1, start2, end2)) {
                     // 调整后一个连接的节点位置
                     int adjustTech = conn2.second;
                     Vec2 pos = _techPositions[adjustTech];
 
-                    // 尝试向上或向下调整
-                    if (iter % 2 == 0) {
-                        pos.y += MAX_ADJUSTMENT / 2;
+                    // 根据连接线的相对位置决定调整方向
+                    float y1 = (start1.y + end1.y) / 2.0f;
+                    float y2 = (start2.y + end2.y) / 2.0f;
+
+                    if (y2 > y1) {
+                        pos.y += MAX_ADJUSTMENT * 0.7f;  // 向下调整
                     }
                     else {
-                        pos.y -= MAX_ADJUSTMENT / 2;
+                        pos.y -= MAX_ADJUSTMENT * 0.7f;  // 向上调整
                     }
 
                     // 确保调整后的位置在合理范围内
@@ -528,6 +582,8 @@ void TechTreePanel::adjustPositionsForConnections() {
         int column = columnPair.first;
         const auto& techsInColumn = columnPair.second;
 
+        if (techsInColumn.size() <= 1) continue;
+
         // 按Y坐标排序
         std::vector<int> sortedTechs = techsInColumn;
         std::sort(sortedTechs.begin(), sortedTechs.end(),
@@ -544,16 +600,24 @@ void TechTreePanel::adjustPositionsForConnections() {
             Vec2 currPos = _techPositions[currId];
 
             // 如果两个节点太接近，调整位置
-            float minSpacing = NODE_HEIGHT + 40.0f; // 最小间距
-            if (currPos.y - prevPos.y < minSpacing) {
-                // 平均分配空间
-                float newPrevY = (prevPos.y + currPos.y - minSpacing) / 2.0f;
-                float newCurrY = (prevPos.y + currPos.y + minSpacing) / 2.0f;
+            float minSpacing = NODE_HEIGHT + 60.0f; // 增加最小间距
+            float currentSpacing = currPos.y - prevPos.y;
+
+            if (currentSpacing < minSpacing) {
+                // 计算需要移动的总距离
+                float neededSpace = minSpacing - currentSpacing;
+
+                // 平均分配空间，向上移动前一个节点，向下移动后一个节点
+                float moveDistance = neededSpace / 2.0f;
+
+                float newPrevY = prevPos.y - moveDistance;
+                float newCurrY = currPos.y + moveDistance;
 
                 // 确保不超出边界
                 newPrevY = std::max(MIN_Y, std::min(newPrevY, MAX_Y - minSpacing));
                 newCurrY = std::max(MIN_Y + minSpacing, std::min(newCurrY, MAX_Y));
 
+                // 更新位置
                 _techPositions[prevId].y = newPrevY;
                 _techPositions[currId].y = newCurrY;
             }
@@ -562,15 +626,26 @@ void TechTreePanel::adjustPositionsForConnections() {
 }
 
 // === 检查两条线段是否相交 ===
-bool TechTreePanel::doLinesCross(const Vec2& p1, const Vec2& p2,
-    const Vec2& q1, const Vec2& q2) {
-    // 简化实现：检查边界框是否相交
-    Rect rect1(std::min(p1.x, p2.x), std::min(p1.y, p2.y),
-        abs(p1.x - p2.x), abs(p1.y - p2.y));
-    Rect rect2(std::min(q1.x, q2.x), std::min(q1.y, q2.y),
-        abs(q1.x - q2.x), abs(q1.y - q2.y));
+bool TechTreePanel::doLinesCross(const Vec2& p1, const Vec2& p2, const Vec2& q1, const Vec2& q2) {
+    // 计算方向向量
+    Vec2 r = p2 - p1;
+    Vec2 s = q2 - q1;
 
-    return rect1.intersectsRect(rect2);
+    // 计算叉积
+    float rxs = r.cross(s);
+    float qpxr = (q1 - p1).cross(r);
+
+    // 如果两线段平行
+    if (abs(rxs) < 0.0001f) {
+        return false;
+    }
+
+    // 计算交点参数
+    float t = (q1 - p1).cross(s) / rxs;
+    float u = (q1 - p1).cross(r) / rxs;
+
+    // 检查交点是否在两线段上
+    return (t >= 0.0f && t <= 1.0f && u >= 0.0f && u <= 1.0f);
 }
 
 // === 创建样条曲线连接 ===
@@ -629,46 +704,46 @@ void TechTreePanel::createSplineConnection(int fromTechId, int toTechId) {
 
 // === 绘制列背景 ===
 void TechTreePanel::drawColumnBackgrounds() {
-    // 找到最大列数
-    int maxColumn = 0;
-    for (const auto& pair : _techDepth) {
-        maxColumn = std::max(maxColumn, pair.second);
-    }
+    //// 找到最大列数
+    //int maxColumn = 0;
+    //for (const auto& pair : _techDepth) {
+    //    maxColumn = std::max(maxColumn, pair.second);
+    //}
 
-    // 绘制列背景
-    const float COLUMN_WIDTH = 180.0f;
-    const float PADDING = 20.0f;
-    const float BACKGROUND_HEIGHT = 700.0f; // 增加背景高度
-    const float BACKGROUND_BOTTOM = 50.0f;   // 背景底部位置
+    //// 绘制列背景
+    //const float COLUMN_WIDTH = 180.0f;
+    //const float PADDING = 20.0f;
+    //const float BACKGROUND_HEIGHT = 700.0f; // 增加背景高度
+    //const float BACKGROUND_BOTTOM = 50.0f;   // 背景底部位置
 
-    for (int col = 0; col <= maxColumn; col++) {
-        float x = 60 + col * 200 - PADDING;
-        float width = COLUMN_WIDTH + PADDING * 2;
+    //for (int col = 0; col <= maxColumn; col++) {
+    //    float x = 60 + col * 200 - PADDING;
+    //    float width = COLUMN_WIDTH + PADDING * 2;
 
-        auto columnBg = DrawNode::create();
-        Color4F bgColor = Color4F(0.05f, 0.05f, 0.08f, 0.3f);
+    //    auto columnBg = DrawNode::create();
+    //    Color4F bgColor = Color4F(0.05f, 0.05f, 0.08f, 0.3f);
 
-        // 绘制圆角矩形列背景
-        Rect columnRect(x, BACKGROUND_BOTTOM, width, BACKGROUND_HEIGHT);
-        drawRoundedRect(columnBg, columnRect, 10.0f, bgColor);
+    //    // 绘制圆角矩形列背景
+    //    Rect columnRect(x, BACKGROUND_BOTTOM, width, BACKGROUND_HEIGHT);
+    //    drawRoundedRect(columnBg, columnRect, 10.0f, bgColor);
 
-        _contentNode->addChild(columnBg, -10);
+    //    _contentNode->addChild(columnBg, -10);
 
-        // 添加列标签（时代名称）
-        std::string columnLabel;
-        if (col == 0) columnLabel = "远古时代";
-        else if (col == 1) columnLabel = "古典时代";
-        else if (col == 2) columnLabel = "中世纪";
-        else if (col == 3) columnLabel = "文艺复兴";
-        else if (col == 4) columnLabel = "工业时代";
-        else if (col == 5) columnLabel = "现代";
-        else columnLabel = "未来时代";
+    //    // 添加列标签（时代名称）
+    //    std::string columnLabel;
+    //    if (col == 0) columnLabel = u8"远古时代";
+    //    else if (col == 1) columnLabel = u8"古典时代";
+    //    else if (col == 2) columnLabel = u8"中世纪";
+    //    else if (col == 3) columnLabel = u8"文艺复兴";
+    //    else if (col == 4) columnLabel = u8"工业时代";
+    //    else if (col == 5) columnLabel = u8"现代";
+    //    else columnLabel = u8"未来时代";
 
-        auto label = Label::createWithTTF(columnLabel, "fonts/arial.ttf", 18);
-        label->setPosition(Vec2(x + width / 2, BACKGROUND_BOTTOM + BACKGROUND_HEIGHT + 20));
-        label->setColor(Color3B(220, 220, 255));
-        _contentNode->addChild(label, -5);
-    }
+    //    auto label = Label::createWithSystemFont(columnLabel, "Arial", 18);
+    //    label->setPosition(Vec2(x + width / 2, BACKGROUND_BOTTOM + BACKGROUND_HEIGHT + 20));
+    //    label->setColor(Color3B(220, 220, 255));
+    //    _contentNode->addChild(label, -5);
+    //}
 }
 
 // === 修改拓扑排序函数（优化版） ===
@@ -719,7 +794,16 @@ std::vector<int> TechTreePanel::topologicalSort() {
 
 void TechTreePanel::updateNodeUIState(int techId, TechNodeState state) {
     auto container = _nodeUIMap[techId];
-    if (!container) return;
+    if (!container) {
+        CCLOG("ERROR: No container found for tech %d", techId);
+        return;
+    }
+
+    // 移除调试背景
+    auto debugBg = container->getChildByTag(999);
+    if (debugBg) {
+        debugBg->removeFromParent();
+    }
 
     // 获取正确的菜单项
     Menu* menu = nullptr;
@@ -740,7 +824,6 @@ void TechTreePanel::updateNodeUIState(int techId, TechNodeState state) {
         switch (state) {
             case TechNodeState::LOCKED:
                 menuItem->setEnabled(false);
-                // MenuItem没有setBright方法，所以不需要调用
                 break;
             case TechNodeState::RESEARCHABLE:
             case TechNodeState::RESEARCHING:
@@ -755,19 +838,21 @@ void TechTreePanel::updateNodeUIState(int techId, TechNodeState state) {
 
     // 获取背景（Layout）
     auto background = dynamic_cast<Layout*>(container->getChildByTag(100));
-    auto iconLabel = dynamic_cast<Label*>(container->getChildByTag(101));
-    auto nameLabel = dynamic_cast<Label*>(container->getChildByTag(102));
+    auto nameLabel = dynamic_cast<Label*>(container->getChildByTag(101));
     auto costLabel = dynamic_cast<Label*>(container->getChildByTag(103));
     auto border = dynamic_cast<DrawNode*>(container->getChildByTag(106));
     auto progressBar = dynamic_cast<DrawNode*>(container->getChildByTag(105));
 
-    if (!background || !iconLabel || !nameLabel || !costLabel || !border) {
+    if (!background || !nameLabel || !costLabel || !border) {
         CCLOG("ERROR: Failed to get UI elements for tech %d", techId);
+        if (!background) CCLOG("  - Background not found");
+        if (!nameLabel) CCLOG("  - Name label not found");
+        if (!costLabel) CCLOG("  - Cost label not found");
+        if (!border) CCLOG("  - Border not found");
         return;
     }
 
     Color3B bgColor;
-    Color3B iconColor = Color3B::WHITE;
     Color3B nameColor = Color3B::YELLOW;
     Color3B costColor = Color3B(180, 180, 255);
     Color4F borderColor = Color4F(1.0f, 1.0f, 1.0f, 0.3f);
@@ -775,33 +860,31 @@ void TechTreePanel::updateNodeUIState(int techId, TechNodeState state) {
     // 根据状态设置颜色
     switch (state) {
         case TechNodeState::LOCKED:
-            bgColor = Color3B(64, 64, 89); // 保持原来的深蓝色
-            iconColor = Color3B(120, 120, 120);
+            bgColor = Color3B(64, 64, 89);
             nameColor = Color3B(150, 150, 100);
             costColor = Color3B(120, 120, 180);
             borderColor = Color4F(0.5f, 0.5f, 0.5f, 0.3f);
             break;
         case TechNodeState::RESEARCHABLE:
-            bgColor = Color3B(89, 89, 127); // 更亮的蓝色
-            borderColor = Color4F(0.8f, 0.8f, 0.2f, 0.8f); // 金色边框
+            bgColor = Color3B(89, 89, 127);
+            borderColor = Color4F(0.8f, 0.8f, 0.2f, 0.8f);
             break;
         case TechNodeState::RESEARCHING:
-            bgColor = Color3B(204, 153, 25); // 金色
+            bgColor = Color3B(204, 153, 25);
             nameColor = Color3B(255, 230, 100);
             borderColor = Color4F(1.0f, 0.9f, 0.2f, 1.0f);
             break;
         case TechNodeState::IN_PROGRESS:
-            bgColor = Color3B(127, 127, 76); // 土黄色
+            bgColor = Color3B(127, 127, 76);
             break;
         case TechNodeState::ACTIVATED:
-            bgColor = Color3B(51, 127, 51); // 绿色
-            iconColor = Color3B(200, 255, 200);
+            bgColor = Color3B(51, 127, 51);
             nameColor = Color3B(180, 255, 180);
             borderColor = Color4F(0.2f, 0.8f, 0.2f, 1.0f);
             break;
     }
 
-    // 更新背景颜色（使用Layout的setBackGroundColor）
+    // 更新背景颜色
     background->setBackGroundColor(bgColor);
 
     // 更新边框
@@ -809,9 +892,11 @@ void TechTreePanel::updateNodeUIState(int techId, TechNodeState state) {
     border->drawRect(Vec2(2, 2), Vec2(NODE_WIDTH - 2, NODE_HEIGHT - 2), borderColor);
 
     // 更新文本颜色
-    iconLabel->setColor(iconColor);
     nameLabel->setColor(nameColor);
     costLabel->setColor(costColor);
+
+    CCLOG("Updated UI state for tech %d: name color = (%d, %d, %d)",
+        techId, nameColor.r, nameColor.g, nameColor.b);
 
     // 更新进度条（如果有）
     if (progressBar && _techTree) {
@@ -824,16 +909,16 @@ void TechTreePanel::updateNodeUIState(int techId, TechNodeState state) {
 
             Color4F progressColor;
             if (state == TechNodeState::RESEARCHING) {
-                progressColor = Color4F(0.9f, 0.7f, 0.1f, 1.0f); // 金色
+                progressColor = Color4F(0.9f, 0.7f, 0.1f, 1.0f);
             }
             else if (state == TechNodeState::ACTIVATED) {
-                progressColor = Color4F(0.1f, 0.8f, 0.1f, 1.0f); // 绿色
+                progressColor = Color4F(0.1f, 0.8f, 0.1f, 1.0f);
             }
             else {
-                progressColor = Color4F(0.2f, 0.6f, 0.2f, 1.0f); // 深绿
+                progressColor = Color4F(0.2f, 0.6f, 0.2f, 1.0f);
             }
 
-            progressBar->drawSolidRect(Vec2(5, NODE_HEIGHT - 8),
+            progressBar->drawSolidRect(Vec2(5, NODE_HEIGHT - 12),
                 Vec2(5 + width, NODE_HEIGHT - 4), progressColor);
 
             // 更新成本显示为进度
@@ -948,13 +1033,13 @@ void TechTreePanel::showTechDetail(int techId) {
     this->addChild(_detailPanel, 10);
 
     // 科技名称
-    auto nameLabel = Label::createWithTTF(techInfo->name, "fonts/arial.ttf", 28);
+    auto nameLabel = Label::createWithSystemFont(techInfo->name, "Arial", 28);
     nameLabel->setPosition(Vec2(175, 200));
     nameLabel->setColor(Color3B::YELLOW);
     _detailPanel->addChild(nameLabel);
 
     // 科技效果
-    auto effectLabel = Label::createWithTTF(techInfo->effectDescription, "fonts/arial.ttf", 18);
+    auto effectLabel = Label::createWithSystemFont(techInfo->effectDescription, "Arial", 18);
     effectLabel->setPosition(Vec2(175, 120));
     effectLabel->setDimensions(320, 120);
     effectLabel->setAlignment(TextHAlignment::LEFT);
@@ -999,7 +1084,7 @@ void TechTreePanel::showTechDetail(int techId) {
         statusText = "Locked";
     }
 
-    auto statusLabel = Label::createWithTTF(statusText, "fonts/arial.ttf", 18);
+    auto statusLabel = Label::createWithSystemFont(statusText, "Arial", 18);
     statusLabel->setPosition(Vec2(175, 30));
     statusLabel->setColor(Color3B(255, 200, 100));
     _detailPanel->addChild(statusLabel);
@@ -1031,7 +1116,7 @@ void TechTreePanel::updateControlPanel() {
     if (currentResearch > 0) {
         auto techInfo = _techTree->getTechInfo(currentResearch);
         if (techInfo) {
-            std::string researchText = "当前研究：" + techInfo->name;
+            std::string researchText = u8"当前研究：" + techInfo->name;
             _currentResearchLabel->setString(researchText);
 
             int progress = _techTree->getTechProgress(currentResearch);
@@ -1041,7 +1126,7 @@ void TechTreePanel::updateControlPanel() {
         }
     }
     else {
-        _currentResearchLabel->setString("当前研究：无");
+        _currentResearchLabel->setString(u8"当前研究：无");
         _researchProgressBar->setPercentage(0);
     }
 }

@@ -60,7 +60,7 @@ bool HUDLayer::init() {
     _btnTechTree->setTitleText("[ TECH TREE ]");
     _btnTechTree->setTitleFontSize(20);
     _btnTechTree->setTitleColor(Color3B::BLUE);
-    _btnTechTree->setPosition(Vec2(visibleSize.width - 250, 60)); // 放在下一回合按钮左边
+    _btnTechTree->setPosition(Vec2(100, visibleSize.height - 70)); // 屏幕左上角
     _btnTechTree->addClickEventListener([this](Ref*) {
         this->openTechTree();
         });
