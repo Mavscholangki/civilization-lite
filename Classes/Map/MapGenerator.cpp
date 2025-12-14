@@ -419,5 +419,100 @@ std::map<Hex, TileData> MapGenerator::generate(int width, int height) {
         }
     }
 
+    // ========================================================================
+    // 步骤 8：初始化地形产出
+    // ========================================================================
+    for (auto& pair : map_data) {
+        TileData& tile = pair.second;
+
+        // 根据地形类型初始化产出
+        // 【关键】山脉和深海没有产出
+        switch(tile.type) {
+            case TerrainType::OCEAN:
+                // 深海：没有产出
+                tile.food = 0;
+                tile.gold = 0;
+                tile.production = 0;
+                tile.science = 0;
+                tile.culture = 0;
+                break;
+                
+            case TerrainType::COAST:
+                // 浅海：有产出
+                tile.food = 2;
+                tile.gold = 1;
+                tile.production = 0;
+                tile.science = 0;
+                tile.culture = 0;
+                break;
+                
+            case TerrainType::DESERT:
+                // 沙漠：少量产出
+                tile.food = 0;
+                tile.gold = 1;
+                tile.production = 1;
+                tile.science = 0;
+                tile.culture = 0;
+                break;
+                
+            case TerrainType::PLAINS:
+                // 平原：标准产出
+                tile.food = 2;
+                tile.gold = 1;
+                tile.production = 2;
+                tile.science = 0;
+                tile.culture = 0;
+                break;
+                
+            case TerrainType::GRASSLAND:
+                // 草原：粮食丰富
+                tile.food = 3;
+                tile.gold = 0;
+                tile.production = 1;
+                tile.science = 0;
+                tile.culture = 0;
+                break;
+                
+            case TerrainType::JUNGLE:
+                // 雨林：多样化产出
+                tile.food = 2;
+                tile.gold = 0;
+                tile.production = 1;
+                tile.science = 1;
+                tile.culture = 1;
+                break;
+                
+            case TerrainType::TUNDRA:
+                // 冻土：极少产出
+                tile.food = 1;
+                tile.gold = 0;
+                tile.production = 0;
+                tile.science = 0;
+                tile.culture = 0;
+                break;
+                
+            case TerrainType::SNOW:
+                // 雪地：没有产出
+                tile.food = 0;
+                tile.gold = 0;
+                tile.production = 0;
+                tile.science = 0;
+                tile.culture = 0;
+                break;
+                
+            case TerrainType::MOUNTAIN:
+                // 山脉：没有产出
+                tile.food = 0;
+                tile.gold = 0;
+                tile.production = 0;
+                tile.science = 0;
+                tile.culture = 0;
+                break;
+                
+            default:
+                break;
+        }
+    }
+
     return map_data;
 }
