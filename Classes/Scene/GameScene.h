@@ -4,6 +4,7 @@
 #include "cocos2d.h"
 
 class TechTree;
+class CultureTree;
 class HUDLayer;
 class GameMapLayer;
 class AbstractUnit;
@@ -19,10 +20,12 @@ public:
 private:
     // 私有实现方法
     void initTechTree();
+    void initCultureTree();
     void setupCallbacks();
 
     // 私有成员（使用前向声明的指针）
     TechTree* _techTree;    // 科技系统实例
+    CultureTree* _cultureTree;  // 文化系统实例
     HUDLayer* _hudLayer;    // HUD层引用
     GameMapLayer* _mapLayer; // 地图层引用
 };

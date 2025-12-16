@@ -2,6 +2,7 @@
 #include "../Map/GameMapLayer.h"
 #include "../UI/HUDLayer.h"
 #include "../Development/TechSystem.h"
+#include "../Development/CultureSystem.h"
 #include "../Units/Base/AbstractUnit.h"  // 如果需要AbstractUnit的完整定义
 
 USING_NS_CC;
@@ -23,8 +24,9 @@ bool GameScene::init() {
     if (!_hudLayer) return false;
     this->addChild(_hudLayer, 100);
 
-    // 初始化科技树
+    // 初始化树
     initTechTree();
+    initCultureTree();
 
     // 设置回调函数
     setupCallbacks();
@@ -50,6 +52,36 @@ void GameScene::initTechTree() {
     }
 
     CCLOG("TechTree system initialized");
+}
+
+void GameScene::initCultureTree() {
+    // 创建文化系统实例
+    _cultureTree = new CultureTree();
+
+    if (!_cultureTree) {
+        CCLOG("ERROR: Failed to create CultureTree!");
+        return;
+    }
+
+    // 初始化文化树
+    _cultureTree->initializeCultureTree();
+
+    // 设置一个默认的当前研究文化（例如101：法典）
+    std::vector<int> unlockable = _cultureTree->getUnlockableCultureList();
+    if (!unlockable.empty()) {
+        _cultureTree->setCurrentResearch(unlockable[0]);
+        CCLOG("Set default culture research to: %d", unlockable[0]);
+    }
+    else {
+        CCLOG("No unlockable cultures available");
+    }
+
+    // 设置HUD层的文化系统
+    if (_hudLayer && _cultureTree) {
+        _hudLayer->setCultureTree(_cultureTree);
+    }
+
+    CCLOG("CultureTree system initialized");
 }
 
 void GameScene::setupCallbacks() {
@@ -81,10 +113,16 @@ void GameScene::setupCallbacks() {
             int sciencePerTurn = 5; // 可根据城市、建筑等计算
 
             // 更新科技进度
-            _techTree->addSciencePoints(sciencePerTurn);
+            _techTree->updateProgress(sciencePerTurn);
 
             // 如果HUD层有更新科学值的方法，可以调用
             // _hudLayer->updateScience(sciencePerTurn);
+        }
+
+        // 新增：文化系统更新
+        if (_cultureTree) {
+            int culturePerTurn = 3; // 可根据纪念碑、剧院等计算
+            _cultureTree->updateProgress(culturePerTurn);
         }
 
         // 更新资源显示
@@ -94,8 +132,10 @@ void GameScene::setupCallbacks() {
         gold += 5; // 每回合+5金币
         static int science = 0;
         science += 5; // 每回合+5科研
+        static int culture = 0;
+        culture += 3; // 每回合+3文化
 
-        _hudLayer->updateResources(gold, science, turn);
+        _hudLayer->updateResources(gold, science, culture, turn);
         });
 }
 
@@ -104,6 +144,12 @@ void GameScene::onExit() {
     if (_techTree) {
         delete _techTree;
         _techTree = nullptr;
+    }
+
+    // 清理文化树
+    if (_cultureTree) {
+        delete _cultureTree;
+        _cultureTree = nullptr;
     }
 
     // 调用父类的onExit

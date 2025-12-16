@@ -17,7 +17,7 @@ bool HUDLayer::init() {
     topBar->setPosition(Vec2(0, visibleSize.height - 40));
     this->addChild(topBar);
 
-    _resLabel = Label::createWithSystemFont("Turn: 1  |  Gold: 0  |  Science: 0", "Arial", 18);
+    _resLabel = Label::createWithSystemFont("Turn: 1  |  Gold: 0  |  Science: 0  |  Culture: 0", "Arial", 18);
     _resLabel->setAnchorPoint(Vec2(0.5, 0.5));
     _resLabel->setPosition(Vec2(visibleSize.width / 2, 20)); // 相对于 topBar
     topBar->addChild(_resLabel);
@@ -68,6 +68,21 @@ bool HUDLayer::init() {
     _techTreePanel = nullptr;
     _techTree = nullptr;
     _isTechTreeOpen = false;
+
+    // --- 6. 新增：文化树按钮 ---
+    _btnCultureTree = Button::create();
+    _btnCultureTree->setTitleText("[ CULTURE TREE ]");
+    _btnCultureTree->setTitleFontSize(20);
+    _btnCultureTree->setTitleColor(Color3B(200, 100, 255)); // 紫色
+    _btnCultureTree->setPosition(Vec2(100, visibleSize.height - 110));
+    _btnCultureTree->addClickEventListener([this](Ref*) {
+        this->openCultureTree();
+        });
+    this->addChild(_btnCultureTree);
+    _cultureTreePanel = nullptr;
+    _cultureTree = nullptr;
+    _isCultureTreeOpen = false;
+
     // --- 监听科技树关闭事件 ---
     auto listener = cocos2d::EventListenerCustom::create("tech_tree_closed",
         [this](cocos2d::EventCustom* event) {
@@ -75,6 +90,12 @@ bool HUDLayer::init() {
         });
     this->getEventDispatcher()->addEventListenerWithSceneGraphPriority(listener, this);
 
+    // --- 监听文化树关闭事件 ---
+    auto cultureListener = cocos2d::EventListenerCustom::create("culture_tree_closed",
+        [this](cocos2d::EventCustom* event) {
+            this->closeCultureTree();
+        });
+    this->getEventDispatcher()->addEventListenerWithSceneGraphPriority(cultureListener, this);
 
     // 面板里的内容
     _unitNameLabel = Label::createWithSystemFont("Unit Name", "Arial", 22);
@@ -117,9 +138,9 @@ void HUDLayer::hideUnitInfo() {
 
 void HUDLayer::setNextTurnCallback(const std::function<void()>& cb) { _onNextTurn = cb; }
 
-void HUDLayer::updateResources(int gold, int science, int turn) {
+void HUDLayer::updateResources(int gold, int science, int culture, int turn) {
     char buf[100];
-    sprintf(buf, "Turn: %d  |  Gold: %d  |  Science: %d", turn, gold, science);
+    sprintf(buf, "Turn: %d  |  Gold: %d  |  Science: %d  |  Culture: %d", turn, gold, science, culture);
     _resLabel->setString(buf);
 
     updateSciencePerTurn(science);
@@ -127,7 +148,7 @@ void HUDLayer::updateResources(int gold, int science, int turn) {
 
 void HUDLayer::setBuildCityCallback(const std::function<void()>& cb) { _onBuildCity = cb; }
 
-// 新增方法 - 科技树相关
+// 科技树相关
 void HUDLayer::openTechTree() {
     if (_isTechTreeOpen || !_techTree) return;
 
@@ -171,5 +192,57 @@ void HUDLayer::setTechTree(TechTree* techTree) {
 void HUDLayer::updateSciencePerTurn(int science) {
     if (_techTreePanel && _isTechTreeOpen) {
         _techTreePanel->setSciencePerTurn(science);
+    }
+}
+
+// 文化树相关
+void HUDLayer::openCultureTree() {
+    if (_isCultureTreeOpen || !_cultureTree) return;
+
+    // 如果科技树已打开，先关闭科技树
+    if (_isTechTreeOpen) {
+        closeTechTree();
+    }
+
+    // 创建文化树面板
+    _cultureTreePanel = CultureTreePanel::create();
+    if (!_cultureTreePanel) return;
+
+    // 设置文化系统
+    _cultureTreePanel->setCultureTree(_cultureTree);
+
+    // 添加为子节点
+    this->addChild(_cultureTreePanel, 100);
+
+    // 更新状态
+    _isCultureTreeOpen = true;
+
+    // 禁用文化树按钮
+    _btnCultureTree->setEnabled(false);
+    _btnCultureTree->setTitleColor(Color3B::GRAY);
+}
+
+void HUDLayer::closeCultureTree() {
+    if (!_isCultureTreeOpen || !_cultureTreePanel) return;
+
+    // 移除文化树面板
+    _cultureTreePanel->removeFromParent();
+    _cultureTreePanel = nullptr;
+
+    // 更新状态
+    _isCultureTreeOpen = false;
+
+    // 重新启用按钮
+    _btnCultureTree->setEnabled(true);
+    _btnCultureTree->setTitleColor(Color3B(200, 100, 255));
+}
+
+void HUDLayer::setCultureTree(CultureTree* cultureTree) {
+    _cultureTree = cultureTree;
+}
+
+void HUDLayer::updateCulturePerTurn(int culture) {
+    if (_cultureTreePanel && _isCultureTreeOpen) {
+        _cultureTreePanel->setCulturePerTurn(culture);
     }
 }

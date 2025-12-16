@@ -3,9 +3,11 @@
 
 #include "cocos2d.h"
 #include "ui/CocosGUI.h"
-#include "../Units/Base/AbstractUnit.h" // 引用单位基类
-#include "../Development/TechSystem.h"  // 引用科技树
-#include "TechTreePanel.h"              // 引用科技树UI
+#include "../Units/Base/AbstractUnit.h"
+#include "../Development/TechSystem.h"
+#include "../Development/CultureSystem.h"
+#include "TechTreePanel.h"
+#include "CultureTreePanel.h"
 
 class HUDLayer : public cocos2d::Layer {
 public:
@@ -13,7 +15,7 @@ public:
     CREATE_FUNC(HUDLayer);
 
     // 更新顶部资源
-    void updateResources(int gold, int science, int turn);
+    void updateResources(int gold, int science, int culture, int turn);
 
     // 【新功能】显示单位详情面板
     void showUnitInfo(AbstractUnit* unit);
@@ -24,11 +26,17 @@ public:
     void setNextTurnCallback(const std::function<void()>& cb);
     void setBuildCityCallback(const std::function<void()>& cb);
 
-    // 新增方法 - 科技树相关
-    void openTechTree();                     // 打开科技树面板
-    void closeTechTree();                    // 关闭科技树面板
-    void setTechTree(TechTree* techTree);    // 设置科技系统
-    void updateSciencePerTurn(int science);  // 更新每回合科研值
+    // 科技树相关方法
+    void openTechTree();
+    void closeTechTree();
+    void setTechTree(TechTree* techTree);
+    void updateSciencePerTurn(int science);
+
+    // 文化树相关方法
+    void openCultureTree();
+    void closeCultureTree();
+    void setCultureTree(CultureTree* cultureTree);
+    void updateCulturePerTurn(int culture);
 
 private:
     cocos2d::Label* _resLabel;  // 资源文字
@@ -40,11 +48,17 @@ private:
     cocos2d::ui::Button* _btnBuildCity; // 新增按钮
     std::function<void()> _onBuildCity;
 
-    // 新增成员 - 科技树相关
+    // 科技树相关成员
     cocos2d::ui::Button* _btnTechTree;       // 打开科技树按钮
     TechTreePanel* _techTreePanel;           // 科技树面板
     TechTree* _techTree;                     // 科技系统引用
     bool _isTechTreeOpen;                    // 科技树是否打开
+
+    // 文化树相关成员
+    cocos2d::ui::Button* _btnCultureTree;       // 文化树按钮
+    CultureTreePanel* _cultureTreePanel;        // 文化树面板
+    CultureTree* _cultureTree;                  // 文化系统引用
+    bool _isCultureTreeOpen;                    // 文化树是否打开
 };
 
 #endif
