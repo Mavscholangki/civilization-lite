@@ -17,52 +17,62 @@ void CultureTree::initializeCultureTree() {
 	// 第1层：远古时代市政
 	cultureList.emplace(101, CultureNode(101, u8"法典", 25, {}, u8"解锁基础法律系统，建立社会秩序"));
 	cultureList[101].policySlotCount[0] = 1; // 1个军事政策槽
+	cultureList[101].unlockedPolicyIds = { 1001, 2001 }; // 征兵, 城市规划
 
 	// 第2层：古典时代市政
 	cultureList.emplace(102, CultureNode(102, u8"技艺", 50, { 101 }, u8"解锁艺术和手工艺，提升文化产出"));
 	cultureList[102].policySlotCount[1] = 1; // 1个经济政策槽
+	cultureList[102].unlockedPolicyIds = { 2002 }; // 贸易联盟
 
 	cultureList.emplace(103, CultureNode(103, u8"政治哲学", 50, { 101 }, u8"建立政治理论，解锁新政府形式"));
-	cultureList[103].unlockedGovernmentList = { GovernmentType::AUTOCRACY,
-											   GovernmentType::OLIGARCHY };
+	cultureList[103].unlockedGovernmentList = { GovernmentType::AUTOCRACY, GovernmentType::OLIGARCHY };
 	cultureList[103].policySlotCount[3] = 1; // 1个通用政策槽
+	cultureList[103].unlockedPolicyIds = { 3001, 4001 }; // 外交联盟, 启示录
 
 	// 第3层：中世纪市政
 	cultureList.emplace(104, CultureNode(104, u8"公会", 80, { 102 }, u8"解锁行会制度，促进经济发展"));
 	cultureList[104].policySlotCount[1] = 2; // 2个经济政策槽
+	cultureList[104].unlockedPolicyIds = { 2003 }; // 市场经济
 
 	cultureList.emplace(105, CultureNode(105, u8"封建主义", 80, { 103 }, u8"建立封建制度，强化地方统治"));
 	cultureList[105].unlockedGovernmentList = { GovernmentType::MONARCHY };
+	cultureList[105].unlockedPolicyIds = { 1002 }; // 军团
 
 	cultureList.emplace(106, CultureNode(106, u8"历史记录", 80, { 103 }, u8"建立历史档案，提升文化传承"));
+	cultureList[106].unlockedPolicyIds = { 4002 }; // 哲学
 
 	// 第4层：文艺复兴市政
 	cultureList.emplace(107, CultureNode(107, u8"人文主义", 120, { 106 }, u8"强调人文价值，促进艺术发展"));
 	cultureList[107].policySlotCount[2] = 1; // 1个外交政策槽
+	cultureList[107].unlockedPolicyIds = { 3002 }; // 启蒙思想
 
 	// 第5层：工业时代市政
 	cultureList.emplace(108, CultureNode(108, u8"启蒙运动", 200, { 107 }, u8"提倡理性主义，开启科学革命"));
 	cultureList[108].policySlotCount[0] = 2; // 2个军事政策槽
 	cultureList[108].policySlotCount[1] = 2; // 2个经济政策槽
+	cultureList[108].unlockedPolicyIds = { 1004, 1005 }; // 纪律, 佣兵制
 
 	cultureList.emplace(109, CultureNode(109, u8"意识形态", 200, { 107 }, u8"形成明确的政治意识形态"));
-	cultureList[109].unlockedGovernmentList = { GovernmentType::DEMOCRACY,
-												GovernmentType::COMMUNISM,
-												GovernmentType::FASCISM };
+	cultureList[109].unlockedGovernmentList = { GovernmentType::DEMOCRACY, GovernmentType::COMMUNISM, GovernmentType::FASCISM };
+	cultureList[109].unlockedPolicyIds = { 4003 }; // 黄金时代
 
 	// 第6层：现代市政
 	cultureList.emplace(110, CultureNode(110, u8"城市化", 300, { 108 }, u8"促进城市发展，提高人口容量"));
 	cultureList[110].policySlotCount[3] = 2; // 2个通用政策槽
+	cultureList[110].unlockedPolicyIds = { 2004 }; // 工业革命
 
 	// 第7层：信息时代市政
 	cultureList.emplace(111, CultureNode(111, u8"太空竞赛", 400, { 110 }, u8"开启太空探索，追求科技进步"));
 	cultureList[111].unlockedGovernmentList = { GovernmentType::CORPORATE_LIBERTY };
+	cultureList[111].unlockedPolicyIds = { 4004 }; // 科学革命
 
 	cultureList.emplace(112, CultureNode(112, u8"极端主义", 400, { 109 }, u8"极端政治思想，激进行动"));
+	// 112不分配政策卡，代表负面效应
 
 	cultureList.emplace(113, CultureNode(113, u8"全球化", 400, { 110 }, u8"促进全球合作，加强国际关系"));
 	cultureList[113].policySlotCount[2] = 2; // 2个外交政策槽
 	cultureList[113].unlockedGovernmentList = { GovernmentType::DIGITAL_DEMOCRACY };
+	cultureList[113].unlockedPolicyIds = { 3003 }; // 国际合作
 
 	// 设置解锁关系
 	// 第1层解锁第2层
@@ -177,15 +187,13 @@ void CultureTree::activateCulture(int cultureId) {
 			it->second.policySlotCount[i]);
 	}
 
-	// 如果当前正在研究这个市政，重置当前研究
 	if (currentResearchCulture == cultureId) {
 		currentResearchCulture = -1;
 	}
 
-	// 通知监听器
+	// 通知监听器（包括政策系统的监听器）
 	notifyCultureUnlocked(cultureId, it->second.name, it->second.effectDescription);
 
-	// 处理连锁激活
 	onCultureUnlocked_internal(cultureId);
 }
 
@@ -296,6 +304,35 @@ bool CultureTree::isGovernmentUnlocked(GovernmentType government) const {
 		}
 	}
 	return false;
+}
+
+// 新增：获取所有已解锁的政策ID
+std::vector<int> CultureTree::getUnlockedPolicyIds() const {
+	std::vector<int> allPolicyIds;
+	for (int cultureId : activatedCultureList) {
+		auto it = cultureList.find(cultureId);
+		if (it != cultureList.end()) {
+			for (int policyId : it->second.unlockedPolicyIds) {
+				allPolicyIds.push_back(policyId);
+			}
+		}
+	}
+
+	// 去重
+	std::sort(allPolicyIds.begin(), allPolicyIds.end());
+	allPolicyIds.erase(std::unique(allPolicyIds.begin(), allPolicyIds.end()),
+		allPolicyIds.end());
+
+	return allPolicyIds;
+}
+
+// 新增：根据文化ID获取解锁的政策
+std::vector<int> CultureTree::getPoliciesUnlockedByCulture(int cultureId) const {
+	auto it = cultureList.find(cultureId);
+	if (it != cultureList.end() && it->second.activated) {
+		return it->second.unlockedPolicyIds;
+	}
+	return {};
 }
 
 // 添加事件监听器

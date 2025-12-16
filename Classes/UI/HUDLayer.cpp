@@ -55,7 +55,7 @@ bool HUDLayer::init() {
         });
     this->addChild(_btnBuildCity);
 
-    // --- 5. 科技树按钮（新增）---
+    // --- 5. 科技树按钮---
     _btnTechTree = Button::create();
     _btnTechTree->setTitleText("[ TECH TREE ]");
     _btnTechTree->setTitleFontSize(20);
@@ -69,7 +69,7 @@ bool HUDLayer::init() {
     _techTree = nullptr;
     _isTechTreeOpen = false;
 
-    // --- 6. 新增：文化树按钮 ---
+    // --- 6. 文化树按钮 ---
     _btnCultureTree = Button::create();
     _btnCultureTree->setTitleText("[ CULTURE TREE ]");
     _btnCultureTree->setTitleFontSize(20);
@@ -96,6 +96,28 @@ bool HUDLayer::init() {
             this->closeCultureTree();
         });
     this->getEventDispatcher()->addEventListenerWithSceneGraphPriority(cultureListener, this);
+
+    // --- 政策系统按钮 ---
+    _btnPolicySystem = Button::create();
+    _btnPolicySystem->setTitleText("[ POLICY SYSTEM ]");
+    _btnPolicySystem->setTitleFontSize(20);
+    _btnPolicySystem->setTitleColor(Color3B(255, 150, 50)); // 橙色
+    _btnPolicySystem->setPosition(Vec2(100, visibleSize.height - 150));
+    _btnPolicySystem->addClickEventListener([this](Ref*) {
+        this->openPolicyPanel();
+        });
+    this->addChild(_btnPolicySystem);
+
+    _policyPanel = nullptr;
+    _policyManager = nullptr;
+    _isPolicyPanelOpen = false;
+
+    // --- 监听政策面板关闭事件 ---
+    auto policyListener = cocos2d::EventListenerCustom::create("policy_panel_closed",
+        [this](cocos2d::EventCustom* event) {
+            this->closePolicyPanel();
+        });
+    this->getEventDispatcher()->addEventListenerWithSceneGraphPriority(policyListener, this);
 
     // 面板里的内容
     _unitNameLabel = Label::createWithSystemFont("Unit Name", "Arial", 22);
@@ -245,4 +267,56 @@ void HUDLayer::updateCulturePerTurn(int culture) {
     if (_cultureTreePanel && _isCultureTreeOpen) {
         _cultureTreePanel->setCulturePerTurn(culture);
     }
+}
+
+// 政策系统相关
+void HUDLayer::openPolicyPanel() {
+    if (_isPolicyPanelOpen || !_policyManager || !_cultureTree) return;
+
+    // 如果科技树或文化树已打开，先关闭它们
+    if (_isTechTreeOpen) {
+        closeTechTree();
+    }
+    if (_isCultureTreeOpen) {
+        closeCultureTree();
+    }
+
+    // 创建政策面板
+    _policyPanel = PolicyPanel::create();
+    if (!_policyPanel) return;
+
+    // 设置政策管理器
+    _policyPanel->setPolicyManager(_policyManager);
+
+    // 设置文化树
+    _policyPanel->setCultureTree(_cultureTree);
+
+    // 添加为子节点
+    this->addChild(_policyPanel, 100);
+
+    // 更新状态
+    _isPolicyPanelOpen = true;
+
+    // 禁用按钮
+    _btnPolicySystem->setEnabled(false);
+    _btnPolicySystem->setTitleColor(Color3B::GRAY);
+}
+
+void HUDLayer::closePolicyPanel() {
+    if (!_isPolicyPanelOpen || !_policyPanel) return;
+
+    // 移除政策面板
+    _policyPanel->removeFromParent();
+    _policyPanel = nullptr;
+
+    // 更新状态
+    _isPolicyPanelOpen = false;
+
+    // 重新启用按钮
+    _btnPolicySystem->setEnabled(true);
+    _btnPolicySystem->setTitleColor(Color3B(255, 150, 50));
+}
+
+void HUDLayer::setPolicyManager(PolicyManager* policyManager) {
+    _policyManager = policyManager;
 }

@@ -8,6 +8,7 @@
 #include "../Development/CultureSystem.h"
 #include "TechTreePanel.h"
 #include "CultureTreePanel.h"
+#include "PolicyPanel.h"
 
 class HUDLayer : public cocos2d::Layer {
 public:
@@ -38,6 +39,12 @@ public:
     void setCultureTree(CultureTree* cultureTree);
     void updateCulturePerTurn(int culture);
 
+    // 政策系统相关方法
+    void openPolicyPanel();
+    void closePolicyPanel();
+    void setPolicyManager(PolicyManager* policyManager);
+    PolicyPanel* getPolicyPanel() const { return _policyPanel; }
+
 private:
     cocos2d::Label* _resLabel;  // 资源文字
     cocos2d::ui::Layout* _unitPanel; // 左下角的单位信息面板容器
@@ -59,6 +66,12 @@ private:
     CultureTreePanel* _cultureTreePanel;        // 文化树面板
     CultureTree* _cultureTree;                  // 文化系统引用
     bool _isCultureTreeOpen;                    // 文化树是否打开
+
+    // 政策系统相关成员
+    cocos2d::ui::Button* _btnPolicySystem = nullptr;  // 政策系统按钮
+    PolicyPanel* _policyPanel = nullptr;              // 政策面板
+    PolicyManager* _policyManager = nullptr;          // 政策管理器引用
+    bool _isPolicyPanelOpen = false;                  // 政策面板是否打开
 };
 
 #endif

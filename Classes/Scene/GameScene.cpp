@@ -27,6 +27,7 @@ bool GameScene::init() {
     // 初始化树
     initTechTree();
     initCultureTree();
+    initPolicySystem();
 
     // 设置回调函数
     setupCallbacks();
@@ -84,6 +85,58 @@ void GameScene::initCultureTree() {
     CCLOG("CultureTree system initialized");
 }
 
+void GameScene::initPolicySystem() {
+    // 创建政策管理器
+    _policyManager = new PolicyManager();
+
+    if (!_policyManager) {
+        CCLOG("ERROR: Failed to create PolicyManager!");
+        return;
+    }
+
+    // 初始化政策系统
+    _policyManager->initializePolicies();
+
+    // 设置文化树引用
+    if (_cultureTree) {
+        // 设置政府获取回调
+        _policyManager->setGovernmentGetter([this]() {
+            return _cultureTree->getCurrentGovernment();
+            });
+
+        // 设置政策获取回调
+        _policyManager->setPolicyGetter([this](int cultureId) {
+            return _cultureTree->getPoliciesUnlockedByCulture(cultureId);
+            });
+
+        // 设置政策解锁回调
+        _policyManager->setPolicyUnlockedCallback([this](int policyId) {
+            CCLOG("Policy %d unlocked via callback", policyId);
+            });
+
+        // 关键：将PolicyManager作为监听器添加到文化系统
+        _cultureTree->addEventListener(_policyManager);
+        CCLOG("PolicyManager registered as CultureEventListener");
+    }
+
+    // 设置初始政策槽位
+    if (_cultureTree) {
+        const int* slots = _cultureTree->getActivePolicySlots();
+        _policyManager->setPolicySlots(slots[0], slots[1], slots[2], slots[3]);
+        CCLOG("Initial policy slots: Military=%d, Economic=%d, Diplomatic=%d, Wildcard=%d",
+            slots[0], slots[1], slots[2], slots[3]);
+    }
+
+    // 设置HUD层的政策管理器
+    if (_hudLayer) {
+        _hudLayer->setPolicyManager(_policyManager);
+        CCLOG("PolicyManager set on HUDLayer");
+    }
+
+    CCLOG("Policy system initialized with %zu unlocked policies",
+        _policyManager->getUnlockedPolicies().size());
+}
+
 void GameScene::setupCallbacks() {
     // --- 回调设置 ---
 
@@ -109,20 +162,20 @@ void GameScene::setupCallbacks() {
 
         // 科技系统更新
         if (_techTree) {
-            // 假设每回合获得科研值
             int sciencePerTurn = 5; // 可根据城市、建筑等计算
-
-            // 更新科技进度
             _techTree->updateProgress(sciencePerTurn);
-
-            // 如果HUD层有更新科学值的方法，可以调用
-            // _hudLayer->updateScience(sciencePerTurn);
         }
 
-        // 新增：文化系统更新
+        // 文化系统更新
         if (_cultureTree) {
             int culturePerTurn = 3; // 可根据纪念碑、剧院等计算
             _cultureTree->updateProgress(culturePerTurn);
+        }
+
+        // 新增：政策系统更新（如果需要每回合处理什么）
+        if (_policyManager) {
+            // 例如：检查政策组合效果是否持续激活
+            _policyManager->checkPolicyCombos();
         }
 
         // 更新资源显示
@@ -150,6 +203,12 @@ void GameScene::onExit() {
     if (_cultureTree) {
         delete _cultureTree;
         _cultureTree = nullptr;
+    }
+
+    // 清理政策管理器
+    if (_policyManager) {
+        delete _policyManager;
+        _policyManager = nullptr;
     }
 
     // 调用父类的onExit

@@ -37,6 +37,11 @@ struct CultureNode {
 	std::vector<GovernmentType> unlockedGovernmentList;
 	// 市政解锁的政策卡槽位
 	int policySlotCount[4]; // 4个索引依次是[军事,经济,外交,通用]
+	// 新增：解锁的政策卡ID列表
+	std::vector<int> unlockedPolicyIds;
+
+	// 新增：政策槽位类型枚举
+	enum class SlotType { MILITARY, ECONOMIC, DIPLOMATIC, WILDCARD };
 
 	CultureNode() = default;// 防止系统调用出错
 	CultureNode(int id, const std::string& name, int cost, const std::vector<int>& prereqs, const std::string& effect = "");
@@ -113,6 +118,25 @@ public:
 	int getCultureProgress(int cultureId) const;
 	int getCultureCost(int cultureId) const; // 新增：获取文化成本
 	const int* getActivePolicySlots() const { return activePolicySlots; }
+
+	// 新增：获取已解锁的政策ID（供政策系统调用）
+	std::vector<int> getUnlockedPolicyIds() const;
+
+	// 新增：根据文化ID获取解锁的政策ID
+	std::vector<int> getPoliciesUnlockedByCulture(int cultureId) const;
+
+	// 新增：获取当前可用的政策槽位信息
+	struct PolicySlotInfo {
+		int military;
+		int economic;
+		int diplomatic;
+		int wildcard;
+	};
+
+	PolicySlotInfo getPolicySlotInfo() const {
+		return { activePolicySlots[0], activePolicySlots[1],
+				activePolicySlots[2], activePolicySlots[3] };
+	}
 
 	// 事件监听器管理
 	void addEventListener(CultureEventListener* listener);
