@@ -7,6 +7,7 @@
 #include "cocos2d.h"
 #include "Utils/HexUtils.h"
 #include "District/Base/District.h"
+#include "../UI/CityProductionPanel.h"
 #include "Yield.h"
 
 class District;
@@ -18,12 +19,19 @@ public:
     static BaseCity* create(Hex pos, std::string name);
     bool initCity(Hex pos, std::string name);
 	void drawBoundary(); // 绘制城市边界
+	void updateYield(); // 更新城市总产出
+
+    void updateDistribution(); // 更新分配信息
+    
+	void updatePanel(); // 更新生产面板信息
     // 城市属性
     std::string cityName;
-    int population;
+	int population; // 城市人口
+	int unallocated; // 未分配人口
 	Yield cityYield; // 城市总产出
 	std::list <District*> districts; // 城市内的区域列表
 	std::vector<Hex> territory; // 城市领土范围(包含城市所在格子)
+	std::map<Hex, int> populationDistribution; // 人口分配情况(地块坐标 -> 分配人口数)
 
 
     // 回合结算逻辑
@@ -35,8 +43,10 @@ private:
     }
 	void addToTerritory(Hex tile) {
 		territory.push_back(tile);
+		populationDistribution[tile] = 0;
 	}
-    cocos2d::Label* _nameLabel;
+    CityProductionPanel* productionPanelLayer;
+    cocos2d::ui::Button * _nameLabel;
     cocos2d::Node* _visual;
 	cocos2d::Node* _boundaryVisual;
 };

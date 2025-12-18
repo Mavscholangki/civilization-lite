@@ -10,9 +10,6 @@
 #include "City/Yield.h"
 #include <list> 
 
-#ifdef __BUILDING_H__ // Building 类尚未完成...
-class Building;
-#endif
 
 
 class District {
@@ -80,11 +77,9 @@ public:
 
 	District(Hex pos, DistrictType type, std::string name);
 	bool addProduction(int production);
-	virtual void calculateAdjacencyBonus() = 0;
+	virtual void calculateBonus();
 	void updateGrossYield();
-#ifdef __BUILDING_H__
-	bool addBuilding(Building addedBuilding);
-#endif
+	// bool addBuilding(Building addedBuilding);
 	inline int getConstructionProgress() { return currentProgress; }
 	inline int getID() { return _id; }
 	inline DistrictType getType() { return _type; }
@@ -93,7 +88,7 @@ public:
 	inline Yield getYield() { return grossYield; }
 
 protected:
-	virtual bool canErectDistrict() = 0;
+	virtual bool canErectDistrict(Hex where);
 
 	// 计数所有的区域,便于编号
 	static int count;
@@ -111,6 +106,7 @@ protected:
 	int productionCost; // 区域所耗生产力
 	int currentProgress; // 区域建造进度
 	int turnsRemaining; // 区域建成预计剩余回合数
+	// std::vector<Building*> buildings; // 区域内建筑列表
 
 	// 产出相关
 	Yield baseYield; // 区域基础产出 

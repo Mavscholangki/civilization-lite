@@ -19,6 +19,16 @@ struct Yield {
         ret.cultureYield = cultureYield + other.cultureYield;
         return ret;
     }
+
+    Yield& operator+=(const Yield& other)
+    {
+		foodYield += other.foodYield;
+		productionYield += other.productionYield;
+		scienceYield += other.scienceYield;
+		goldYield += other.goldYield;
+		cultureYield += other.cultureYield;
+		return *this;
+    }
 };
 
 #endif

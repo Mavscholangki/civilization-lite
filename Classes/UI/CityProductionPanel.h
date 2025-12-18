@@ -3,8 +3,29 @@
 
 
 #include "cocos2d.h"
-#include "City/BaseCity.h"
+#include "Utils/HexUtils.h"
 #include "UI/CocosGUI.h"
+#include "City/Yield.h"
+
+USING_NS_CC;
+
+class PopulationDistributionPanel : public cocos2d::ui::Layout {
+public:
+	bool init();
+	CREATE_FUNC(PopulationDistributionPanel);
+
+	void updatePanel(std::map<Hex, int> populationDistribution, int population);
+	void manualDistribute(Hex tileIndex); // 手动分配人口到指定地块
+	void addListItem(Node* item); // 向列表中添加项目
+	void createNewItem(Hex tile, bool isWorked); // 创建新的地块项目
+	std::map<Hex, int> currentDistribution; // 当前分配状态
+	ui::ScrollView* workedTilesList; // 显示耕作地块的列表
+private:
+	bool visible;
+	bool selected; // 有地块被选中将调走人口，否则为false，与selectedTile配合使用
+	Hex selectedTile; // 选中的地块(当手动调整时用到)
+	ui::Button* selectedItem; // 选中的地块对应的按钮
+};
 
 class PanelItem : public cocos2d::ui::Button {
 public:
@@ -53,24 +74,35 @@ public:
 	}
 };
 
+class ProductionPanel : public cocos2d::ui::Layout {
+public:
+	bool init();
+	CREATE_FUNC(ProductionPanel);
+	void addListItem(cocos2d::ui::ScrollView* listView, Node* item);
+	void createNewButtonItem(std::string name, PanelItem::ItemType toWhichList, int cost);
+	void createNewLabelItem(std::string text, PanelItem::ItemType toWhichList);
+private:
+	cocos2d::ui::Button* ProductButton;
+	cocos2d::ui::Button* PurchaseButton;
+	cocos2d::ui::ScrollView* ProductList;
+	cocos2d::ui::ScrollView* PurchaseList;
+};
 
 class CityProductionPanel : public cocos2d::Layer {
 public:
 	bool init();
 	CREATE_FUNC(CityProductionPanel);
 
-	void addListItem(cocos2d::ui::ScrollView* listView, Node* item);
-	void createNewButtonItem(std::string name, PanelItem::ItemType toWhichList, int cost);
-	void createNewLabelItem(std::string text, PanelItem::ItemType toWhichList);
+	PopulationDistributionPanel* populationPanel; // 人口分配面板
+	ProductionPanel* productionPanel; // 生产面板
 private:
 	bool visible;
 	cocos2d::ui::Layout* PanelBG;
-
-	cocos2d::ui::Button* Pull;
-	cocos2d::ui::Button* ProductButton;
-	cocos2d::ui::Button* PurchaseButton;
-	cocos2d::ui::ScrollView* ProductList;
-	cocos2d::ui::ScrollView* PurchaseList;
+	
+	cocos2d::ui::Button* Pull; // 拉取按钮
+	cocos2d::ui::Button* showProductionPanel; // 显示生产面板按钮
+	cocos2d::ui::Button* showPopulationPanel; // 显示人口分配面板按钮
+	cocos2d::Node* currentShownPanel; // 当前显示的面板
 };
 
 
