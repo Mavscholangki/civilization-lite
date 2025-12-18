@@ -5,7 +5,8 @@
 #include <cmath>
 #include <algorithm>
 
-struct Hex {
+// 六边形坐标类 (使用立方坐标系的q,r,s三轴表示法，满足q + r + s = 0)
+struct Hex { 
     int q, r, s;
 
     Hex() : q(0), r(0), s(0) {}
@@ -32,26 +33,26 @@ struct Hex {
         return (dq + dr + ds) / 2;
     }
 };
-
+// 六边形布局类 (点y向下，0度在右侧水平向右)
 class HexLayout {
 public:
-    float size;
-    HexLayout(float _size) : size(_size) {}
+	float size; // 六边形大小(从中心到任意顶点的距离)
+	HexLayout(float _size) : size(_size) {} // 构造函数
 
-    cocos2d::Vec2 hexToPixel(Hex h) {
+	cocos2d::Vec2 hexToPixel(Hex h) { // 六边形坐标转像素坐标
         float x = size * sqrt(3.0) * (h.q + h.r / 2.0);
         float y = size * 3.0 / 2.0 * h.r;
         return cocos2d::Vec2(x, y);
     }
 
-    Hex pixelToHex(cocos2d::Vec2 p) {
+	Hex pixelToHex(cocos2d::Vec2 p) { // 像素坐标转六边形坐标
         float q = (sqrt(3.0) / 3.0 * p.x - 1.0 / 3.0 * p.y) / size;
         float r = (2.0 / 3.0 * p.y) / size;
         return hexRound(q, r);
     }
 
 private:
-    Hex hexRound(float fracQ, float fracR) {
+	Hex hexRound(float fracQ, float fracR) { // 四舍五入取整
         float fracS = -fracQ - fracR;
         int q = std::round(fracQ);
         int r = std::round(fracR);

@@ -8,6 +8,8 @@
 USING_NS_CC;
 using namespace ui;
 
+class TechTreePanel;
+
 // 科技节点UI状态
 enum class TechNodeState {
     LOCKED,          // 未解锁
@@ -17,70 +19,41 @@ enum class TechNodeState {
     ACTIVATED        // 已激活
 };
 
-// 科技树面板
-class TechTreePanel : public Layer, public TechEventListener {
+// 内部事件监听器类（作为TechTreePanel的成员）
+class TechTreePanelEventListener : public TechEventListener {
 private:
-    TechTree* techTree;                   // 科技系统引用
-    std::unordered_map<int, Node*> nodeUIMap; // 科技ID到UI节点的映射
-
-    // UI元素
-    ScrollView* scrollView;               // 滚动容器
-    Node* contentNode;                    // 内容节点
-    LayerColor* background;               // 背景
-
-    // 当前显示详情
-    Node* detailPanel;                    // 详情面板
-
-    // 底部控制面板
-    Node* controlPanel;                   // 底部控制面板
-    Label* currentResearchLabel;          // 当前研究显示
-    ProgressTimer* researchProgressBar;   // 研究进度条
-    Label* sciencePerTurnLabel;           // 每回合科研显示
-
-    // UI常量
-    const float NODE_SIZE = 90.0f;
-    const float NODE_SPACING = 140.0f;
-    const float LINE_WIDTH = 4.0f;
-    const Color4F LINE_COLOR = Color4F(0.4f, 0.4f, 0.5f, 0.6f);
-    const Color4F LINE_ACTIVE_COLOR = Color4F(0.2f, 0.8f, 0.2f, 0.8f);
-    const Color4F LINE_CURRENT_COLOR = Color4F(0.9f, 0.6f, 0.1f, 0.8f); // 当前研究的连接线颜色
+    TechTreePanel* _owner;  // 指向外部TechTreePanel的指针
 
 public:
-    CREATE_FUNC(TechTreePanel);
-
-    // 设置科技系统
-    void setTechTree(TechTree* tree);
-
-    // 初始化UI
-    virtual bool init() override;
-
-    // 更新UI
-    void refreshUI();
-
-    // 清理
-    virtual void onExit() override;
+    TechTreePanelEventListener(TechTreePanel* owner) : _owner(owner) {}
 
     // TechEventListener接口实现
     virtual void onTechActivated(int techId, const std::string& techName,
         const std::string& effect) override;
+
     virtual void onResearchProgress(int techId, int currentProgress, int totalCost) override;
+
     virtual void onEurekaTriggered(int techId, const std::string& techName) override;
+};
 
-    // 设置每回合科研值（供外部调用更新）
+// 科技树面板
+class TechTreePanel : public Layer {
+    friend class TechTreePanelEventListener;  // 允许事件监听器访问私有成员
+
+public:
+    CREATE_FUNC(TechTreePanel);
+
+    virtual bool init() override;
+    virtual void onExit() override;
+
+    // 设置科技系统
+    void setTechTree(TechTree* tree);
+
+    // 更新UI
+    void refreshUI();
+
+    // 设置每回合科研值
     void setSciencePerTurn(int science);
-
-private:
-    // 创建科技节点UI
-    Node* createTechNodeUI(const TechNode* techData);
-
-    // 创建连接线
-    void createConnectionLine(int fromTechId, int toTechId);
-
-    // 更新科技节点UI状态
-    void updateNodeUIState(int techId, TechNodeState state);
-
-    // 节点点击回调
-    void onTechNodeClicked(Ref* sender, Widget::TouchEventType type);
 
     // 显示科技详情
     void showTechDetail(int techId);
@@ -88,26 +61,67 @@ private:
     // 隐藏科技详情
     void hideTechDetail();
 
-    // 设置为当前研究
-    void setAsCurrentResearch(int techId);
+    // 提供给事件监听器调用的公共方法
+    void handleTechActivated(int techId, const std::string& techName, const std::string& effect);
+    void handleResearchProgress(int techId, int currentProgress, int totalCost);
+    void handleEurekaTriggered(int techId, const std::string& techName);
 
-    // 布局科技树
-    void layoutTechTree();
+private:
+    // 科技系统引用
+    TechTree* _techTree = nullptr;
 
-    // 创建尤里卡特效
-    void createEurekaEffect(int techId);
+    // 事件监听器
+    TechTreePanelEventListener* _eventListener = nullptr;
 
-    // 更新底部控制面板
+    // UI元素
+    LayerColor* _background = nullptr;
+    ScrollView* _scrollView = nullptr;
+    Node* _contentNode = nullptr;
+
+    // 底部控制面板
+    Node* _controlPanel = nullptr;
+    Label* _currentResearchLabel = nullptr;
+    ProgressTimer* _researchProgressBar = nullptr;
+    Label* _sciencePerTurnLabel = nullptr;
+
+    // 详情面板
+    LayerColor* _detailPanel = nullptr;
+
+    // 节点映射
+    std::unordered_map<int, Node*> _nodeUIMap;
+
+    // UI常量
+    const float NODE_WIDTH = 180.0f;
+    const float NODE_HEIGHT = 110.0f;
+    const float NODE_CORNER_RADIUS = 10.0f;
+    const float ERA_SPACING = 280.0f;
+    const float NODE_SPACING = 120.0f;
+    const float LINE_WIDTH = 4.0f;
+
+    // 私有方法
+    Node* createTechNodeUI(const TechNode* techData);
+    void updateNodeUIState(int techId, TechNodeState state);
     void updateControlPanel();
-
-    // 计算节点位置（可以根据依赖关系自动布局）
-    Vec2 calculateNodePosition(int techId);
-
-    // 获取科技时代（用于布局）
-    int getTechEra(int techId) const;
-
-    // 更新连接线状态
     void updateConnectionLines();
+    void drawRoundedRect(DrawNode* drawNode, const Rect& rect, float radius, const Color4F& color);
+    void onTechNodeClicked(Ref* sender, Widget::TouchEventType type);
+    void setAsCurrentResearch(int techId);
+    void createEurekaEffect(int techId);
+    void drawColumnBackgrounds();  // 添加这个声明
+
+    // 布局相关的新方法（确保与cpp中的实现匹配）
+    std::vector<int> topologicalSort();
+    void calculateTechDepths();
+    void layoutTechTree();
+    void createSplineConnection(int fromTechId, int toTechId);
+    void adjustPositionsForConnections();
+    bool doLinesCross(const Vec2& p1, const Vec2& p2, const Vec2& q1, const Vec2& q2);
+
+    // 布局数据结构
+    std::unordered_map<int, int> _techDepth;      // 科技深度（列）
+    std::unordered_map<int, int> _techRow;        // 科技行号
+    std::unordered_map<int, Vec2> _techPositions; // 最终位置
+    std::unordered_map<int, std::vector<int>> _techByDepth; // 按深度分组的科技
 };
 
 #endif // TECH_TREE_PANEL_H
