@@ -2,12 +2,15 @@
 #include "../Map/GameMapLayer.h"
 <<<<<<< HEAD
 #include "../UI/HUDLayer.h" // 引用 UI 头文件
+<<<<<<< HEAD
 #include "../UI/CityProductionPanel.h"
 =======
 #include "../UI/HUDLayer.h"
 #include "../Development/TechSystem.h"
 #include "../Units/Base/AbstractUnit.h"  // 如果需要AbstractUnit的完整定义
 >>>>>>> a57c8333fd4baa8f82905889ae79c08aebf48c0e
+=======
+>>>>>>> feature/productionPanel
 
 USING_NS_CC;
 
@@ -29,8 +32,11 @@ bool GameScene::init() {
     this->addChild(_hudLayer, 100);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     auto productionPanelLayer = CityProductionPanel::create();
     this->addChild(productionPanelLayer, 120);
+=======
+>>>>>>> feature/productionPanel
 
     // --- 核心联动 ---
     // 当地图层汇报“选中了单位”时 -> 让 HUD 层显示面板
