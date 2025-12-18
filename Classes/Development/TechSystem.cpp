@@ -14,46 +14,46 @@ void TechTree::initializeTechTree() {
 	currentResearchTech = -1;
 
 	// 第1层：基础科技（成本较低）
-	techList.emplace(1, TechNode(1, "畜牧", 25, {}, "解锁牧场，允许训练骑兵单位"));
-	techList.emplace(2, TechNode(2, "采矿", 25, {}, "解锁矿山，允许开采矿产资源"));
+	techList.emplace(1, TechNode(1, u8"畜牧", 25, {}, u8"解锁牧场，允许训练骑兵单位"));
+	techList.emplace(2, TechNode(2, u8"采矿", 25, {}, u8"解锁矿山，允许开采矿产资源"));
 
 	// 第2层：早期科技（成本增加）
-	techList.emplace(3, TechNode(3, "弓箭手", 50, { 1, 2 }, "解锁弓箭手单位，增强远程攻击能力"));
-	techList.emplace(4, TechNode(4, "书写", 50, { 1 }, "解锁图书馆，开启文化系统"));
+	techList.emplace(3, TechNode(3, u8"弓箭手", 50, { 1, 2 }, u8"解锁弓箭手单位，增强远程攻击能力"));
+	techList.emplace(4, TechNode(4, u8"书写", 50, { 1 }, u8"解锁图书馆，开启文化系统"));
 
 	// 第3层：古典时代科技
-	techList.emplace(5, TechNode(5, "航海", 80, { 4 }, "解锁船只，开启海上探索和贸易"));
-	techList.emplace(6, TechNode(6, "货币", 80, { 4 }, "解锁市场，增加金币收入"));
-	techList.emplace(7, TechNode(7, "铁器", 80, { 2 }, "解锁铁剑士，增强近战能力"));
+	techList.emplace(5, TechNode(5, u8"航海", 80, { 4 }, u8"解锁船只，开启海上探索和贸易"));
+	techList.emplace(6, TechNode(6, u8"货币", 80, { 4 }, u8"解锁市场，增加金币收入"));
+	techList.emplace(7, TechNode(7, u8"铁器", 80, { 2 }, u8"解锁铁剑士，增强近战能力"));
 
 	// 第4层：中世纪科技
-	techList.emplace(8, TechNode(8, "工程学", 120, { 7 }, "解锁攻城武器，增强攻城能力"));
-	techList.emplace(9, TechNode(9, "造船术", 120, { 5 }, "解锁更强大的船只，增强海军"));
-	techList.emplace(10, TechNode(10, "数学", 120, { 4 }, "解锁大学，提升科研效率"));
-	techList.emplace(11, TechNode(11, "机械", 120, { 7 }, "解锁弩兵和投石机"));
+	techList.emplace(8, TechNode(8, u8"工程学", 120, { 7 }, u8"解锁攻城武器，增强攻城能力"));
+	techList.emplace(9, TechNode(9, u8"造船术", 120, { 5 }, u8"解锁更强大的船只，增强海军"));
+	techList.emplace(10, TechNode(10, u8"数学", 120, { 4 }, u8"解锁大学，提升科研效率"));
+	techList.emplace(11, TechNode(11, u8"机械", 120, { 7 }, u8"解锁弩兵和投石机"));
 
 	// 第5层：文艺复兴科技
-	techList.emplace(12, TechNode(12, "学徒制", 200, { 10, 11 }, "解锁工坊，提升生产力"));
-	techList.emplace(13, TechNode(13, "银行", 200, { 6 }, "解锁银行，大幅增加金币收入"));
+	techList.emplace(12, TechNode(12, u8"学徒制", 200, { 10, 11 }, u8"解锁工坊，提升生产力"));
+	techList.emplace(13, TechNode(13, u8"银行", 200, { 6 }, u8"解锁银行，大幅增加金币收入"));
 
 	// 第6层：工业时代科技
-	techList.emplace(14, TechNode(14, "火药", 300, { 12 }, "解锁火枪手，开启热兵器时代"));
-	techList.emplace(15, TechNode(15, "金属铸造", 300, { 12 }, "解锁工厂，大幅提升生产力"));
+	techList.emplace(14, TechNode(14, u8"火药", 300, { 12 }, u8"解锁火枪手，开启热兵器时代"));
+	techList.emplace(15, TechNode(15, u8"金属铸造", 300, { 12 }, u8"解锁工厂，大幅提升生产力"));
 
 	// 第7层：启蒙时代科技
-	techList.emplace(16, TechNode(16, "制图学", 400, { 5, 9 }, "解锁更精确的地图，提升探索效率"));
-	techList.emplace(17, TechNode(17, "工业化", 400, { 15 }, "解锁工业区，开启工业革命"));
-	techList.emplace(18, TechNode(18, "飞行", 400, { 16 }, "解锁飞机，开启空中战斗"));
-	techList.emplace(19, TechNode(19, "经济学", 400, { 13 }, "解锁证券交易所，经济大幅增长"));
+	techList.emplace(16, TechNode(16, u8"制图学", 400, { 5, 9 }, u8"解锁更精确的地图，提升探索效率"));
+	techList.emplace(17, TechNode(17, u8"工业化", 400, { 15 }, u8"解锁工业区，开启工业革命"));
+	techList.emplace(18, TechNode(18, u8"飞行", 400, { 16 }, u8"解锁飞机，开启空中战斗"));
+	techList.emplace(19, TechNode(19, u8"经济学", 400, { 13 }, u8"解锁证券交易所，经济大幅增长"));
 
 	// 第8层：现代科技
-	techList.emplace(20, TechNode(20, "高级飞行", 600, { 18 }, "解锁喷气式飞机，掌握制空权"));
-	techList.emplace(21, TechNode(21, "火箭学", 600, { 20 }, "解锁火箭，开启太空时代"));
+	techList.emplace(20, TechNode(20, u8"高级飞行", 600, { 18 }, u8"解锁喷气式飞机，掌握制空权"));
+	techList.emplace(21, TechNode(21, u8"火箭学", 600, { 20 }, u8"解锁火箭，开启太空时代"));
 
 	// 第9层：信息时代科技
-	techList.emplace(22, TechNode(22, "卫星", 800, { 21 }, "解锁卫星，获得全球视野"));
-	techList.emplace(23, TechNode(23, "核裂变", 800, { 17 }, "解锁核电站和原子弹"));
-	techList.emplace(24, TechNode(24, "核聚变", 1000, { 23 }, "解锁聚变反应堆，近乎无限的能源"));
+	techList.emplace(22, TechNode(22, u8"卫星", 800, { 21 }, u8"解锁卫星，获得全球视野"));
+	techList.emplace(23, TechNode(23, u8"核裂变", 800, { 17 }, u8"解锁核电站和原子弹"));
+	techList.emplace(24, TechNode(24, u8"核聚变", 1000, { 23 }, u8"解锁聚变反应堆，近乎无限的能源"));
 
 	// 设置解锁关系（构建有向图）
 	// 第1层解锁第2层
@@ -62,7 +62,7 @@ void TechTree::initializeTechTree() {
 
 	// 第2层解锁第3层
 	techList[3].dstTechList = { 8 };
-	techList[4].dstTechList = { 5, 6, 10 };
+	techList[4].dstTechList = { 5, 6, 7, 10 };
 
 	// 第3层解锁第4层
 	techList[5].dstTechList = { 9, 16 };
