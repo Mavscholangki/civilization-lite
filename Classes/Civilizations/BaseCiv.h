@@ -1,110 +1,119 @@
 // BaseCiv.h
-#ifndef __BASIC_CIV_H__
-#define __BASIC_CIV_H__
+#ifndef __BASE_CIV_H__
+#define __BASE_CIV_H__
 
-#include <string>
-#include <vector>
-#include <memory>
-#include "../Development/CultureSystem.h"
+#include "cocos2d.h"
 #include "../Development/TechSystem.h"
-#include "../Units/Base/AbstractUnit.h"
-#include "../District/Base/District.h"
+#include "../Development/CultureSystem.h"
+#include "../City/Yield.h"  // 包含项目中的 Yield 定义
 
-// 文明类型枚举
-enum class CivilizationType {
-    BASIC,      // 基本文明
-    GERMANY,    // 德国
-    CHINA,      // 中国
-    RUSSIA      // 俄罗斯
-};
+// 前向声明
+class District;
+namespace DistrictType {
+    struct DistrictTypeInfo;
+}
 
-// 文明特性结构
+// 文明特性结构体
 struct CivilizationTrait {
     std::string name;
     std::string description;
 
-    // 数值加成
-    float scienceBonus = 1.0f;        // 科研加成
-    float cultureBonus = 1.0f;        // 文化加成
-    float productionBonus = 1.0f;     // 生产力加成
-    float militaryProductionBonus = 1.0f; // 军事生产力加成
+    // 通用加成
+    int initialTiles = 3;             // 初始地块数
+    float eurekaBoost = 0.5f;         // 尤里卡加成系数（默认50%）
+    float inspirationBoost = 0.5f;    // 灵感加成系数（默认50%）
 
-    // 特殊能力
+    // 资源加成
+    float scienceBonus = 1.0f;        // 科研加成系数
+    float cultureBonus = 1.0f;        // 文化加成系数
+    float productionBonus = 1.0f;     // 生产力加成系数
+    float goldBonus = 1.0f;           // 金币加成系数
+    float faithBonus = 1.0f;          // 信仰加成系数
+
+    // 区域相关
     bool halfCostIndustrial = false;  // 工业区半价
     bool extraDistrictSlot = false;   // 额外区域槽位
-    bool enhancedBuilder = false;     // 增强建造者
-    int initialTiles = 7;             // 初始地块数量
-    float eurekaBoost = 0.5f;         // 尤里卡加成
+    float militaryProductionBonus = 1.0f; // 军事单位生产力成本系数
+
+    // 单位相关
+    int builderCharges = 3;           // 建造者使用次数
+
+    CivilizationTrait() = default;
 };
 
-// 基本文明类
-class BaseCiv {
-protected:
-    CivilizationType civType;
-    std::string civName;
-    std::string leaderName;
-
-    CivilizationTrait traits;
-
-    // 特殊单位列表
-    std::vector<std::string> uniqueUnits;
-
-    // 科技和文化系统指针
-    TechTree* techTree;
-    CultureTree* cultureTree;
-
+class BaseCiv : public cocos2d::Ref {
 public:
-    BaseCiv(const std::string& name, const std::string& leader);
+    // 创建方法
+    static BaseCiv* create() {
+        BaseCiv* pRet = new(std::nothrow) BaseCiv();
+        if (pRet && pRet->init()) {
+            pRet->autorelease();
+            return pRet;
+        }
+        delete pRet;
+        return nullptr;
+    }
+
+    // 初始化
+    virtual bool init();
+
     virtual ~BaseCiv() {}
 
-    // 获取基本信息
-    CivilizationType getCivilizationType() const { return civType; }
-    std::string getCivilizationName() const { return civName; }
-    std::string getLeaderName() const { return leaderName; }
+    // ==================== 文明特性获取 ====================
+    virtual CivilizationTrait getTraits() const { return m_traits; }
 
-    // 获取特性
-    virtual CivilizationTrait getTraits() const { return traits; }
+    // ==================== 通用加成接口 ====================
+    virtual int getInitialTiles() const { return m_traits.initialTiles; }
+    virtual float getEurekaBoost() const { return m_traits.eurekaBoost; }
+    virtual float getInspirationBoost() const { return m_traits.inspirationBoost; }
+    virtual int getBuilderCharges() const { return m_traits.builderCharges; }
 
-    // 特殊能力判定
-    virtual bool hasHalfCostIndustrial() const { return false; }    // 工业区半价
-    virtual bool hasExtraDistrictSlot() const { return false; }     // 城市区域上限+1
+    // ==================== 资源加成接口 ====================
+    virtual float getScienceBonus() const { return m_traits.scienceBonus; }
+    virtual float getCultureBonus() const { return m_traits.cultureBonus; }
+    virtual float getProductionBonus() const { return m_traits.productionBonus; }
+    virtual float getGoldBonus() const { return m_traits.goldBonus; }
+    virtual float getFaithBonus() const { return m_traits.faithBonus; }
+    virtual float getMilitaryProductionCost() const { return m_traits.militaryProductionBonus; }
 
-    // 特殊能力数值
-    virtual float getEurekaBoost() const { return traits.eurekaBoost; }
-    virtual int getBuilderCharges() const { return 3; } // 默认建造者3次
-    virtual int getInitialTiles() const { return traits.initialTiles; }
-    virtual float getMilitaryProductionCost() const { return 1.0f; } // 默认100%
+    // ==================== 区域相关接口 ====================
+    virtual bool hasHalfCostIndustrial() const { return m_traits.halfCostIndustrial; }
+    virtual bool hasExtraDistrictSlot() const { return m_traits.extraDistrictSlot; }
 
-    // 数值加成计算
-    virtual float calculateScienceBonus() const { return traits.scienceBonus; }
-    virtual float calculateCultureBonus() const { return traits.cultureBonus; }
-    virtual float calculateProductionBonus() const { return traits.productionBonus; }
+    // ==================== 特殊单位接口 ====================
+    virtual bool hasUniqueUnit(const std::string& unitName) const { return false; }
+    virtual bool isUniqueUnitUnlocked(const std::string& unitName) const { return false; }
+    virtual cocos2d::Ref* createUniqueUnit(const std::string& unitName, void* position) { return nullptr; }
 
-    // 区域建设成本计算
-    virtual float calculateDistrictCost(const std::string& districtType) const;
-    virtual float calculateDistrictCost(District::DistrictType type) const;
-
-    // 城市区域容量计算
-    virtual int calculateMaxDistricts(int population) const;
-
-    // 区域加成计算
+    // ==================== 区域加成计算 ====================
     virtual Yield calculateDistrictBonus(const District* district) const;
 
-    // 设置系统指针
-    void setTechTree(TechTree* tree) { techTree = tree; }
-    void setCultureTree(CultureTree* tree) { cultureTree = tree; }
+    // ==================== 成本计算接口 ====================
+    virtual float calculateDistrictCost(const std::string& districtType) const { return 1.0f; }
+    virtual float calculateDistrictCost(const DistrictType::DistrictTypeInfo& type) const { return 1.0f; }
 
-    // 检查是否有特殊单位
-    virtual bool hasUniqueUnit(const std::string& unitName) const;
-    virtual bool isUniqueUnitUnlocked(const std::string& unitName) const;
+    // ==================== 区域容量计算 ====================
+    virtual int calculateMaxDistricts(int population) const;
 
-    // 创建特殊单位
-    virtual AbstractUnit* createUniqueUnit(const std::string& unitName, Hex pos);
+    // ==================== 科技/文化加成应用 ====================
+    virtual int applyScienceBonus(int baseScience) const {
+        return static_cast<int>(baseScience * getScienceBonus());
+    }
 
-    // 事件回调
-    virtual void onCityFounded() {}
-    virtual void onTechResearched(int techId) {}
+    virtual int applyCultureBonus(int baseCulture) const {
+        return static_cast<int>(baseCulture * getCultureBonus());
+    }
+
+    virtual int applyEurekaBonus(int techId, const TechTree* techTree) const;
+    virtual int applyInspirationBonus(int cultureId, const CultureTree* cultureTree) const;
+
+    // ==================== 事件回调 ====================
+    virtual void onTechActivated(int techId) {}
     virtual void onCultureUnlocked(int cultureId) {}
+    virtual void onCityFounded(void* city) {}
+
+protected:
+    CivilizationTrait m_traits;
 };
 
-#endif
+#endif // __BASE_CIV_H__

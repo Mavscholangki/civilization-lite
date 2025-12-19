@@ -6,26 +6,36 @@
 
 class CivGermany : public BaseCiv {
 public:
-    CivGermany();
-    virtual ~CivGermany() {}
+    // 创建方法
+    static CivGermany* create() {
+        CivGermany* pRet = new(std::nothrow) CivGermany();
+        if (pRet && pRet->init()) {
+            pRet->autorelease();
+            return pRet;
+        }
+        delete pRet;
+        return nullptr;
+    }
 
-    // 重写特性获取
+    // 初始化
+    virtual bool init() override;
+
+    // ==================== 文明特性获取 ====================
     virtual CivilizationTrait getTraits() const override;
 
-    // 特殊能力 - 完全按照文档实现
-    virtual bool hasHalfCostIndustrial() const override { return true; }    // 工业区半价
-    virtual bool hasExtraDistrictSlot() const override { return true; }     // 城市区域上限+1
+    // ==================== 区域相关接口 ====================
+    virtual bool hasHalfCostIndustrial() const override { return true; }
+    virtual bool hasExtraDistrictSlot() const override { return true; }
 
-    // 德国没有特殊单位，不需要重写创建特殊单位的方法
-
-    // 区域建设成本计算
+    // ==================== 成本计算接口 ====================
     virtual float calculateDistrictCost(const std::string& districtType) const override;
 
-    // 城市区域容量计算
+    // ==================== 区域容量计算 ====================
     virtual int calculateMaxDistricts(int population) const override;
 
 private:
     // 德国特色建筑：汉萨商站（工业区特色建筑）
+    // 可以在后续添加相关方法
 };
 
-#endif
+#endif // __CIV_GERMANY_H__
