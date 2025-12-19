@@ -25,8 +25,9 @@ bool GameScene::init() {
     this->addChild(_hudLayer, 100);
 
     // 3. 创建生产面板 (来自 feature/productionPanel 分支)
-    auto productionPanelLayer = CityProductionPanel::create();
-    this->addChild(productionPanelLayer, 120);
+    _productionPanelLayer = CityProductionPanel::create();
+    _productionPanelLayer->setVisible(false);
+    this->addChild(_productionPanelLayer, 120);
 
     // 4. 初始化科技树和回调 (来自 main 分支)
     initTechTree();
@@ -75,6 +76,24 @@ void GameScene::setupCallbacks() {
         static int science = 0; science += 5;
         _hudLayer->updateResources(gold, science, turn);
         });
+
+    _mapLayer->setOnCitySelectedCallback([this](BaseCity* city) {
+        if (city) {
+            // 1. 隐藏单位信息（因为选中了城市）
+            _hudLayer->hideUnitInfo();
+
+            // 2. 显示生产面板
+            _productionPanelLayer->setVisible(true);
+
+            // 3. 把选中的城市数据传给面板，让面板知道在给谁造东西
+            // _productionPanelLayer->setTargetCity(city); 
+        }
+        else {
+            // 点击空地，隐藏面板
+            _productionPanelLayer->setVisible(false);
+        }
+        });
+
 }
 
 void GameScene::onExit() {

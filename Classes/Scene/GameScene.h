@@ -7,6 +7,7 @@ class TechTree;
 class HUDLayer;
 class GameMapLayer;
 class AbstractUnit;
+class CityProductionPanel;
 
 class GameScene : public cocos2d::Scene {
 public:
@@ -25,6 +26,8 @@ private:
     TechTree* _techTree;    // 科技系统实例
     HUDLayer* _hudLayer;    // HUD层引用
     GameMapLayer* _mapLayer; // 地图层引用
+
+    CityProductionPanel* _productionPanelLayer; ///<
 };
 
 #endif

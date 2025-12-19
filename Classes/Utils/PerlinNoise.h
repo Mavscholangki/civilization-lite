@@ -6,6 +6,10 @@
 #include <random>
 #include <algorithm>
 #include <numeric>
+/**
+* @brief Perlin Noise 实现类
+* @details 提供 2D Perlin Noise 生成和分形布朗运动 (FBM) 功能
+*/
 
 class PerlinNoise {
 public:
