@@ -1,39 +1,46 @@
 // CivGermany.cpp
 #include "CivGermany.h"
 
-// ¹¹Ôìº¯Êı
-CivGermany::CivGermany() : BaseCiv("Germany", "Barbarossa") {
-    civType = CivilizationType::GERMANY;
-
-    // ÉèÖÃµÂ¹úÌØĞÔ
-    traits.name = "ÉñÊ¥ÂŞÂí»ÊµÛ";
-    traits.description = "¹¤ÒµÇø½¨Éè³É±¾¼õ°ë£¬Ã¿¸ö³ÇÊĞ¿É½¨ÔìµÄÇøÓòÉÏÏŞ+1";
-    traits.halfCostIndustrial = true;
-    traits.extraDistrictSlot = true;
-    traits.initialTiles = 7;      // Ä¬ÈÏÖµ
-    traits.eurekaBoost = 0.5f;    // Ä¬ÈÏÖµ
-}
-
-// »ñÈ¡ÌØĞÔ
-CivilizationTrait CivGermany::getTraits() const {
-    return traits;
-}
-
-// ÇøÓò½¨Éè³É±¾¼ÆËã
-float CivGermany::calculateDistrictCost(const std::string& districtType) const {
-    // ¼ì²éÊÇ·ñÎª¹¤ÒµÇø£¨ĞèÒª¸ù¾İÊµ¼ÊÏîÄ¿ÖĞµÄÇøÓòÀàĞÍ±êÊ¶µ÷Õû£©
-    if (districtType == "INDUSTRY_ZONE" || districtType == "IndustrialZone") {
-        return 0.5f; // °ë¼Û
+bool CivGermany::init() {
+    if (!BaseCiv::init()) {
+        return false;
     }
 
-    // ÆäËûÇøÓò°´Ô­¼Û
+    // è®¾ç½®å¾·å›½ç‰¹æ€§
+    m_traits.name = "ç¥åœ£ç½—é©¬çš‡å¸";
+    m_traits.description = "å·¥ä¸šåŒºå»ºè®¾æˆæœ¬å‡åŠï¼Œæ¯ä¸ªåŸå¸‚å¯å»ºé€ çš„åŒºåŸŸä¸Šé™+1";
+    m_traits.halfCostIndustrial = true;
+    m_traits.extraDistrictSlot = true;
+    m_traits.initialTiles = 3;
+    m_traits.eurekaBoost = 0.5f;
+    m_traits.inspirationBoost = 0.5f;
+    m_traits.builderCharges = 3;
+    m_traits.scienceBonus = 1.0f;
+    m_traits.cultureBonus = 1.0f;
+    m_traits.militaryProductionBonus = 1.0f;
+
+    return true;
+}
+
+CivilizationTrait CivGermany::getTraits() const {
+    return m_traits;
+}
+
+float CivGermany::calculateDistrictCost(const std::string& districtType) const {
+    // æ£€æŸ¥æ˜¯å¦ä¸ºå·¥ä¸šåŒºï¼ˆéœ€è¦æ ¹æ®å®é™…é¡¹ç›®ä¸­çš„åŒºåŸŸç±»å‹æ ‡è¯†è°ƒæ•´ï¼‰
+    if (districtType == "INDUSTRY_ZONE" ||
+        districtType == "IndustrialZone" ||
+        districtType == "å·¥ä¸šåŒº") {
+        return 0.5f; // åŠä»·
+    }
+
+    // å…¶ä»–åŒºåŸŸæŒ‰åŸä»·
     return 1.0f;
 }
 
-// ³ÇÊĞÇøÓòÈİÁ¿¼ÆËã
 int CivGermany::calculateMaxDistricts(int population) const {
-    // µÂ¹úÌØÊâÄÜÁ¦£ºÇøÓòÉÏÏŞ+1
-    // Ä¬ÈÏ¹«Ê½£ºÈË¿Ú³ıÒÔ3£¨ÏòÏÂÈ¡Õû£©ÔÙ¼Ó1£¬µÂ¹ú¶îÍâ+1
-    int baseDistricts = std::max(1, population / 3 + 1);
-    return baseDistricts + 1; // µÂ¹ú¶îÍâ+1
+    // å¾·å›½ç‰¹æ®Šèƒ½åŠ›ï¼šåŒºåŸŸä¸Šé™+1
+    // é»˜è®¤å…¬å¼ï¼šäººå£é™¤ä»¥3ï¼ˆå‘ä¸‹å–æ•´ï¼‰å†åŠ 1ï¼Œå¾·å›½é¢å¤–+1
+    int baseDistricts = BaseCiv::calculateMaxDistricts(population);
+    return baseDistricts + 1; // å¾·å›½é¢å¤–+1
 }

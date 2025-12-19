@@ -1,64 +1,60 @@
 // BaseCiv.cpp
 #include "BaseCiv.h"
-#include "../Units/Melee/Warrior.h"
-// BaseCiv.cpp
-#include "BaseCiv.h"
-#include "../Units/Melee/Warrior.h"
-#include "../Units/Civilian/Settler.h"
-#include "../Units/Civilian/Builder.h"
+#include "District/Base/District.h"
 
-BaseCiv::BaseCiv(const std::string& name, const std::string& leader)
-    : civType(CivilizationType::BASIC), civName(name), leaderName(leader) {
+bool BaseCiv::init() {
+    // åˆå§‹åŒ–é»˜è®¤ç‰¹æ€§
+    m_traits.name = "Default Civilization";
+    m_traits.description = "Standard civilization with no special bonuses";
+    m_traits.initialTiles = 3;
+    m_traits.eurekaBoost = 0.5f;
+    m_traits.inspirationBoost = 0.5f;
+    m_traits.scienceBonus = 1.0f;
+    m_traits.cultureBonus = 1.0f;
+    m_traits.productionBonus = 1.0f;
+    m_traits.goldBonus = 1.0f;
+    m_traits.faithBonus = 1.0f;
+    m_traits.halfCostIndustrial = false;
+    m_traits.extraDistrictSlot = false;
+    m_traits.militaryProductionBonus = 1.0f;
+    m_traits.builderCharges = 3;
 
-    // ÉèÖÃ»ù±¾ÌØĞÔ
-    traits.name = "»ù±¾ÎÄÃ÷";
-    traits.description = "Ã»ÓĞÌØÊâÄÜÁ¦µÄÎÄÃ÷";
-    traits.initialTiles = 7;
-    traits.eurekaBoost = 0.5f; // Ä¬ÈÏ50%
-    traits.scienceBonus = 1.0f;
-    traits.cultureBonus = 1.0f;
-    traits.productionBonus = 1.0f;
-    traits.militaryProductionBonus = 1.0f;
+    return true;
 }
 
-bool BaseCiv::hasUniqueUnit(const std::string& unitName) const {
-    for (const auto& unit : uniqueUnits) {
-        if (unit == unitName) return true;
-    }
-    return false;
+Yield BaseCiv::calculateDistrictBonus(const District* district) const {
+    // é»˜è®¤æ–‡æ˜æ²¡æœ‰åŒºåŸŸåŠ æˆ
+    Yield bonus;
+    bonus.foodYield = 0;
+    bonus.productionYield = 0;
+    bonus.scienceYield = 0;
+    bonus.goldYield = 0;
+    bonus.cultureYield = 0;
+    return bonus;
 }
 
-bool BaseCiv::isUniqueUnitUnlocked(const std::string& unitName) const {
-    return false;
-}
-
-AbstractUnit* BaseCiv::createUniqueUnit(const std::string& unitName, Hex pos) {
-    // Ä¬ÈÏ´´½¨»ù±¾µ¥Î»
-    if (unitName == "Õ½Ê¿") return Warrior::create(pos);
-    if (unitName == "¿ªÍØÕß") return Settler::create(pos);
-    if (unitName == "½¨ÔìÕß") return Builder::create(pos);
-
-    return nullptr;
-}
-
-// ÇøÓò½¨Éè³É±¾¼ÆËã£¨Ä¬ÈÏÊµÏÖ£©
-float BaseCiv::calculateDistrictCost(const std::string& districtType) const {
-    // Ä¬ÈÏ·µ»Ø1.0f£¬±íÊ¾Ô­¼Û
-    return 1.0f;
-}
-
-float BaseCiv::calculateDistrictCost(District::DistrictType type) const {
-    // Ä¬ÈÏ·µ»Ø1.0f£¬±íÊ¾Ô­¼Û
-    return 1.0f;
-}
-
-// ³ÇÊĞÇøÓòÈİÁ¿¼ÆËã£¨Ä¬ÈÏÊµÏÖ£©
 int BaseCiv::calculateMaxDistricts(int population) const {
-    // Ä¬ÈÏ¹æÔò£ºÈË¿Ú³ıÒÔ3£¨ÏòÏÂÈ¡Õû£©ÔÙ¼Ó1
+    // é»˜è®¤å…¬å¼ï¼šäººå£é™¤ä»¥3ï¼ˆå‘ä¸‹å–æ•´ï¼‰å†åŠ 1
+    if (population <= 0) return 0;
     return std::max(1, population / 3 + 1);
 }
 
-// ÇøÓò¼Ó³É¼ÆËã£¨Ä¬ÈÏÊµÏÖ£©- ·µ»Ø¿Õ¼Ó³É
-Yield BaseCiv::calculateDistrictBonus(const District* district) const {
-    return Yield{ 0, 0, 0, 0, 0 };
+int BaseCiv::applyEurekaBonus(int techId, const TechTree* techTree) const {
+    const TechNode* techNode = techTree->getTechInfo(techId);
+    if (techNode) {
+        int baseBonus = techNode->cost / 2; // é»˜è®¤50%
+        float boostFactor = getEurekaBoost() / 0.5f; // ç›¸å¯¹äºé»˜è®¤50%çš„æ¯”ä¾‹
+        return static_cast<int>(baseBonus * boostFactor);
+    }
+    return 0;
+}
+
+int BaseCiv::applyInspirationBonus(int cultureId, const CultureTree* cultureTree) const {
+    const CultureNode* cultureNode = cultureTree->getCultureInfo(cultureId);
+    if (cultureNode) {
+        int baseBonus = cultureNode->cost / 2; // é»˜è®¤50%
+        float boostFactor = getInspirationBoost() / 0.5f; // ç›¸å¯¹äºé»˜è®¤50%çš„æ¯”ä¾‹
+        return static_cast<int>(baseBonus * boostFactor);
+    }
+    return 0;
 }

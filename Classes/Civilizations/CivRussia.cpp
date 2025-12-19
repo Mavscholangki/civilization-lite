@@ -2,28 +2,34 @@
 #include "CivRussia.h"
 #include "District/Base/District.h"
 
-CivRussia::CivRussia() : BaseCiv("Russia", "Peter") {
-    civType = CivilizationType::RUSSIA;
+bool CivRussia::init() {
+    if (!BaseCiv::init()) {
+        return false;
+    }
 
-    // …Ë÷√∂Ì¬ﬁÀπÃÿ–‘
-    traits.name = "±Àµ√¥Ûµ€";
-    traits.description = "≥ı º¡ÏÕ¡¿©¥Û£®+8µÿøÈ£©£¨—ß‘∫∫ÕæÁ‘∫π„≥°≤˙≥ˆ+20%£¨æ¸ ¬µ•Œª…˙≤˙≥…±æΩµµÕ";
-    traits.initialTiles = 8;               // ≥ı ºµÿøÈ+8
-    traits.scienceBonus = 1.2f;           // ø∆—–º”≥…20%
-    traits.cultureBonus = 1.2f;           // ŒƒªØº”≥…20%
-    traits.militaryProductionBonus = 0.8f; // æ¸ ¬…˙≤˙¡¶≥…±æºı…Ÿ20%
-    traits.halfCostIndustrial = false;
-    traits.extraDistrictSlot = false;
-    traits.eurekaBoost = 0.5f;            // ƒ¨»œ÷µ
-    traits.productionBonus = 1.0f;        // ƒ¨»œ÷µ
+    // ËÆæÁΩÆ‰øÑÁΩóÊñØÁâπÊÄß
+    m_traits.name = "ÂΩºÂæóÂ§ßÂ∏ù";
+    m_traits.description = "ÂàùÂßãÈ¢ÜÂúüÊâ©Â§ßÔºà+8Âú∞ÂùóÔºâÔºåÂ≠¶Èô¢ÂíåÂâßÈô¢ÂπøÂú∫‰∫ßÂá∫+20%ÔºåÂÜõ‰∫ãÂçï‰ΩçÁîü‰∫ßÊàêÊú¨Èôç‰Ωé";
+    m_traits.initialTiles = 8;               // ÂàùÂßãÂú∞Âùó+8
+    m_traits.scienceBonus = 1.2f;           // ÁßëÁ†îÂä†Êàê20%
+    m_traits.cultureBonus = 1.2f;           // ÊñáÂåñÂä†Êàê20%
+    m_traits.militaryProductionBonus = 0.8f; // ÂÜõ‰∫ãÁîü‰∫ßÂäõÊàêÊú¨ÂáèÂ∞ë20%
+    m_traits.halfCostIndustrial = false;
+    m_traits.extraDistrictSlot = false;
+    m_traits.eurekaBoost = 0.5f;
+    m_traits.inspirationBoost = 0.5f;
+    m_traits.builderCharges = 3;
+    m_traits.productionBonus = 1.0f;
+    m_traits.goldBonus = 1.0f;
+    m_traits.faithBonus = 1.0f;
+
+    return true;
 }
 
-// ªÒ»°Ãÿ–‘
 CivilizationTrait CivRussia::getTraits() const {
-    return traits;
+    return m_traits;
 }
 
-// «¯”Úº”≥…º∆À„
 Yield CivRussia::calculateDistrictBonus(const District* district) const {
     Yield bonus = { 0, 0, 0, 0, 0 };
 
@@ -31,33 +37,21 @@ Yield CivRussia::calculateDistrictBonus(const District* district) const {
         return bonus;
     }
 
-    auto districtType = district->getType();
+    // Ëé∑ÂèñÂå∫ÂüüÁ±ªÂûã
+    District::DistrictType districtType = district->getType();
 
-    // »Áπ˚ «—ß‘∫«¯”Ú£¨Ã·π©∂ÓÕ‚µƒø∆—–º”≥…
+    // Â¶ÇÊûúÊòØÂ≠¶Èô¢Âå∫ÂüüÔºåÊèê‰æõÈ¢ùÂ§ñÁöÑÁßëÁ†îÂä†Êàê
     if (districtType.typeName == District::DistrictTypeName::CAMPUS) {
-        int baseScience = district->getYield().scienceYield;
-        bonus.scienceYield = static_cast<int>(baseScience * 0.2f); // +20%
+        // Ëé∑ÂèñÂü∫Á°Ä‰∫ßÂá∫
+        Yield baseYield = district->getYield();
+        bonus.scienceYield = static_cast<int>(baseYield.scienceYield * 0.2f); // +20%
     }
 
-    // »Áπ˚ «æÁ‘∫π„≥°«¯”Ú£¨Ã·π©∂ÓÕ‚µƒŒƒªØº”≥…
+    // Â¶ÇÊûúÊòØÂâßÈô¢ÂπøÂú∫Âå∫ÂüüÔºåÊèê‰æõÈ¢ùÂ§ñÁöÑÊñáÂåñÂä†Êàê
     if (districtType.typeName == District::DistrictTypeName::THEATER_SQUARE) {
-        int baseCulture = district->getYield().cultureYield;
-        bonus.cultureYield = static_cast<int>(baseCulture * 0.2f); // +20%
+        Yield baseYield = district->getYield();
+        bonus.cultureYield = static_cast<int>(baseYield.cultureYield * 0.2f); // +20%
     }
 
     return bonus;
-}
-
-// «¯”ÚΩ®…Ë≥…±æº∆À„
-float CivRussia::calculateDistrictCost(const std::string& districtType) const {
-    return 1.0f;
-}
-
-float CivRussia::calculateDistrictCost(District::DistrictType type) const {
-    return 1.0f;
-}
-
-// ≥« –«¯”Ú»›¡øº∆À„
-int CivRussia::calculateMaxDistricts(int population) const {
-    return BaseCiv::calculateMaxDistricts(population);
 }

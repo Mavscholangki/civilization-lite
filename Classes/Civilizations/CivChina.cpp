@@ -1,83 +1,68 @@
 // CivChina.cpp
 #include "CivChina.h"
-#include "../Units/Civilian/Builder.h"
 #include "../Development/TechSystem.h"
-#include "District/Base/District.h"
+#include <City/Yield.h>
 
-CivChina::CivChina() : BaseCiv("China", "Qin Shi Huang") {
-    civType = CivilizationType::CHINA;
+bool CivChina::init() {
+    if (!BaseCiv::init()) {
+        return false;
+    }
 
-    // ÉèÖÃÖĞ¹úÌØĞÔ
-    traits.name = "Ê¼»ÊµÛ";
-    traits.description = "ÓÈÀï¿¨ºÍÁé¸Ğ¼Ó³ÉÌáÉı75%£¬½¨ÔìÕßÓĞ5´ÎÊ¹ÓÃ´ÎÊı£¬ÓµÓĞÌØÊâµ¥Î»»¢¶×ÅÚ";
-    traits.eurekaBoost = 0.75f; // 75%ÓÈÀï¿¨¼Ó³É
-    traits.initialTiles = 7;    // Ä¬ÈÏÖµ
-    traits.halfCostIndustrial = false;
-    traits.extraDistrictSlot = false;
-    traits.scienceBonus = 1.0f;  // Ä¬ÈÏ
-    traits.cultureBonus = 1.0f;  // Ä¬ÈÏ
-    traits.productionBonus = 1.0f; // Ä¬ÈÏ
-    traits.militaryProductionBonus = 1.0f; // Ä¬ÈÏ
+    // è®¾ç½®ä¸­å›½ç‰¹æ€§
+    m_traits.name = "å§‹çš‡å¸";
+    m_traits.description = "å°¤é‡Œå¡å’Œçµæ„ŸåŠ æˆæå‡75%ï¼Œå»ºé€ è€…æœ‰5æ¬¡ä½¿ç”¨æ¬¡æ•°ï¼Œæ‹¥æœ‰ç‰¹æ®Šå•ä½è™è¹²ç‚®";
+    m_traits.eurekaBoost = 0.75f; // 75%å°¤é‡Œå¡åŠ æˆ
+    m_traits.inspirationBoost = 0.75f; // 75%çµæ„ŸåŠ æˆ
+    m_traits.builderCharges = 5;
+    m_traits.initialTiles = 3; // é»˜è®¤å€¼
+    m_traits.scienceBonus = 1.0f;
+    m_traits.cultureBonus = 1.0f;
+    m_traits.halfCostIndustrial = false;
+    m_traits.extraDistrictSlot = false;
+    m_traits.militaryProductionBonus = 1.0f;
 
-    // Ìí¼ÓÌØÊâµ¥Î»µ½ÁĞ±í
-    uniqueUnits.push_back("»¢¶×ÅÚ");
+    // æ·»åŠ ç‰¹æ®Šå•ä½åˆ°åˆ—è¡¨
+    m_uniqueUnits.push_back("è™è¹²ç‚®");
+
+    return true;
 }
 
-// »ñÈ¡ÌØĞÔ
 CivilizationTrait CivChina::getTraits() const {
-    return traits;
+    return m_traits;
 }
 
-// ¼ì²éÊÇ·ñÓĞÌØÊâµ¥Î»
 bool CivChina::hasUniqueUnit(const std::string& unitName) const {
-    for (const auto& unit : uniqueUnits) {
-        if (unit == unitName) return true;
+    for (const auto& unit : m_uniqueUnits) {
+        if (unit == unitName) {
+            return true;
+        }
     }
     return false;
 }
 
-// ¼ì²é»¢¶×ÅÚÊÇ·ñ½âËø
 bool CivChina::isUniqueUnitUnlocked(const std::string& unitName) const {
-    if (unitName != "»¢¶×ÅÚ") {
+    if (unitName != "è™è¹²ç‚®") {
         return false;
     }
 
-    if (techTree == nullptr) {
-        return false;
-    }
-
-    // ¼ì²é»úĞµ¿Æ¼¼£¨ID:11£©ÊÇ·ñ½âËø
-    return techTree->isActivated(11); // »úĞµ¿Æ¼¼ID
+    // è™è¹²ç‚®éœ€è¦æœºæ¢°ç§‘æŠ€ï¼ˆID:11ï¼‰è§£é”
+    // æ³¨æ„ï¼šè¿™é‡Œéœ€è¦è®¿é—®ç§‘æŠ€æ ‘ï¼Œä½†æ–‡æ˜ç±»é€šå¸¸ä¸ç›´æ¥æŒæœ‰ç§‘æŠ€æ ‘
+    // è¿™ä¸ªæ£€æŸ¥åº”è¯¥åœ¨Playerç±»ä¸­å®Œæˆï¼Œä½¿ç”¨Playerçš„ç§‘æŠ€æ ‘
+    // è¿™é‡Œæš‚æ—¶è¿”å›trueï¼Œå®é™…åº”åœ¨Playerä¸­åˆ¤æ–­
+    return true;
 }
 
-// ´´½¨ÌØÊâµ¥Î»
-AbstractUnit* CivChina::createUniqueUnit(const std::string& unitName, Hex pos) {
-    if (unitName == "»¢¶×ÅÚ") {
-        // ¼ì²éÊÇ·ñ½âËø
-        if (isUniqueUnitUnlocked(unitName)) {
-            return TigerCannonUnit::create(pos);
-        }
+cocos2d::Ref* CivChina::createUniqueUnit(const std::string& unitName, void* position) {
+    if (unitName == "è™è¹²ç‚®") {
+        // è¿™é‡Œåº”è¯¥åˆ›å»ºè™è¹²ç‚®å•ä½
+        // TigerCannonUnit::create(position);
+        // æš‚æ—¶è¿”å›nullptrï¼Œå¾…å•ä½ç³»ç»Ÿå®Œå–„
+        return nullptr;
     }
-
     return nullptr;
 }
 
-// ÇøÓò½¨Éè³É±¾¼ÆËã - ×Ö·û´®°æ±¾
-float CivChina::calculateDistrictCost(const std::string& districtType) const {
-    return 1.0f; // Ô­¼Û
-}
-
-// ÇøÓò½¨Éè³É±¾¼ÆËã - DistrictType°æ±¾
-float CivChina::calculateDistrictCost(District::DistrictType type) const {
-    return 1.0f; // Ô­¼Û
-}
-
-// ³ÇÊĞÇøÓòÈİÁ¿¼ÆËã
-int CivChina::calculateMaxDistricts(int population) const {
-    return BaseCiv::calculateMaxDistricts(population);
-}
-
-// ÇøÓò¼Ó³É¼ÆËã
 Yield CivChina::calculateDistrictBonus(const District* district) const {
+    // ä¸­å›½æ²¡æœ‰ç‰¹æ®ŠåŒºåŸŸåŠ æˆï¼Œä½¿ç”¨åŸºç±»å®ç°
     return BaseCiv::calculateDistrictBonus(district);
 }

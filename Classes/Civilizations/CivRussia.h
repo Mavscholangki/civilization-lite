@@ -3,33 +3,39 @@
 #define __CIV_RUSSIA_H__
 
 #include "BaseCiv.h"
-#include "../District/Base/District.h"
 
 class CivRussia : public BaseCiv {
 public:
-    CivRussia();
-    virtual ~CivRussia() {}
+    // åˆ›å»ºæ–¹æ³•
+    static CivRussia* create() {
+        CivRussia* pRet = new(std::nothrow) CivRussia();
+        if (pRet && pRet->init()) {
+            pRet->autorelease();
+            return pRet;
+        }
+        delete pRet;
+        return nullptr;
+    }
 
-    // ÖØĞ´ÌØĞÔ»ñÈ¡
+    // åˆå§‹åŒ–
+    virtual bool init() override;
+
+    // ==================== æ–‡æ˜ç‰¹æ€§è·å– ====================
     virtual CivilizationTrait getTraits() const override;
 
-    // ÌØÊâÄÜÁ¦
-    virtual int getInitialTiles() const override { return 8; }    // ³õÊ¼µØ¿é+8
-    virtual float getMilitaryProductionCost() const override { return 0.8f; } // ¾üÊÂµ¥Î»³É±¾¼õÉÙ20%
+    // ==================== é€šç”¨åŠ æˆæ¥å£ ====================
+    virtual int getInitialTiles() const override { return 8; } // åˆå§‹åœ°å—+8
+    virtual float getMilitaryProductionCost() const override { return 0.8f; } // å†›äº‹å•ä½æˆæœ¬å‡å°‘20%
 
-    // Ñ§ÔºÓëÎÄ»¯¼Ó³É£¨Í¨¹ıÌØĞÔÊµÏÖ£¬²»ĞèÒª¶îÍâ·½·¨£©
-    virtual float calculateScienceBonus() const override { return 1.2f; }
-    virtual float calculateCultureBonus() const override { return 1.2f; }
+    // ==================== èµ„æºåŠ æˆæ¥å£ ====================
+    virtual float getScienceBonus() const override { return 1.2f; }
+    virtual float getCultureBonus() const override { return 1.2f; }
 
-    // ÇøÓò¼Ó³É¼ÆËã£¨Ñ§ÔººÍ¾çÔº¹ã³¡£©
+    // ==================== åŒºåŸŸåŠ æˆè®¡ç®— ====================
     virtual Yield calculateDistrictBonus(const District* district) const override;
 
-    // ÇøÓò½¨Éè³É±¾¼ÆËã£¨¶íÂŞË¹Ã»ÓĞÌØÊâÕÛ¿Û£©
-    virtual float calculateDistrictCost(const std::string& districtType) const override;
-    virtual float calculateDistrictCost(District::DistrictType type) const override;
-
-    // ³ÇÊĞÇøÓòÈİÁ¿¼ÆËã£¨¶íÂŞË¹Ã»ÓĞ¶îÍâÇøÓò²ÛÎ»£©
-    virtual int calculateMaxDistricts(int population) const override;
+private:
+    // ä¿„ç½—æ–¯æ²¡æœ‰ç‰¹æ®Šå•ä½
 };
 
-#endif
+#endif // __CIV_RUSSIA_H__

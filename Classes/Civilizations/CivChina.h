@@ -3,14 +3,18 @@
 #define __CIV_CHINA_H__
 
 #include "BaseCiv.h"
-#include "../Units/Base/AbstractUnit.h"
+#include <vector>
+#include <string>
 
-// »¢¶×ÅÚµ¥Î» - ÊÊÓ¦ÏÖÓĞAbstractUnit½Ó¿Ú
-class TigerCannonUnit : public AbstractUnit {
+// å‰å‘å£°æ˜
+class TigerCannonUnit;
+
+class CivChina : public BaseCiv {
 public:
-    static TigerCannonUnit* create(Hex pos) {
-        TigerCannonUnit* pRet = new TigerCannonUnit();
-        if (pRet && pRet->initUnit(pos)) {
+    // åˆ›å»ºæ–¹æ³•
+    static CivChina* create() {
+        CivChina* pRet = new(std::nothrow) CivChina();
+        if (pRet && pRet->init()) {
             pRet->autorelease();
             return pRet;
         }
@@ -18,52 +22,26 @@ public:
         return nullptr;
     }
 
-    // ÊµÏÖAbstractUnitµÄ´¿Ğéº¯Êı
-    virtual std::string getUnitName() override {
-        return "»¢¶×ÅÚ";
-    }
-    virtual int getBaseAttack() override {
-        return 30;
-    }
-    virtual int getMaxMoves() override {
-        return 2;
-    }
+    // åˆå§‹åŒ–
+    virtual bool init() override;
 
-    // »¢¶×ÅÚÌØÓĞÊôĞÔ£¨Í¨¹ı³ÉÔ±±äÁ¿ÊµÏÖ£©
-    int getSiegeBonus() const { return 15; } // ¹¥³Ç¼Ó³É
-    bool isRangedUnit() const { return true; } // ÊÇÔ¶³Ìµ¥Î»
-    int getRange() const { return 1; } // ¹¥»÷¾àÀë1
-
-private:
-    int experience = 0;
-};
-
-class CivChina : public BaseCiv {
-public:
-    CivChina();
-    virtual ~CivChina() {}
-
-    // ÖØĞ´ÌØĞÔ»ñÈ¡
+    // ==================== æ–‡æ˜ç‰¹æ€§è·å– ====================
     virtual CivilizationTrait getTraits() const override;
 
-    // ÌØÊâÄÜÁ¦
-    virtual float getEurekaBoost() const override { return 0.75f; } // ÓÈÀï¿¨75%
-    virtual int getBuilderCharges() const override { return 5; }    // ½¨ÔìÕß5´Î
+    // ==================== é€šç”¨åŠ æˆæ¥å£ ====================
+    virtual float getEurekaBoost() const override { return 0.75f; } // å°¤é‡Œå¡75%
+    virtual int getBuilderCharges() const override { return 5; }    // å»ºé€ è€…5æ¬¡
 
-    // ÌØÊâµ¥Î»Ïà¹Ø
+    // ==================== ç‰¹æ®Šå•ä½æ¥å£ ====================
     virtual bool hasUniqueUnit(const std::string& unitName) const override;
-    virtual AbstractUnit* createUniqueUnit(const std::string& unitName, Hex pos) override;
     virtual bool isUniqueUnitUnlocked(const std::string& unitName) const override;
+    virtual cocos2d::Ref* createUniqueUnit(const std::string& unitName, void* position) override;
 
-    // ÇøÓò½¨Éè³É±¾¼ÆËã£¨ÖĞ¹úÃ»ÓĞÌØÊâÕÛ¿Û£©
-    virtual float calculateDistrictCost(const std::string& districtType) const override;
-    virtual float calculateDistrictCost(District::DistrictType type) const override;
-
-    // ³ÇÊĞÇøÓòÈİÁ¿¼ÆËã£¨ÖĞ¹úÃ»ÓĞ¶îÍâÇøÓò²ÛÎ»£©
-    virtual int calculateMaxDistricts(int population) const override;
-
-    // ÇøÓò¼Ó³É¼ÆËã
+    // ==================== åŒºåŸŸåŠ æˆè®¡ç®— ====================
     virtual Yield calculateDistrictBonus(const District* district) const override;
+
+private:
+    std::vector<std::string> m_uniqueUnits;
 };
 
-#endif
+#endif // __CIV_CHINA_H__
