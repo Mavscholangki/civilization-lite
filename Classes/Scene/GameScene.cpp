@@ -24,9 +24,12 @@ bool GameScene::init() {
     if (!_hudLayer) return false;
     this->addChild(_hudLayer, 100);
 
-    // 3. 创建生产面板 (来自 feature/productionPanel 分支)
-    auto productionPanelLayer = CityProductionPanel::create();
-    this->addChild(productionPanelLayer, 120);
+
+    // 3. ����������� (���� feature/productionPanel ��֧)
+    _productionPanelLayer = CityProductionPanel::create();
+    _productionPanelLayer->setVisible(false);
+    this->addChild(_productionPanelLayer, 120);
+
 
     // 4. 初始化科技树和回调 (来自 main 分支)
     initTechTree();
@@ -173,6 +176,24 @@ void GameScene::setupCallbacks() {
         static int culture = 0; culture += 3;
         _hudLayer->updateResources(gold, science, culture, turn);
         });
+
+    _mapLayer->setOnCitySelectedCallback([this](BaseCity* city) {
+        if (city) {
+            // 1. ���ص�λ��Ϣ����Ϊѡ���˳��У�
+            _hudLayer->hideUnitInfo();
+
+            // 2. ��ʾ�������
+            _productionPanelLayer->setVisible(true);
+
+            // 3. ��ѡ�еĳ������ݴ�����壬�����֪���ڸ�˭�춫��
+            // _productionPanelLayer->setTargetCity(city); 
+        }
+        else {
+            // ����յأ��������
+            _productionPanelLayer->setVisible(false);
+        }
+        });
+
 }
 
 void GameScene::onExit() {
