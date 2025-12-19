@@ -6,9 +6,9 @@ bool CivGermany::init() {
         return false;
     }
 
-    // ÉèÖÃµÂ¹úÌØĞÔ
-    m_traits.name = "ÉñÊ¥ÂŞÂí»ÊµÛ";
-    m_traits.description = "¹¤ÒµÇø½¨Éè³É±¾¼õ°ë£¬Ã¿¸ö³ÇÊĞ¿É½¨ÔìµÄÇøÓòÉÏÏŞ+1";
+    // è®¾ç½®å¾·å›½ç‰¹æ€§
+    m_traits.name = "ç¥åœ£ç½—é©¬çš‡å¸";
+    m_traits.description = "å·¥ä¸šåŒºå»ºè®¾æˆæœ¬å‡åŠï¼Œæ¯ä¸ªåŸå¸‚å¯å»ºé€ çš„åŒºåŸŸä¸Šé™+1";
     m_traits.halfCostIndustrial = true;
     m_traits.extraDistrictSlot = true;
     m_traits.initialTiles = 3;
@@ -27,20 +27,20 @@ CivilizationTrait CivGermany::getTraits() const {
 }
 
 float CivGermany::calculateDistrictCost(const std::string& districtType) const {
-    // ¼ì²éÊÇ·ñÎª¹¤ÒµÇø£¨ĞèÒª¸ù¾İÊµ¼ÊÏîÄ¿ÖĞµÄÇøÓòÀàĞÍ±êÊ¶µ÷Õû£©
+    // æ£€æŸ¥æ˜¯å¦ä¸ºå·¥ä¸šåŒºï¼ˆéœ€è¦æ ¹æ®å®é™…é¡¹ç›®ä¸­çš„åŒºåŸŸç±»å‹æ ‡è¯†è°ƒæ•´ï¼‰
     if (districtType == "INDUSTRY_ZONE" ||
         districtType == "IndustrialZone" ||
-        districtType == "¹¤ÒµÇø") {
-        return 0.5f; // °ë¼Û
+        districtType == "å·¥ä¸šåŒº") {
+        return 0.5f; // åŠä»·
     }
 
-    // ÆäËûÇøÓò°´Ô­¼Û
+    // å…¶ä»–åŒºåŸŸæŒ‰åŸä»·
     return 1.0f;
 }
 
 int CivGermany::calculateMaxDistricts(int population) const {
-    // µÂ¹úÌØÊâÄÜÁ¦£ºÇøÓòÉÏÏŞ+1
-    // Ä¬ÈÏ¹«Ê½£ºÈË¿Ú³ıÒÔ3£¨ÏòÏÂÈ¡Õû£©ÔÙ¼Ó1£¬µÂ¹ú¶îÍâ+1
+    // å¾·å›½ç‰¹æ®Šèƒ½åŠ›ï¼šåŒºåŸŸä¸Šé™+1
+    // é»˜è®¤å…¬å¼ï¼šäººå£é™¤ä»¥3ï¼ˆå‘ä¸‹å–æ•´ï¼‰å†åŠ 1ï¼Œå¾·å›½é¢å¤–+1
     int baseDistricts = BaseCiv::calculateMaxDistricts(population);
-    return baseDistricts + 1; // µÂ¹ú¶îÍâ+1
+    return baseDistricts + 1; // å¾·å›½é¢å¤–+1
 }

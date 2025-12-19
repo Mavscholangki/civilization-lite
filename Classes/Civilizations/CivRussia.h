@@ -6,7 +6,7 @@
 
 class CivRussia : public BaseCiv {
 public:
-    // ´´½¨·½·¨
+    // åˆ›å»ºæ–¹æ³•
     static CivRussia* create() {
         CivRussia* pRet = new(std::nothrow) CivRussia();
         if (pRet && pRet->init()) {
@@ -17,25 +17,25 @@ public:
         return nullptr;
     }
 
-    // ³õÊ¼»¯
+    // åˆå§‹åŒ–
     virtual bool init() override;
 
-    // ==================== ÎÄÃ÷ÌØĞÔ»ñÈ¡ ====================
+    // ==================== æ–‡æ˜ç‰¹æ€§è·å– ====================
     virtual CivilizationTrait getTraits() const override;
 
-    // ==================== Í¨ÓÃ¼Ó³É½Ó¿Ú ====================
-    virtual int getInitialTiles() const override { return 8; } // ³õÊ¼µØ¿é+8
-    virtual float getMilitaryProductionCost() const override { return 0.8f; } // ¾üÊÂµ¥Î»³É±¾¼õÉÙ20%
+    // ==================== é€šç”¨åŠ æˆæ¥å£ ====================
+    virtual int getInitialTiles() const override { return 8; } // åˆå§‹åœ°å—+8
+    virtual float getMilitaryProductionCost() const override { return 0.8f; } // å†›äº‹å•ä½æˆæœ¬å‡å°‘20%
 
-    // ==================== ×ÊÔ´¼Ó³É½Ó¿Ú ====================
+    // ==================== èµ„æºåŠ æˆæ¥å£ ====================
     virtual float getScienceBonus() const override { return 1.2f; }
     virtual float getCultureBonus() const override { return 1.2f; }
 
-    // ==================== ÇøÓò¼Ó³É¼ÆËã ====================
+    // ==================== åŒºåŸŸåŠ æˆè®¡ç®— ====================
     virtual Yield calculateDistrictBonus(const District* district) const override;
 
 private:
-    // ¶íÂŞË¹Ã»ÓĞÌØÊâµ¥Î»
+    // ä¿„ç½—æ–¯æ²¡æœ‰ç‰¹æ®Šå•ä½
 };
 
 #endif // __CIV_RUSSIA_H__

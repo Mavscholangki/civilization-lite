@@ -6,7 +6,7 @@
 
 class CivGermany : public BaseCiv {
 public:
-    // ´´½¨·½·¨
+    // åˆ›å»ºæ–¹æ³•
     static CivGermany* create() {
         CivGermany* pRet = new(std::nothrow) CivGermany();
         if (pRet && pRet->init()) {
@@ -17,25 +17,25 @@ public:
         return nullptr;
     }
 
-    // ³õÊ¼»¯
+    // åˆå§‹åŒ–
     virtual bool init() override;
 
-    // ==================== ÎÄÃ÷ÌØĞÔ»ñÈ¡ ====================
+    // ==================== æ–‡æ˜ç‰¹æ€§è·å– ====================
     virtual CivilizationTrait getTraits() const override;
 
-    // ==================== ÇøÓòÏà¹Ø½Ó¿Ú ====================
+    // ==================== åŒºåŸŸç›¸å…³æ¥å£ ====================
     virtual bool hasHalfCostIndustrial() const override { return true; }
     virtual bool hasExtraDistrictSlot() const override { return true; }
 
-    // ==================== ³É±¾¼ÆËã½Ó¿Ú ====================
+    // ==================== æˆæœ¬è®¡ç®—æ¥å£ ====================
     virtual float calculateDistrictCost(const std::string& districtType) const override;
 
-    // ==================== ÇøÓòÈİÁ¿¼ÆËã ====================
+    // ==================== åŒºåŸŸå®¹é‡è®¡ç®— ====================
     virtual int calculateMaxDistricts(int population) const override;
 
 private:
-    // µÂ¹úÌØÉ«½¨Öş£ºººÈøÉÌÕ¾£¨¹¤ÒµÇøÌØÉ«½¨Öş£©
-    // ¿ÉÒÔÔÚºóĞøÌí¼ÓÏà¹Ø·½·¨
+    // å¾·å›½ç‰¹è‰²å»ºç­‘ï¼šæ±‰è¨å•†ç«™ï¼ˆå·¥ä¸šåŒºç‰¹è‰²å»ºç­‘ï¼‰
+    // å¯ä»¥åœ¨åç»­æ·»åŠ ç›¸å…³æ–¹æ³•
 };
 
 #endif // __CIV_GERMANY_H__

@@ -8,21 +8,21 @@ bool CivChina::init() {
         return false;
     }
 
-    // ÉèÖÃÖĞ¹úÌØĞÔ
-    m_traits.name = "Ê¼»ÊµÛ";
-    m_traits.description = "ÓÈÀï¿¨ºÍÁé¸Ğ¼Ó³ÉÌáÉı75%£¬½¨ÔìÕßÓĞ5´ÎÊ¹ÓÃ´ÎÊı£¬ÓµÓĞÌØÊâµ¥Î»»¢¶×ÅÚ";
-    m_traits.eurekaBoost = 0.75f; // 75%ÓÈÀï¿¨¼Ó³É
-    m_traits.inspirationBoost = 0.75f; // 75%Áé¸Ğ¼Ó³É
+    // è®¾ç½®ä¸­å›½ç‰¹æ€§
+    m_traits.name = "å§‹çš‡å¸";
+    m_traits.description = "å°¤é‡Œå¡å’Œçµæ„ŸåŠ æˆæå‡75%ï¼Œå»ºé€ è€…æœ‰5æ¬¡ä½¿ç”¨æ¬¡æ•°ï¼Œæ‹¥æœ‰ç‰¹æ®Šå•ä½è™è¹²ç‚®";
+    m_traits.eurekaBoost = 0.75f; // 75%å°¤é‡Œå¡åŠ æˆ
+    m_traits.inspirationBoost = 0.75f; // 75%çµæ„ŸåŠ æˆ
     m_traits.builderCharges = 5;
-    m_traits.initialTiles = 3; // Ä¬ÈÏÖµ
+    m_traits.initialTiles = 3; // é»˜è®¤å€¼
     m_traits.scienceBonus = 1.0f;
     m_traits.cultureBonus = 1.0f;
     m_traits.halfCostIndustrial = false;
     m_traits.extraDistrictSlot = false;
     m_traits.militaryProductionBonus = 1.0f;
 
-    // Ìí¼ÓÌØÊâµ¥Î»µ½ÁĞ±í
-    m_uniqueUnits.push_back("»¢¶×ÅÚ");
+    // æ·»åŠ ç‰¹æ®Šå•ä½åˆ°åˆ—è¡¨
+    m_uniqueUnits.push_back("è™è¹²ç‚®");
 
     return true;
 }
@@ -41,28 +41,28 @@ bool CivChina::hasUniqueUnit(const std::string& unitName) const {
 }
 
 bool CivChina::isUniqueUnitUnlocked(const std::string& unitName) const {
-    if (unitName != "»¢¶×ÅÚ") {
+    if (unitName != "è™è¹²ç‚®") {
         return false;
     }
 
-    // »¢¶×ÅÚĞèÒª»úĞµ¿Æ¼¼£¨ID:11£©½âËø
-    // ×¢Òâ£ºÕâÀïĞèÒª·ÃÎÊ¿Æ¼¼Ê÷£¬µ«ÎÄÃ÷ÀàÍ¨³£²»Ö±½Ó³ÖÓĞ¿Æ¼¼Ê÷
-    // Õâ¸ö¼ì²éÓ¦¸ÃÔÚPlayerÀàÖĞÍê³É£¬Ê¹ÓÃPlayerµÄ¿Æ¼¼Ê÷
-    // ÕâÀïÔİÊ±·µ»Øtrue£¬Êµ¼ÊÓ¦ÔÚPlayerÖĞÅĞ¶Ï
+    // è™è¹²ç‚®éœ€è¦æœºæ¢°ç§‘æŠ€ï¼ˆID:11ï¼‰è§£é”
+    // æ³¨æ„ï¼šè¿™é‡Œéœ€è¦è®¿é—®ç§‘æŠ€æ ‘ï¼Œä½†æ–‡æ˜ç±»é€šå¸¸ä¸ç›´æ¥æŒæœ‰ç§‘æŠ€æ ‘
+    // è¿™ä¸ªæ£€æŸ¥åº”è¯¥åœ¨Playerç±»ä¸­å®Œæˆï¼Œä½¿ç”¨Playerçš„ç§‘æŠ€æ ‘
+    // è¿™é‡Œæš‚æ—¶è¿”å›trueï¼Œå®é™…åº”åœ¨Playerä¸­åˆ¤æ–­
     return true;
 }
 
 cocos2d::Ref* CivChina::createUniqueUnit(const std::string& unitName, void* position) {
-    if (unitName == "»¢¶×ÅÚ") {
-        // ÕâÀïÓ¦¸Ã´´½¨»¢¶×ÅÚµ¥Î»
+    if (unitName == "è™è¹²ç‚®") {
+        // è¿™é‡Œåº”è¯¥åˆ›å»ºè™è¹²ç‚®å•ä½
         // TigerCannonUnit::create(position);
-        // ÔİÊ±·µ»Ønullptr£¬´ıµ¥Î»ÏµÍ³ÍêÉÆ
+        // æš‚æ—¶è¿”å›nullptrï¼Œå¾…å•ä½ç³»ç»Ÿå®Œå–„
         return nullptr;
     }
     return nullptr;
 }
 
 Yield CivChina::calculateDistrictBonus(const District* district) const {
-    // ÖĞ¹úÃ»ÓĞÌØÊâÇøÓò¼Ó³É£¬Ê¹ÓÃ»ùÀàÊµÏÖ
+    // ä¸­å›½æ²¡æœ‰ç‰¹æ®ŠåŒºåŸŸåŠ æˆï¼Œä½¿ç”¨åŸºç±»å®ç°
     return BaseCiv::calculateDistrictBonus(district);
 }
