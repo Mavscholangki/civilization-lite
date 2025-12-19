@@ -1,16 +1,9 @@
 #include "GameScene.h"
 #include "../Map/GameMapLayer.h"
-<<<<<<< HEAD
 #include "../UI/HUDLayer.h" // 引用 UI 头文件
-<<<<<<< HEAD
 #include "../UI/CityProductionPanel.h"
-=======
-#include "../UI/HUDLayer.h"
 #include "../Development/TechSystem.h"
 #include "../Units/Base/AbstractUnit.h"  // 如果需要AbstractUnit的完整定义
->>>>>>> a57c8333fd4baa8f82905889ae79c08aebf48c0e
-=======
->>>>>>> feature/productionPanel
 
 USING_NS_CC;
 
@@ -31,22 +24,15 @@ bool GameScene::init() {
     if (!_hudLayer) return false;
     this->addChild(_hudLayer, 100);
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    auto productionPanelLayer = CityProductionPanel::create();
-    this->addChild(productionPanelLayer, 120);
-=======
->>>>>>> feature/productionPanel
-
     // --- 核心联动 ---
     // 当地图层汇报“选中了单位”时 -> 让 HUD 层显示面板
-    mapLayer->setOnUnitSelectedCallback([hudLayer](AbstractUnit* unit) {
-=======
-    // 初始化科技树
-    initTechTree();
+    _mapLayer->setOnUnitSelectedCallback([this](AbstractUnit* unit) {
+        // 初始化科技树
+        initTechTree();
 
-    // 设置回调函数
-    setupCallbacks();
+        // 设置回调函数
+        setupCallbacks();
+    });
 
     return true;
 }
@@ -76,7 +62,6 @@ void GameScene::setupCallbacks() {
 
     // 地图层选中单位 -> 更新HUD显示
     _mapLayer->setOnUnitSelectedCallback([this](AbstractUnit* unit) {
->>>>>>> a57c8333fd4baa8f82905889ae79c08aebf48c0e
         if (unit) {
             _hudLayer->showUnitInfo(unit);
         }
