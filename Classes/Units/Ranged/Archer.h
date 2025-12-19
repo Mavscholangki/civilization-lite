@@ -1,12 +1,12 @@
-#ifndef __SWORDSMAN_H__
-#define __SWORDSMAN_H__
+#ifndef __ARCHER_H__
+#define __ARCHER_H__
 
 #include "../Base/AbstractUnit.h"
 
-class Swordsman : public AbstractUnit {
+class Archer : public AbstractUnit {
 public:
-    static Swordsman* create(Hex pos) {
-        Swordsman* pRet = new Swordsman();
+    static Archer* create(Hex pos) {
+        Archer* pRet = new Archer();
         if (pRet && pRet->initUnit(pos)) {
             pRet->autorelease();
             return pRet;
@@ -16,11 +16,11 @@ public:
     }
 
     virtual std::string getUnitName() override {
-        return "线列步兵";
+        return "弓箭手";
     }
 
     virtual int getBaseAttack() override {
-        return 40;
+        return 15;
     }
 
     virtual int getMaxMoves() override {
@@ -28,7 +28,7 @@ public:
     }
 
     virtual std::string getSpriteName() override {
-        return "units/swordsman.png";
+        return "units/archer.png";
     }
 };
 

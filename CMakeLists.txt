@@ -125,7 +125,7 @@ endif()
 
 target_link_libraries(${APP_NAME} cocos2d)
 target_include_directories(${APP_NAME}
-        PRIVATE Classes
+        PRIVATE Classes proj.win32
         PRIVATE ${COCOS2DX_ROOT_PATH}/cocos/audio/include/
 )
 

@@ -39,3 +39,5 @@ bin/
 # 忽略 CMake 缓存
 CMakeCache.txt
 CMakeFiles/
+
+Resources/Private/
