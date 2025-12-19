@@ -21,6 +21,13 @@ public:
     // 【注意】这里必须是 virtual，且Settler需要重写它
     virtual std::string getSpriteName() { return ""; }
 
+
+    // 【新增】飞行单位返回 true，无视地形
+    virtual bool canFly() { return false; }
+
+    // 【新增】能否跨越水域
+    virtual bool canCrossWater() { return false; }
+
     void moveTo(Hex targetPos, HexLayout* layout);
 
     // -------------------------------------------------

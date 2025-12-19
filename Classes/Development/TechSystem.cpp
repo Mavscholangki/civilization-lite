@@ -117,7 +117,7 @@ bool TechTree::setCurrentResearch(int techId) {
 }
 
 // 增加科研点数（由游戏回合系统调用）
-void TechTree::addSciencePoints(int points) {
+void TechTree::updateProgress(int points) {
 	if (currentResearchTech <= 0 || points <= 0) {
 		return;
 	}
@@ -126,7 +126,7 @@ void TechTree::addSciencePoints(int points) {
 }
 
 // 触发尤里卡（由事件系统调用）
-void TechTree::triggerEureka(int techId) {
+void TechTree::updateProgress_Eureka(int techId) {
 	auto it = techList.find(techId);
 	if (it == techList.end() || it->second.activated) {
 		return;

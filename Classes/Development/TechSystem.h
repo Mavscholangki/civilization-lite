@@ -62,10 +62,10 @@ public:
 	int getCurrentResearch() const { return currentResearchTech; }
 
 	// 增加科研点数（由游戏回合系统调用）
-	void addSciencePoints(int points);
+	void updateProgress(int points);
 
 	// 触发尤里卡（由事件系统调用）
-	void triggerEureka(int techId);
+	void updateProgress_Eureka(int techId);
 
 	// 查询函数
 	bool isResearchable(int techId) const;

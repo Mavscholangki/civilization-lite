@@ -1,12 +1,12 @@
-#ifndef __SWORDSMAN_H__
-#define __SWORDSMAN_H__
+#ifndef __JET_FIGHTER_H__
+#define __JET_FIGHTER_H__
 
 #include "../Base/AbstractUnit.h"
 
-class Swordsman : public AbstractUnit {
+class JetFighter : public AbstractUnit {
 public:
-    static Swordsman* create(Hex pos) {
-        Swordsman* pRet = new Swordsman();
+    static JetFighter* create(Hex pos) {
+        JetFighter* pRet = new JetFighter();
         if (pRet && pRet->initUnit(pos)) {
             pRet->autorelease();
             return pRet;
@@ -16,19 +16,23 @@ public:
     }
 
     virtual std::string getUnitName() override {
-        return "线列步兵";
+        return "喷气式飞机";
     }
 
     virtual int getBaseAttack() override {
-        return 40;
+        return 50;
     }
 
     virtual int getMaxMoves() override {
-        return 2;
+        return 4;
+    }
+
+    virtual bool canFly() override {
+        return true;
     }
 
     virtual std::string getSpriteName() override {
-        return "units/swordsman.png";
+        return "units/jet_fighter.png";
     }
 };
 
