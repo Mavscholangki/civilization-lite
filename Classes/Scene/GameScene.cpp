@@ -24,16 +24,14 @@ bool GameScene::init() {
     if (!_hudLayer) return false;
     this->addChild(_hudLayer, 100);
 
-    // 初始化树
-    initTechTree();
-    initCultureTree();
-    initPolicySystem();
     // 3. 创建生产面板 (来自 feature/productionPanel 分支)
     auto productionPanelLayer = CityProductionPanel::create();
     this->addChild(productionPanelLayer, 120);
 
     // 4. 初始化科技树和回调 (来自 main 分支)
     initTechTree();
+    initCultureTree();
+    initPolicySystem();
     setupCallbacks();
 
     return true;
@@ -169,20 +167,11 @@ void GameScene::setupCallbacks() {
             _policyManager->checkPolicyCombos();
         }
         // 更新资源显示
-        static int turn = 1;
-        turn++;
-        static int gold = 0;
-        gold += 5; // 每回合+5金币
-        static int science = 0;
-        science += 5; // 每回合+5科研
-        static int culture = 0;
-        culture += 3; // 每回合+3文化
-
-        _hudLayer->updateResources(gold, science, culture, turn);
         static int turn = 1; turn++;
         static int gold = 0; gold += 5;
         static int science = 0; science += 5;
-        _hudLayer->updateResources(gold, science, turn);
+        static int culture = 0; culture += 3;
+        _hudLayer->updateResources(gold, science, culture, turn);
         });
 }
 
