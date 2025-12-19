@@ -184,12 +184,19 @@ Node* TechTreePanel::createTechNodeUI(const TechNode* techData) {
     // 设置回调函数
     menuItem->setCallback([this, techId = techData->id](Ref* sender) {
         CCLOG("Tech node clicked: %d", techId);
-        this->showTechDetail(techId);
 
-        if (this->_techTree &&
-            this->_techTree->isResearchable(techId) &&
-            !this->_techTree->isActivated(techId)) {
-            this->setAsCurrentResearch(techId);
+        if (!this->_detailPanel || this->_detailPanel->getTag() != techId) {
+            // 第一次点击，或点击了不同的节点：显示详情
+            this->showTechDetail(techId);
+        }
+        else {
+            // 第二次点击同一个节点（详情已显示）：设为当前研究
+            if (this->_techTree &&
+                this->_techTree->isResearchable(techId) &&
+                !this->_techTree->isActivated(techId)) {
+                this->setAsCurrentResearch(techId);
+                this->hideTechDetail();  // 设为研究后隐藏详情
+            }
         }
         });
 
@@ -987,7 +994,6 @@ void TechTreePanel::onTechNodeClicked(Ref* sender, Widget::TouchEventType type) 
 }
 
 void TechTreePanel::showTechDetail(int techId) {
-
     CCLOG("showTechDetail called for tech: %d", techId);
 
     if (!_techTree) {
@@ -1010,10 +1016,10 @@ void TechTreePanel::showTechDetail(int techId) {
     auto visibleSize = Director::getInstance()->getVisibleSize();
 
     // 创建详情面板 - 确保位置在可见区域内
-    _detailPanel = LayerColor::create(Color4B(0, 0, 0, 220), 350, 250);
+    _detailPanel = LayerColor::create(Color4B(0, 0, 0, 220), 400, 320); // 增加高度以容纳更多内容
 
     // 计算位置，确保不超出屏幕
-    float panelX = visibleSize.width - 370;
+    float panelX = visibleSize.width - 420;
     float panelY = 150;
 
     // 如果超出右边界，调整位置
@@ -1022,55 +1028,97 @@ void TechTreePanel::showTechDetail(int techId) {
     }
 
     // 如果超出上边界，调整位置
-    if (panelY + 250 > visibleSize.height - 100) {
-        panelY = visibleSize.height - 350;
+    if (panelY + 320 > visibleSize.height - 100) {
+        panelY = visibleSize.height - 420;
     }
 
     _detailPanel->setPosition(Vec2(panelX, panelY));
     _detailPanel->setName("detail_panel");
 
-    // 添加详情面板到TechTreePanel，而不是场景
+    // 添加详情面板到TechTreePanel
     this->addChild(_detailPanel, 10);
 
     // 科技名称
     auto nameLabel = Label::createWithSystemFont(techInfo->name, "Arial", 28);
-    nameLabel->setPosition(Vec2(175, 200));
+    nameLabel->setPosition(Vec2(200, 280));
     nameLabel->setColor(Color3B::YELLOW);
     _detailPanel->addChild(nameLabel);
 
     // 科技效果
     auto effectLabel = Label::createWithSystemFont(techInfo->effectDescription, "Arial", 18);
-    effectLabel->setPosition(Vec2(175, 120));
-    effectLabel->setDimensions(320, 120);
+    effectLabel->setPosition(Vec2(200, 200));
+    effectLabel->setDimensions(360, 120);
     effectLabel->setAlignment(TextHAlignment::LEFT);
     effectLabel->setVerticalAlignment(TextVAlignment::TOP);
     effectLabel->setColor(Color3B::WHITE);
     _detailPanel->addChild(effectLabel);
 
+    // === 新增：当前进度显示 ===
+    int progress = _techTree->getTechProgress(techId);
+    int cost = _techTree->getTechCost(techId);
+    int percent = (cost > 0) ? (progress * 100 / cost) : 0;
+
+    std::string progressText = u8"当前进度：" + std::to_string(progress) + "/" +
+        std::to_string(cost) + " (" + std::to_string(percent) + "%)";
+
+    auto progressLabel = Label::createWithSystemFont(progressText, "Arial", 18);
+    progressLabel->setPosition(Vec2(200, 140));
+    progressLabel->setColor(Color3B(255, 200, 100));
+    _detailPanel->addChild(progressLabel);
+
+    // === 新增：成本显示 ===
+    std::string costText = u8"所需科研值：" + std::to_string(cost);
+    auto costLabel = Label::createWithSystemFont(costText, "Arial", 16);
+    costLabel->setPosition(Vec2(200, 110));
+    costLabel->setColor(Color3B(180, 180, 255));
+    _detailPanel->addChild(costLabel);
+
+    // === 新增：前置科技显示 ===
+    if (!techInfo->srcTechList.empty()) {
+        std::string prereqText = u8"前置科技：";
+        bool first = true;
+        for (int prereqId : techInfo->srcTechList) {
+            auto prereqInfo = _techTree->getTechInfo(prereqId);
+            if (prereqInfo) {
+                if (!first) prereqText += "，";
+                prereqText += prereqInfo->name;
+                first = false;
+            }
+        }
+
+        auto prereqLabel = Label::createWithSystemFont(prereqText, "Arial", 14);
+        prereqLabel->setPosition(Vec2(200, 80));
+        prereqLabel->setDimensions(360, 40);
+        prereqLabel->setAlignment(TextHAlignment::LEFT);
+        prereqLabel->setVerticalAlignment(TextVAlignment::TOP);
+        prereqLabel->setColor(_techTree->isResearchable(techId) ? Color3B(150, 255, 150) : Color3B(255, 150, 150));
+        _detailPanel->addChild(prereqLabel);
+    }
+
     // 研究状态
     std::string statusText;
     if (_techTree->isActivated(techId)) {
-        statusText = "Already researched";
+        statusText = u8"已研究完成";
     }
     else if (_techTree->getCurrentResearch() == techId) {
-        statusText = "Researching...";
+        statusText = u8"正在研究中";
     }
     else if (_techTree->getTechProgress(techId) > 0) {
-        statusText = "Has progress";
+        statusText = u8"已有进度 (" + std::to_string(percent) + "%)";
     }
     else if (_techTree->isResearchable(techId)) {
-        statusText = "Researchable";
+        statusText = u8"可研究";
 
         // 添加研究按钮
-        auto researchButton = Button::create();
-        researchButton->setTitleText("Set as current research");
+        auto researchButton = ui::Button::create();
+        researchButton->setTitleText(u8"设为当前研究");
         researchButton->setTitleFontSize(18);
         researchButton->setTitleColor(Color3B::WHITE);
-        researchButton->setContentSize(Size(200, 40));
-        researchButton->setPosition(Vec2(175, 60));
+        researchButton->setContentSize(Size(150, 40));
+        researchButton->setPosition(Vec2(200, 40));
         researchButton->setTag(techId);
         researchButton->addClickEventListener([this](Ref* sender) {
-            auto button = dynamic_cast<Button*>(sender);
+            auto button = dynamic_cast<ui::Button*>(sender);
             if (button) {
                 int techId = button->getTag();
                 CCLOG("Set research button clicked for tech: %d", techId);
@@ -1081,13 +1129,19 @@ void TechTreePanel::showTechDetail(int techId) {
         _detailPanel->addChild(researchButton);
     }
     else {
-        statusText = "Locked";
+        statusText = u8"锁定（需要前置科技）";
     }
 
-    auto statusLabel = Label::createWithSystemFont(statusText, "Arial", 18);
-    statusLabel->setPosition(Vec2(175, 30));
-    statusLabel->setColor(Color3B(255, 200, 100));
-    _detailPanel->addChild(statusLabel);
+    if (_techTree->getCurrentResearch() != techId && !_techTree->isActivated(techId) &&
+        _techTree->isResearchable(techId)) {
+        // 已经添加过按钮，不需要再添加状态标签
+    }
+    else {
+        auto statusLabel = Label::createWithSystemFont(statusText, "Arial", 18);
+        statusLabel->setPosition(Vec2(200, 40));
+        statusLabel->setColor(Color3B(255, 200, 100));
+        _detailPanel->addChild(statusLabel);
+    }
 
     CCLOG("Detail panel created and shown");
 }
@@ -1103,8 +1157,11 @@ void TechTreePanel::setAsCurrentResearch(int techId) {
     if (!_techTree) return;
 
     if (_techTree->setCurrentResearch(techId)) {
+        // 设置成功，刷新UI
         refreshUI();
         updateControlPanel();
+
+        
     }
 }
 
