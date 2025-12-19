@@ -80,12 +80,12 @@ public:
 	virtual void calculateBonus();
 	void updateGrossYield();
 	// bool addBuilding(Building addedBuilding);
-	inline int getConstructionProgress() { return currentProgress; }
-	inline int getID() { return _id; }
-	inline DistrictType getType() { return _type; }
+	inline int getConstructionProgress() const { return currentProgress; }
+	inline int getID() const { return _id; }
+	inline DistrictType getType() const { return _type; }
 	inline std::string getName() { return _name; }
-	inline Hex getPos() { return _pos; }
-	inline Yield getYield() { return grossYield; }
+	inline Hex getPos() const { return _pos; }
+	inline Yield getYield() const { return grossYield; }
 
 protected:
 	virtual bool canErectDistrict(Hex where);
