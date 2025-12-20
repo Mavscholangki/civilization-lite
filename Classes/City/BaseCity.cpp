@@ -40,6 +40,10 @@ bool BaseCity::initCity(Hex pos, std::string name) {
     _visual = draw;
     this->addChild(_visual);
 
+	// 创建生产面板 
+	this->productionPanelLayer = CityProductionPanel::create();
+	this->productionPanelLayer->setVisible(false); // 初始隐藏
+
     // 城市名字
     _nameLabel = ui::Button::create();
 	_nameLabel->setTitleText(cityName);
@@ -58,9 +62,8 @@ bool BaseCity::initCity(Hex pos, std::string name) {
     
     this->addChild(_nameLabel);
 
-	CityProductionPanel* panel = CityProductionPanel::create();
-	this->productionPanelLayer = panel;
 	updatePanel();
+
 	Director::getInstance()->getRunningScene()->addChild(productionPanelLayer, 100);
     return true;
 }
@@ -116,7 +119,8 @@ void BaseCity::updateDistribution() // 更新分配信息
 
 void BaseCity::updatePanel() // 更新生产面板信息
 {
-	productionPanelLayer->populationPanel->updatePanel(this->populationDistribution, this->population);
+	// if (!this->productionPanelLayer) return; // 没有面板则不更新
+	this->productionPanelLayer->populationPanel->updatePanel(this->populationDistribution, this->population);
 }
 
 void BaseCity::onTurnEnd() {

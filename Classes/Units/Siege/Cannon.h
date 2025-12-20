@@ -5,31 +5,35 @@
 
 class Cannon : public AbstractUnit {
 public:
-    static Cannon* create(Hex pos) {
-        Cannon* pRet = new Cannon();
-        if (pRet && pRet->initUnit(pos)) {
-            pRet->autorelease();
-            return pRet;
-        }
-        delete pRet;
-        return nullptr;
+    std::string getUnitName() const override { 
+        return "Cannon"; 
+    }
+    UnitType getUnitType() const override { 
+        return UnitType::SIEGE;
+    }
+    std::string getSpritePath() const override { 
+        return "units/cannon.png"; 
     }
 
-    virtual std::string getUnitName() override {
-        return "火炮";
+    int getMaxHp() const override {
+        return 160; 
+    }      // 攻城器械比较脆
+    int getBaseAttack() const override { 
+        return 90; 
+    } // 攻击很高
+    int getMaxMoves() const override { 
+        return 2;
+    }    // 移动很慢
+    int getAttackRange() const override { 
+        return 3; 
+    } // 射程 2 格
+
+    // 攻城单位通常攻击后不能移动 (覆盖基类默认值)
+    bool canMoveAfterAttack() const override { 
+        return false; 
     }
 
-    virtual int getBaseAttack() override {
-        return 40;
-    }
-
-    virtual int getMaxMoves() override {
-        return 1;
-    }
-
-    virtual std::string getSpriteName() override {
-        return "units/cannon.png";
-    }
+    CREATE_FUNC(Cannon);
 };
 
 #endif

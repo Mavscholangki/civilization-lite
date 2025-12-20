@@ -1,9 +1,10 @@
 #include "GameScene.h"
 #include "../Map/GameMapLayer.h"
-#include "../UI/HUDLayer.h"
+#include "../UI/HUDLayer.h" // ÒıÓÃ UI Í·ÎÄ¼ş
+#include "../UI/CityProductionPanel.h"
 #include "../Development/TechSystem.h"
+#include "../Units/Base/AbstractUnit.h"  // Èç¹ûĞèÒªAbstractUnitµÄÍêÕû¶¨Òå
 #include "../Development/CultureSystem.h"
-#include "../Units/Base/AbstractUnit.h"  // å¦‚æœéœ€è¦AbstractUnitçš„å®Œæ•´å®šä¹‰
 
 USING_NS_CC;
 
@@ -14,21 +15,24 @@ Scene* GameScene::createScene() {
 bool GameScene::init() {
     if (!Scene::init()) return false;
 
-    // 1. åˆ›å»ºåœ°å›¾å±‚
+    // 1. ´´½¨µØÍ¼²ã
     _mapLayer = GameMapLayer::create();
     if (!_mapLayer) return false;
     this->addChild(_mapLayer, 0);
 
-    // 2. åˆ›å»ºHUDå±‚
+    // 2. ´´½¨HUD²ã
     _hudLayer = HUDLayer::create();
     if (!_hudLayer) return false;
     this->addChild(_hudLayer, 100);
 
-    // 3. åˆ›å»ºç”Ÿäº§é¢æ¿ (æ¥è‡ª feature/productionPanel åˆ†æ”¯)
-    auto productionPanelLayer = CityProductionPanel::create();
-    this->addChild(productionPanelLayer, 120);
 
-    // 4. åˆå§‹åŒ–ç§‘æŠ€æ ‘å’Œå›è°ƒ (æ¥è‡ª main åˆ†æ”¯)
+    // 3. ??????????? (???? feature/productionPanel ???)
+    _productionPanelLayer = CityProductionPanel::create();
+    _productionPanelLayer->setVisible(false);
+    this->addChild(_productionPanelLayer, 120);
+
+
+    // 4. ³õÊ¼»¯¿Æ¼¼Ê÷ºÍ»Øµ÷ (À´×Ô main ·ÖÖ§)
     initTechTree();
     initCultureTree();
     initPolicySystem();
@@ -50,7 +54,7 @@ void GameScene::initTechTree() {
 }
 
 void GameScene::initCultureTree() {
-    // åˆ›å»ºæ–‡åŒ–ç³»ç»Ÿå®ä¾‹
+    // ´´½¨ÎÄ»¯ÏµÍ³ÊµÀı
     _cultureTree = new CultureTree();
 
     if (!_cultureTree) {
@@ -58,10 +62,10 @@ void GameScene::initCultureTree() {
         return;
     }
 
-    // åˆå§‹åŒ–æ–‡åŒ–æ ‘
+    // ³õÊ¼»¯ÎÄ»¯Ê÷
     _cultureTree->initializeCultureTree();
 
-    // è®¾ç½®ä¸€ä¸ªé»˜è®¤çš„å½“å‰ç ”ç©¶æ–‡åŒ–ï¼ˆä¾‹å¦‚101ï¼šæ³•å…¸ï¼‰
+    // ÉèÖÃµ±Ç°ÑĞ¾¿ÎÄ»¯£¨ÀıÈç01£º·¨µä£©
     std::vector<int> unlockable = _cultureTree->getUnlockableCultureList();
     if (!unlockable.empty()) {
         _cultureTree->setCurrentResearch(unlockable[0]);
@@ -71,7 +75,7 @@ void GameScene::initCultureTree() {
         CCLOG("No unlockable cultures available");
     }
 
-    // è®¾ç½®HUDå±‚çš„æ–‡åŒ–ç³»ç»Ÿ
+    // ÉèÖÃHUD²ãµÄÎÄ»¯ÏµÍ³
     if (_hudLayer && _cultureTree) {
         _hudLayer->setCultureTree(_cultureTree);
     }
@@ -80,7 +84,7 @@ void GameScene::initCultureTree() {
 }
 
 void GameScene::initPolicySystem() {
-    // åˆ›å»ºæ”¿ç­–ç®¡ç†å™¨
+	// ´´½¨Õş²ß¹ÜÀíÆ÷ÊµÀı
     _policyManager = new PolicyManager();
 
     if (!_policyManager) {
@@ -88,32 +92,32 @@ void GameScene::initPolicySystem() {
         return;
     }
 
-    // åˆå§‹åŒ–æ”¿ç­–ç³»ç»Ÿ
+	// ³õÊ¼»¯Õş²ßÊı¾İ
     _policyManager->initializePolicies();
 
-    // è®¾ç½®æ–‡åŒ–æ ‘å¼•ç”¨
+	// ½«Õş²ß¹ÜÀíÆ÷ÓëÎÄ»¯ÏµÍ³¹ØÁª
     if (_cultureTree) {
-        // è®¾ç½®æ”¿åºœè·å–å›è°ƒ
+        // ÉèÖÃÕş¸®»ñÈ¡»Øµ÷
         _policyManager->setGovernmentGetter([this]() {
             return _cultureTree->getCurrentGovernment();
             });
 
-        // è®¾ç½®æ”¿ç­–è·å–å›è°ƒ
+        // ÉèÖÃÕş²ß»ñÈ¡»Øµ÷
         _policyManager->setPolicyGetter([this](int cultureId) {
             return _cultureTree->getPoliciesUnlockedByCulture(cultureId);
             });
 
-        // è®¾ç½®æ”¿ç­–è§£é”å›è°ƒ
+        // ÉèÖÃÕş²ß½âËø»Øµ÷
         _policyManager->setPolicyUnlockedCallback([this](int policyId) {
             CCLOG("Policy %d unlocked via callback", policyId);
             });
 
-        // å…³é”®ï¼šå°†PolicyManagerä½œä¸ºç›‘å¬å™¨æ·»åŠ åˆ°æ–‡åŒ–ç³»ç»Ÿ
+        // ¹Ø¼ü£º½«PolicyManager×÷Îª¼àÌıÆ÷Ìí¼Óµ½ÎÄ»¯ÏµÍ³
         _cultureTree->addEventListener(_policyManager);
         CCLOG("PolicyManager registered as CultureEventListener");
     }
 
-    // è®¾ç½®åˆå§‹æ”¿ç­–æ§½ä½
+	// ÉèÖÃ³õÊ¼Õş²ß²Û
     if (_cultureTree) {
         const int* slots = _cultureTree->getActivePolicySlots();
         _policyManager->setPolicySlots(slots[0], slots[1], slots[2], slots[3]);
@@ -121,7 +125,7 @@ void GameScene::initPolicySystem() {
             slots[0], slots[1], slots[2], slots[3]);
     }
 
-    // è®¾ç½®HUDå±‚çš„æ”¿ç­–ç®¡ç†å™¨
+    // ÉèÖÃHUD²ãµÄÕş²ß¹ÜÀí²ã
     if (_hudLayer) {
         _hudLayer->setPolicyManager(_policyManager);
         CCLOG("PolicyManager set on HUDLayer");
@@ -132,7 +136,7 @@ void GameScene::initPolicySystem() {
 }
 
 void GameScene::setupCallbacks() {
-    // åœ°å›¾å±‚é€‰ä¸­å•ä½ -> æ›´æ–°HUDæ˜¾ç¤º
+    // µØÍ¼²ãÑ¡ÖĞµ¥Î» -> ¸üĞÂHUDÏÔÊ¾
     _mapLayer->setOnUnitSelectedCallback([this](AbstractUnit* unit) {
         if (unit) {
             _hudLayer->showUnitInfo(unit);
@@ -142,37 +146,55 @@ void GameScene::setupCallbacks() {
         }
         });
 
-    // HUDå»ºåŸæŒ‰é’® -> åœ°å›¾å±‚å»ºåŸåŠ¨ä½œ
+    // HUD½¨³Ç°´Å¥ -> µØÍ¼²ã½¨³Ç¶¯»­
     _hudLayer->setBuildCityCallback([this]() {
         _mapLayer->onBuildCityAction();
         });
 
-    // ä¸‹ä¸€å›åˆæŒ‰é’®å›è°ƒ
+    // ÏÂÒ»»ØºÏ°´Å¥»Øµ÷
     _hudLayer->setNextTurnCallback([this]() {
         _mapLayer->onNextTurnAction();
         if (_techTree) {
-            int sciencePerTurn = 5; // å¯æ ¹æ®åŸå¸‚ã€å»ºç­‘ç­‰è®¡ç®—
+            int sciencePerTurn = 5; // ????????ÊĞ¡¢½¨ÖşµÈ¼ÆËã
             _techTree->updateProgress(sciencePerTurn);
         }
 
-        // æ–‡åŒ–ç³»ç»Ÿæ›´æ–°
+        // ÎÄ»¯ÏµÍ³¸üĞÂ
         if (_cultureTree) {
-            int culturePerTurn = 3; // å¯æ ¹æ®çºªå¿µç¢‘ã€å‰§é™¢ç­‰è®¡ç®—
+            int culturePerTurn = 3; // ????????Äî??¡¢¾çÔºµÈ¼ÆËã
             _cultureTree->updateProgress(culturePerTurn);
         }
 
-        // æ–°å¢ï¼šæ”¿ç­–ç³»ç»Ÿæ›´æ–°ï¼ˆå¦‚æœéœ€è¦æ¯å›åˆå¤„ç†ä»€ä¹ˆï¼‰
+        // ĞÂ¹¦ÄÜ£ºÕş²ßÏµÍ³¸üĞÂ£¨Èç¹ûĞèÒªÃ¿»ØºÏ´¦ÀíÊ²Ã´£©
         if (_policyManager) {
-            // ä¾‹å¦‚ï¼šæ£€æŸ¥æ”¿ç­–ç»„åˆæ•ˆæœæ˜¯å¦æŒç»­æ¿€æ´»
+			// ÀıÈç£º¼ì²éÕş²ß×éºÏĞ§¹ûÊÇ·ñ³ÖĞø´¥·¢
             _policyManager->checkPolicyCombos();
         }
-        // æ›´æ–°èµ„æºæ˜¾ç¤º
+        // ¸üĞÂ×ÊÔ´ÏÔÊ¾
         static int turn = 1; turn++;
         static int gold = 0; gold += 5;
         static int science = 0; science += 5;
         static int culture = 0; culture += 3;
         _hudLayer->updateResources(gold, science, culture, turn);
         });
+
+    _mapLayer->setOnCitySelectedCallback([this](BaseCity* city) {
+        if (city) {
+            // 1. ?????¦Ë???????????????§µ?
+            _hudLayer->hideUnitInfo();
+
+            // 2. ??????????
+            _productionPanelLayer->setVisible(true);
+
+            // 3. ????§Ö?????????????ÈÉ????????????????
+            // _productionPanelLayer->setTargetCity(city); 
+        }
+        else {
+            // ??????????????
+            _productionPanelLayer->setVisible(false);
+        }
+        });
+
 }
 
 void GameScene::onExit() {
@@ -181,18 +203,18 @@ void GameScene::onExit() {
         _techTree = nullptr;
     }
 
-    // æ¸…ç†æ–‡åŒ–æ ‘
+    // ÇåÀíÎÄ»¯Ê÷
     if (_cultureTree) {
         delete _cultureTree;
         _cultureTree = nullptr;
     }
 
-    // æ¸…ç†æ”¿ç­–ç®¡ç†å™¨
+    // ÇåÀíÕş²ß¹ÜÀí²ã
     if (_policyManager) {
         delete _policyManager;
         _policyManager = nullptr;
     }
 
-    // è°ƒç”¨çˆ¶ç±»çš„onExit
+    // µ÷ÓÃ¸¸ÀàµÄonExit
     Scene::onExit();
 }
