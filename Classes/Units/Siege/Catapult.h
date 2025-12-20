@@ -40,6 +40,21 @@ public:
     std::string getSpritePath() const override { 
         return "units/catapult.png"; 
     }
+    int getCost() const override {
+        return 200;
+    }
+
+    int getMaintenanceCost() const override {
+        return 2;
+    }
+
+    int getProductionCost() const override {
+        return 30;
+    }
+
+    bool ismilitary() const override {
+        return true;
+    }
 
     /**
      * @brief 获取最大生命值

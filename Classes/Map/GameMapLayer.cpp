@@ -64,6 +64,9 @@ bool GameMapLayer::init() {
     unit->initUnit(0, startHex);
     this->addChild(unit, 10);
 
+    unit->onCheckCity = [this](Hex h) {
+        return this->getCityAt(h) != nullptr;
+        };
     _myUnit = unit;
     _allUnits.push_back(unit);
 

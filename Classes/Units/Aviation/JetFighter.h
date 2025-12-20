@@ -55,6 +55,22 @@ public:
         return "units/jetFighter.png"; 
     }
 
+    int getCost() const override {
+        return 10600;
+    }
+
+    int getMaintenanceCost() const override {
+        return 8;
+	}
+
+    int getProductionCost() const override {
+        return 80;
+    }
+
+    bool ismilitary() const override {
+        return true;
+	}
+
     /**
      * @brief 获取最大生命值
      * @return 200 点生命值（最高）

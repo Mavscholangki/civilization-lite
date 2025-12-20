@@ -57,6 +57,22 @@ public:
         return "units/crossbowman.png"; 
     }
 
+    int getCost() const override {
+        return 500;
+    }
+
+    int getMaintenanceCost() const override {
+        return 4;
+    }
+
+    int getProductionCost() const override {
+        return 50;
+    }
+
+    bool ismilitary() const override {
+        return true;
+    }
+
     /**
      * @brief 获取最大生命值
      * @return 150 点生命值
