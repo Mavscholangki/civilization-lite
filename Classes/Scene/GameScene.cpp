@@ -1,9 +1,10 @@
 #include "GameScene.h"
 #include "../Map/GameMapLayer.h"
-#include "../UI/HUDLayer.h"
+#include "../UI/HUDLayer.h" // 引用 UI 头文件
+#include "../UI/CityProductionPanel.h"
 #include "../Development/TechSystem.h"
-#include "../Development/CultureSystem.h"
 #include "../Units/Base/AbstractUnit.h"  // 如果需要AbstractUnit的完整定义
+#include "../Development/CultureSystem.h"
 
 USING_NS_CC;
 
@@ -64,7 +65,7 @@ void GameScene::initCultureTree() {
     // 初始化文化树
     _cultureTree->initializeCultureTree();
 
-    // 设置一个默认的当前研究文化（例如101：法典）
+    // 设置当前研究文化（例如01：法典）
     std::vector<int> unlockable = _cultureTree->getUnlockableCultureList();
     if (!unlockable.empty()) {
         _cultureTree->setCurrentResearch(unlockable[0]);
@@ -83,7 +84,7 @@ void GameScene::initCultureTree() {
 }
 
 void GameScene::initPolicySystem() {
-    // 创建政策管理器
+	// 创建政策管理器实例
     _policyManager = new PolicyManager();
 
     if (!_policyManager) {
@@ -91,10 +92,10 @@ void GameScene::initPolicySystem() {
         return;
     }
 
-    // 初始化政策系统
+	// 初始化政策数据
     _policyManager->initializePolicies();
 
-    // 设置文化树引用
+	// 将政策管理器与文化系统关联
     if (_cultureTree) {
         // 设置政府获取回调
         _policyManager->setGovernmentGetter([this]() {
@@ -116,7 +117,7 @@ void GameScene::initPolicySystem() {
         CCLOG("PolicyManager registered as CultureEventListener");
     }
 
-    // 设置初始政策槽位
+	// 设置初始政策槽
     if (_cultureTree) {
         const int* slots = _cultureTree->getActivePolicySlots();
         _policyManager->setPolicySlots(slots[0], slots[1], slots[2], slots[3]);
@@ -124,7 +125,7 @@ void GameScene::initPolicySystem() {
             slots[0], slots[1], slots[2], slots[3]);
     }
 
-    // 设置HUD层的政策管理器
+    // 设置HUD层的政策管理层
     if (_hudLayer) {
         _hudLayer->setPolicyManager(_policyManager);
         CCLOG("PolicyManager set on HUDLayer");
@@ -145,7 +146,7 @@ void GameScene::setupCallbacks() {
         }
         });
 
-    // HUD建城按钮 -> 地图层建城动作
+    // HUD建城按钮 -> 地图层建城动画
     _hudLayer->setBuildCityCallback([this]() {
         _mapLayer->onBuildCityAction();
         });
@@ -154,19 +155,19 @@ void GameScene::setupCallbacks() {
     _hudLayer->setNextTurnCallback([this]() {
         _mapLayer->onNextTurnAction();
         if (_techTree) {
-            int sciencePerTurn = 5; // 可根据城市、建筑等计算
+            int sciencePerTurn = 5; // �?���?��市、建筑等计算
             _techTree->updateProgress(sciencePerTurn);
         }
 
         // 文化系统更新
         if (_cultureTree) {
-            int culturePerTurn = 3; // 可根据纪念碑、剧院等计算
+            int culturePerTurn = 3; // �?���?��念�?、剧院等计算
             _cultureTree->updateProgress(culturePerTurn);
         }
 
-        // 新增：政策系统更新（如果需要每回合处理什么）
+        // 新功能：政策系统更新（如果需要每回合处理什么）
         if (_policyManager) {
-            // 例如：检查政策组合效果是否持续激活
+			// 例如：检查政策组合效果是否持续触发
             _policyManager->checkPolicyCombos();
         }
         // 更新资源显示
@@ -208,7 +209,7 @@ void GameScene::onExit() {
         _cultureTree = nullptr;
     }
 
-    // 清理政策管理器
+    // 清理政策管理层
     if (_policyManager) {
         delete _policyManager;
         _policyManager = nullptr;

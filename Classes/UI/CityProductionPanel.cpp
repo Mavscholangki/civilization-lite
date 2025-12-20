@@ -58,7 +58,7 @@ bool CityProductionPanel::init()
 	this->showProductionPanel->setTitleText("[ Production ]");
 	this->showProductionPanel->setTitleColor(Color3B(204, 204, 0)); // 黄色文字
 	this->showProductionPanel->setTitleFontSize(24);
-	this->showProductionPanel->setPosition(Vec2(-100, 150)); // 初始位置在面板外
+	this->showProductionPanel->setPosition(Vec2(-80, 150)); // 初始位置在面板外
 	this->showProductionPanel->addClickEventListener([=](Ref* sender) {
 		if (currentShownPanel == productionPanel)
 		{
@@ -77,17 +77,26 @@ bool CityProductionPanel::init()
 	});
 	PanelBG->addChild(this->showProductionPanel);
 
+	// 显示生产面板按钮背景
+	auto showProductionPanelBg = ui::Layout::create();
+	showProductionPanelBg->setContentSize(Size(showProductionPanel->getContentSize().width + 10, showProductionPanel->getContentSize().height + 10));
+	showProductionPanelBg->setBackGroundColor(Color3B(0, 76, 153)); // 深蓝色背景
+	showProductionPanelBg->setBackGroundColorType(ui::Layout::BackGroundColorType::SOLID);
+	showProductionPanelBg->setAnchorPoint(Vec2(0.5f, 0.5f));
+	showProductionPanelBg->setPosition(Vec2(showProductionPanel->getContentSize().width / 2, showProductionPanel->getContentSize().height / 2));
+	this->showProductionPanel->addChild(showProductionPanelBg, -1);
+
 	// 显示人口分配面板按钮
 	this->showPopulationPanel = ui::Button::create();
 	this->showPopulationPanel->setTitleText("[ Population Distribution ]");
 	this->showPopulationPanel->setTitleColor(Color3B(204, 204, 0)); // 黄色文字
 	this->showPopulationPanel->setTitleFontSize(24);
-	this->showPopulationPanel->setPosition(Vec2(-100, 200)); // 初始位置在面板外
+	this->showPopulationPanel->setPosition(Vec2(-150, 200)); // 初始位置在面板外
 	this->showPopulationPanel->addClickEventListener([=](Ref* sender) {
 		if (currentShownPanel == populationPanel)
 		{
 			// 切回生产面板
-			currentShownPanel = this;
+			currentShownPanel = productionPanel;
 			this->populationPanel->setVisible(false);
 			this->productionPanel->setVisible(true);
 		}
@@ -102,6 +111,14 @@ bool CityProductionPanel::init()
 	});
 	PanelBG->addChild(this->showPopulationPanel);
 
+	// 显示人口分配面板按钮背景
+	auto showPopulationPanelBg = ui::Layout::create();
+	showPopulationPanelBg->setContentSize(Size(showPopulationPanel->getContentSize().width + 10, showPopulationPanel->getContentSize().height + 10));
+	showPopulationPanelBg->setBackGroundColor(Color3B(0, 76, 153)); // 深蓝色背景
+	showPopulationPanelBg->setBackGroundColorType(ui::Layout::BackGroundColorType::SOLID);
+	showPopulationPanelBg->setAnchorPoint(Vec2(0.5f, 0.5f));
+	showPopulationPanelBg->setPosition(Vec2(showPopulationPanel->getContentSize().width / 2, showPopulationPanel->getContentSize().height / 2));
+	this->showPopulationPanel->addChild(showPopulationPanelBg, -1);
 	return true;
 }
 
@@ -113,7 +130,7 @@ bool PopulationDistributionPanel::init()
 		return false;
 	}
 	auto visibleSize = Director::getInstance()->getVisibleSize();
-	auto panelSize = Size(visibleSize.width / 7, visibleSize.height);
+	auto panelSize = Size(visibleSize.width / 7, visibleSize.height - 50);
 
 	// 初始化人口分配面板的逻辑
 	visible = false; // 初始为隐藏状态
@@ -125,10 +142,27 @@ bool PopulationDistributionPanel::init()
 	this->workedTilesList->setScrollBarWidth(5);
 	this->addChild(this->workedTilesList);
 
+	// 标题
+	this->title = Label::createWithSystemFont("Population Distribution", "Arial", 24);
+	this->title->setTextColor(Color4B(Color3B(0, 76, 153)));
+	this->title->setContentSize(Size(panelSize.width, 40));
+	this->title->setPosition(Vec2(panelSize.width / 2, panelSize.height - title->getContentSize().height / 2 + 50));
+	this->addChild(this->title);
+
+	// 为标题添加背景
+	auto titleBg = ui::Layout::create();
+	titleBg->setContentSize(Size(panelSize.width, title->getContentSize().height + 10));
+	titleBg->setBackGroundColor(Color3B(153, 204, 255)); // 深蓝色背景
+	titleBg->setBackGroundColorType(ui::Layout::BackGroundColorType::SOLID);
+	titleBg->setAnchorPoint(Vec2(0.5f, 0.5f));
+	titleBg->setPosition(Vec2(panelSize.width / 2, title->getContentSize().height / 2));
+	this->title->addChild(titleBg, -1);
+
 	return true;
 }
 void PopulationDistributionPanel::updatePanel(std::map<Hex, int> populationDistribution, int population)
 {
+	int unallocated = population;
 	// 清空当前列表
 	this->workedTilesList->removeAllChildren();
 	currentDistribution = populationDistribution;
@@ -137,7 +171,12 @@ void PopulationDistributionPanel::updatePanel(std::map<Hex, int> populationDistr
 	{
 		bool isWorked = (currentDistribution[tile.first] > 0);
 		createNewItem(tile.first, isWorked);
+		if (isWorked)
+			unallocated--;
 	}
+	// 更新标题显示人口信息
+	this->title->setString(
+		"Unallocated: " + std::to_string(unallocated) + "/ Total: " + std::to_string(population));
 }
 void PopulationDistributionPanel::manualDistribute(Hex tileIndex)
 {
@@ -185,8 +224,7 @@ void PopulationDistributionPanel::createNewItem(Hex tile, bool isWorked) // 创建
 {
 	auto item = ui::Button::create();
 	item->setTitleText("Tile (" + std::to_string(tile.q) + ", " + std::to_string(tile.r) + ")");
-	item->setTitleColor(isWorked ? Color3B::BLUE : Color3B::BLACK); // 已耕作为蓝色，未耕作为白色
-	item->setTitleFontSize(22);
+	item->setTitleColor(isWorked ? Color3B::BLUE : Color3B(128, 128, 128)); // 已耕作为蓝色，未耕作为灰色
 	item->setTitleFontSize(18);
 	item->setContentSize(Size(this->workedTilesList->getContentSize().width - 20, 40));
 	// 为按钮添加背景
@@ -205,8 +243,7 @@ void PopulationDistributionPanel::createNewItem(Hex tile, bool isWorked) // 创建
 			{
 				// 取消选择该地块
 				selected = false;
-				item->setTitleFontSize(18); // 字体恢复原大小
-				bg->setPosition(Vec2(item->getContentSize().width / 2, item->getContentSize().height / 2));
+				bg->setBackGroundColor(Color3B(153, 204, 255)); // 恢复背景颜色
 			}
 			else
 			{
@@ -216,16 +253,16 @@ void PopulationDistributionPanel::createNewItem(Hex tile, bool isWorked) // 创建
 					currentDistribution[tile] = 1;
 					item->setTitleColor(Color3B::BLUE); // 变为已耕作颜色
 					currentDistribution[selectedTile] = 0;
-					selectedItem->setTitleColor(Color3B::BLACK); // 之前选中的地块变为未耕作颜色
+					selectedItem->setTitleColor(Color3B(128, 128, 128)); // 之前选中的地块变为未耕作颜色
 				}
 				else if (currentDistribution[selectedTile] == 0 && currentDistribution[tile] == 1)
 				{
 					currentDistribution[tile] = 0;
-					item->setTitleColor(Color3B::WHITE); // 变为未耕作颜色
+					item->setTitleColor(Color3B(128, 128, 128)); // 变为未耕作颜色
 					currentDistribution[selectedTile] = 1;
-					selectedItem->setTitleColor(Color3B::BLACK); // 之前选中的地块变为已耕作颜色
+					selectedItem->setTitleColor(Color3B::BLUE); // 之前选中的地块变为已耕作颜色
 				}
-				selectedItem->setTitleFontSize(18); // 之前选中的地块字体恢复原大小
+				selectedItemBg->setBackGroundColor(Color3B(153, 204, 255)); // 恢复背景颜色
 				bg->setPosition(Vec2(item->getContentSize().width / 2, item->getContentSize().height / 2));
 				selected = false;
 			}
@@ -236,9 +273,8 @@ void PopulationDistributionPanel::createNewItem(Hex tile, bool isWorked) // 创建
 			selected = true;
 			selectedTile = tile;
 			selectedItem = item;
-			// 选中时字体变大
-			item->setTitleFontSize(22);
-			bg->setPosition(Vec2(item->getContentSize().width / 2, item->getContentSize().height / 2));
+			selectedItemBg = bg;
+			bg->setBackGroundColor(Color3B::YELLOW); // 黄色背景表示选中
 		}
 	});
 	

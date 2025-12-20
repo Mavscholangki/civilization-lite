@@ -25,6 +25,8 @@ private:
 	bool selected; // 有地块被选中将调走人口，否则为false，与selectedTile配合使用
 	Hex selectedTile; // 选中的地块(当手动调整时用到)
 	ui::Button* selectedItem; // 选中的地块对应的按钮
+	ui::Layout* selectedItemBg; // 选中地块按钮的背景
+	Label* title; // 标题(带有人口信息)
 };
 
 class PanelItem : public cocos2d::ui::Button {
