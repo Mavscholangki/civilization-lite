@@ -6,12 +6,12 @@
 #include <vector>
 #include <string>
 
-// å‰å‘å£°æ˜
+// Ç°ÏòÉùÃ÷
 class TigerCannonUnit;
 
 class CivChina : public BaseCiv {
 public:
-    // åˆ›å»ºæ–¹æ³•
+    // ´´½¨·½·¨
     static CivChina* create() {
         CivChina* pRet = new(std::nothrow) CivChina();
         if (pRet && pRet->init()) {
@@ -22,22 +22,22 @@ public:
         return nullptr;
     }
 
-    // åˆå§‹åŒ–
+    // ³õÊ¼»¯
     virtual bool init() override;
 
-    // ==================== æ–‡æ˜ç‰¹æ€§è·å– ====================
+    // ==================== ÎÄÃ÷ÌØĞÔ»ñÈ¡ ====================
     virtual CivilizationTrait getTraits() const override;
 
-    // ==================== é€šç”¨åŠ æˆæ¥å£ ====================
-    virtual float getEurekaBoost() const override { return 0.75f; } // å°¤é‡Œå¡75%
-    virtual int getBuilderCharges() const override { return 5; }    // å»ºé€ è€…5æ¬¡
+    // ==================== Í¨ÓÃ¼Ó³É½Ó¿Ú ====================
+    virtual float getEurekaBoost() const override { return 0.75f; } // ÓÈÀï¿¨75%
+    virtual int getBuilderCharges() const override { return 5; }    // ½¨ÔìÕß5´Î
 
-    // ==================== ç‰¹æ®Šå•ä½æ¥å£ ====================
+    // ==================== ÌØÊâµ¥Î»½Ó¿Ú ====================
     virtual bool hasUniqueUnit(const std::string& unitName) const override;
     virtual bool isUniqueUnitUnlocked(const std::string& unitName) const override;
     virtual cocos2d::Ref* createUniqueUnit(const std::string& unitName, void* position) override;
 
-    // ==================== åŒºåŸŸåŠ æˆè®¡ç®— ====================
+    // ==================== ÇøÓò¼Ó³É¼ÆËã ====================
     virtual Yield calculateDistrictBonus(const District* district) const override;
 
 private:

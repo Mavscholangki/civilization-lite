@@ -5,45 +5,45 @@
 #include "cocos2d.h"
 #include "../Development/TechSystem.h"
 #include "../Development/CultureSystem.h"
-#include "../City/Yield.h"  // åŒ…å«é¡¹ç›®ä¸­çš„ Yield å®šä¹‰
+#include "../City/Yield.h"  // °üº¬ÏîÄ¿ÖĞµÄ Yield ¶¨Òå
 
-// å‰å‘å£°æ˜
+// Ç°ÏòÉùÃ÷
 class District;
 namespace DistrictType {
     struct DistrictTypeInfo;
 }
 
-// æ–‡æ˜ç‰¹æ€§ç»“æ„ä½“
+// ÎÄÃ÷ÌØĞÔ½á¹¹Ìå
 struct CivilizationTrait {
     std::string name;
     std::string description;
 
-    // é€šç”¨åŠ æˆ
-    int initialTiles = 3;             // åˆå§‹åœ°å—æ•°
-    float eurekaBoost = 0.5f;         // å°¤é‡Œå¡åŠ æˆç³»æ•°ï¼ˆé»˜è®¤50%ï¼‰
-    float inspirationBoost = 0.5f;    // çµæ„ŸåŠ æˆç³»æ•°ï¼ˆé»˜è®¤50%ï¼‰
+    // Í¨ÓÃ¼Ó³É
+    int initialTiles = 3;             // ³õÊ¼µØ¿éÊı
+    float eurekaBoost = 0.5f;         // ÓÈÀï¿¨¼Ó³ÉÏµÊı£¨Ä¬ÈÏ50%£©
+    float inspirationBoost = 0.5f;    // Áé¸Ğ¼Ó³ÉÏµÊı£¨Ä¬ÈÏ50%£©
 
-    // èµ„æºåŠ æˆ
-    float scienceBonus = 1.0f;        // ç§‘ç ”åŠ æˆç³»æ•°
-    float cultureBonus = 1.0f;        // æ–‡åŒ–åŠ æˆç³»æ•°
-    float productionBonus = 1.0f;     // ç”Ÿäº§åŠ›åŠ æˆç³»æ•°
-    float goldBonus = 1.0f;           // é‡‘å¸åŠ æˆç³»æ•°
-    float faithBonus = 1.0f;          // ä¿¡ä»°åŠ æˆç³»æ•°
+    // ×ÊÔ´¼Ó³É
+    float scienceBonus = 1.0f;        // ¿ÆÑĞ¼Ó³ÉÏµÊı
+    float cultureBonus = 1.0f;        // ÎÄ»¯¼Ó³ÉÏµÊı
+    float productionBonus = 1.0f;     // Éú²úÁ¦¼Ó³ÉÏµÊı
+    float goldBonus = 1.0f;           // ½ğ±Ò¼Ó³ÉÏµÊı
+    float faithBonus = 1.0f;          // ĞÅÑö¼Ó³ÉÏµÊı
 
-    // åŒºåŸŸç›¸å…³
-    bool halfCostIndustrial = false;  // å·¥ä¸šåŒºåŠä»·
-    bool extraDistrictSlot = false;   // é¢å¤–åŒºåŸŸæ§½ä½
-    float militaryProductionBonus = 1.0f; // å†›äº‹å•ä½ç”Ÿäº§åŠ›æˆæœ¬ç³»æ•°
+    // ÇøÓòÏà¹Ø
+    bool halfCostIndustrial = false;  // ¹¤ÒµÇø°ë¼Û
+    bool extraDistrictSlot = false;   // ¶îÍâÇøÓò²ÛÎ»
+    float militaryProductionBonus = 1.0f; // ¾üÊÂµ¥Î»Éú²úÁ¦³É±¾ÏµÊı
 
-    // å•ä½ç›¸å…³
-    int builderCharges = 3;           // å»ºé€ è€…ä½¿ç”¨æ¬¡æ•°
+    // µ¥Î»Ïà¹Ø
+    int builderCharges = 3;           // ½¨ÔìÕßÊ¹ÓÃ´ÎÊı
 
     CivilizationTrait() = default;
 };
 
 class BaseCiv : public cocos2d::Ref {
 public:
-    // åˆ›å»ºæ–¹æ³•
+    // ´´½¨·½·¨
     static BaseCiv* create() {
         BaseCiv* pRet = new(std::nothrow) BaseCiv();
         if (pRet && pRet->init()) {
@@ -54,21 +54,21 @@ public:
         return nullptr;
     }
 
-    // åˆå§‹åŒ–
+    // ³õÊ¼»¯
     virtual bool init();
 
     virtual ~BaseCiv() {}
 
-    // ==================== æ–‡æ˜ç‰¹æ€§è·å– ====================
+    // ==================== ÎÄÃ÷ÌØĞÔ»ñÈ¡ ====================
     virtual CivilizationTrait getTraits() const { return m_traits; }
 
-    // ==================== é€šç”¨åŠ æˆæ¥å£ ====================
+    // ==================== Í¨ÓÃ¼Ó³É½Ó¿Ú ====================
     virtual int getInitialTiles() const { return m_traits.initialTiles; }
     virtual float getEurekaBoost() const { return m_traits.eurekaBoost; }
     virtual float getInspirationBoost() const { return m_traits.inspirationBoost; }
     virtual int getBuilderCharges() const { return m_traits.builderCharges; }
 
-    // ==================== èµ„æºåŠ æˆæ¥å£ ====================
+    // ==================== ×ÊÔ´¼Ó³É½Ó¿Ú ====================
     virtual float getScienceBonus() const { return m_traits.scienceBonus; }
     virtual float getCultureBonus() const { return m_traits.cultureBonus; }
     virtual float getProductionBonus() const { return m_traits.productionBonus; }
@@ -76,26 +76,26 @@ public:
     virtual float getFaithBonus() const { return m_traits.faithBonus; }
     virtual float getMilitaryProductionCost() const { return m_traits.militaryProductionBonus; }
 
-    // ==================== åŒºåŸŸç›¸å…³æ¥å£ ====================
+    // ==================== ÇøÓòÏà¹Ø½Ó¿Ú ====================
     virtual bool hasHalfCostIndustrial() const { return m_traits.halfCostIndustrial; }
     virtual bool hasExtraDistrictSlot() const { return m_traits.extraDistrictSlot; }
 
-    // ==================== ç‰¹æ®Šå•ä½æ¥å£ ====================
+    // ==================== ÌØÊâµ¥Î»½Ó¿Ú ====================
     virtual bool hasUniqueUnit(const std::string& unitName) const { return false; }
     virtual bool isUniqueUnitUnlocked(const std::string& unitName) const { return false; }
     virtual cocos2d::Ref* createUniqueUnit(const std::string& unitName, void* position) { return nullptr; }
 
-    // ==================== åŒºåŸŸåŠ æˆè®¡ç®— ====================
+    // ==================== ÇøÓò¼Ó³É¼ÆËã ====================
     virtual Yield calculateDistrictBonus(const District* district) const;
 
-    // ==================== æˆæœ¬è®¡ç®—æ¥å£ ====================
+    // ==================== ³É±¾¼ÆËã½Ó¿Ú ====================
     virtual float calculateDistrictCost(const std::string& districtType) const { return 1.0f; }
     virtual float calculateDistrictCost(const DistrictType::DistrictTypeInfo& type) const { return 1.0f; }
 
-    // ==================== åŒºåŸŸå®¹é‡è®¡ç®— ====================
+    // ==================== ÇøÓòÈİÁ¿¼ÆËã ====================
     virtual int calculateMaxDistricts(int population) const;
 
-    // ==================== ç§‘æŠ€/æ–‡åŒ–åŠ æˆåº”ç”¨ ====================
+    // ==================== ¿Æ¼¼/ÎÄ»¯¼Ó³ÉÓ¦ÓÃ ====================
     virtual int applyScienceBonus(int baseScience) const {
         return static_cast<int>(baseScience * getScienceBonus());
     }
@@ -107,7 +107,7 @@ public:
     virtual int applyEurekaBonus(int techId, const TechTree* techTree) const;
     virtual int applyInspirationBonus(int cultureId, const CultureTree* cultureTree) const;
 
-    // ==================== äº‹ä»¶å›è°ƒ ====================
+    // ==================== ÊÂ¼ş»Øµ÷ ====================
     virtual void onTechActivated(int techId) {}
     virtual void onCultureUnlocked(int cultureId) {}
     virtual void onCityFounded(void* city) {}
