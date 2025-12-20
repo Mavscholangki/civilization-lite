@@ -213,7 +213,11 @@ void Player::addCity(BaseCity* city) {
         // 如果是第一个城市，应用首都加成
         if (m_cities.size() == 1) {
             CCLOG("Player %d founded capital: %s", m_playerId, city->cityName.c_str());
-            // TODO: 设置首都标志
+            // 设置首都标志
+            // 这里可以添加首都特有的属性
+
+            // 首都自动被自己控制
+            addControlledCapital(m_playerId);
         }
 
         CCLOG("Player %d now has %d cities", m_playerId, (int)m_cities.size());
@@ -223,15 +227,32 @@ void Player::addCity(BaseCity* city) {
 void Player::removeCity(BaseCity* city) {
     auto it = std::find(m_cities.begin(), m_cities.end(), city);
     if (it != m_cities.end()) {
+        // 检查是否是首都
+        bool wasCapital = (city == getCapital());
+
         (*it)->release();
         m_cities.erase(it);
 
         CCLOG("Player %d lost a city, remaining: %d", m_playerId, (int)m_cities.size());
 
+        // 如果失去的是首都
+        if (wasCapital) {
+            CCLOG("Player %d lost their capital!", m_playerId);
+            // 从自己控制的列表中移除
+            removeControlledCapital(m_playerId);
+        }
+
         // 如果失去所有城市，玩家失败
         if (m_cities.empty()) {
             m_state = PlayerState::DEFEATED;
             CCLOG("Player %d has been defeated (no cities remaining)", m_playerId);
+        }
+        else if (wasCapital) {
+            // 如果失去首都但还有其他城市，选择新的首都（第一个城市）
+            CCLOG("Player %d's new capital is: %s",
+                m_playerId, m_cities[0]->cityName.c_str());
+            // 重新添加首都控制
+            addControlledCapital(m_playerId);
         }
     }
 }
@@ -271,6 +292,74 @@ Yield Player::calculateBaseYield() const {
     }
 
     return base;
+}
+
+bool Player::isCapital(BaseCity* city) const {
+    if (m_cities.empty() || !city) return false;
+    // 第一个城市是首都
+    return city == m_cities[0];
+}
+
+// 添加控制的首都
+void Player::addControlledCapital(int playerId) {
+    // 检查是否已存在
+    auto it = std::find(m_vicprogress.controlledCapitals.begin(),
+        m_vicprogress.controlledCapitals.end(), playerId);
+    if (it == m_vicprogress.controlledCapitals.end()) {
+        m_vicprogress.controlledCapitals.push_back(playerId);
+        CCLOG("Player %d now controls capital of player %d",
+            m_playerId, playerId);
+    }
+}
+
+// 移除控制的首都
+void Player::removeControlledCapital(int playerId) {
+    auto it = std::find(m_vicprogress.controlledCapitals.begin(),
+        m_vicprogress.controlledCapitals.end(), playerId);
+    if (it != m_vicprogress.controlledCapitals.end()) {
+        m_vicprogress.controlledCapitals.erase(it);
+        CCLOG("Player %d lost control of capital of player %d",
+            m_playerId, playerId);
+    }
+}
+
+// 获取控制的首都列表
+std::vector<int> Player::getControlledCapitals() const {
+    return m_vicprogress.controlledCapitals;
+}
+
+// 检查是否控制特定玩家的首都
+bool Player::controlsCapitalOf(int playerId) const {
+    auto it = std::find(m_vicprogress.controlledCapitals.begin(),
+        m_vicprogress.controlledCapitals.end(), playerId);
+    return it != m_vicprogress.controlledCapitals.end();
+}
+
+// ==================== 单位管理 ====================
+void Player::addUnit(AbstractUnit* unit) {
+    if (unit) {
+        m_units.push_back(unit);
+        unit->retain();
+
+        // 设置单位所属玩家（需要AbstractUnit有这个方法）
+        // unit->setOwner(this);
+
+        CCLOG("Player %d added a unit: %s, total units: %d",
+            m_playerId, unit->getUnitName().c_str(), (int)m_units.size());
+    }
+}
+
+void Player::removeUnit(AbstractUnit* unit) {
+    auto it = std::find(m_units.begin(), m_units.end(), unit);
+    if (it != m_units.end()) {
+        CCLOG("Player %d removing unit: %s",
+            m_playerId, (*it)->getUnitName().c_str());
+
+        (*it)->release();
+        m_units.erase(it);
+        CCLOG("Player %d lost a unit, remaining: %d",
+            m_playerId, (int)m_units.size());
+    }
 }
 
 // ==================== 科技系统接口 ====================
@@ -461,46 +550,6 @@ void Player::updatePolicySlots() {
     CCLOG("Player %d policy slots updated: Military=%d, Economic=%d, Diplomatic=%d, Wildcard=%d",
         m_playerId, slotInfo.military, slotInfo.economic,
         slotInfo.diplomatic, slotInfo.wildcard);
-}
-
-// ==================== 外交系统 ====================
-
-void Player::declareWar(int targetPlayerId) {
-    DiplomaticRelation& relation = m_diplomaticRelations[targetPlayerId];
-    relation.playerId = targetPlayerId;
-    relation.isAtWar = true;
-    relation.relationship = -100;
-
-    CCLOG("Player %d declared war on Player %d", m_playerId, targetPlayerId);
-}
-
-void Player::makePeace(int targetPlayerId) {
-    auto it = m_diplomaticRelations.find(targetPlayerId);
-    if (it != m_diplomaticRelations.end()) {
-        it->second.isAtWar = false;
-        it->second.relationship = 0;
-        CCLOG("Player %d made peace with Player %d", m_playerId, targetPlayerId);
-    }
-}
-
-bool Player::isAtWarWith(int playerId) const {
-    auto it = m_diplomaticRelations.find(playerId);
-    if (it != m_diplomaticRelations.end()) {
-        return it->second.isAtWar;
-    }
-    return false;
-}
-
-void Player::setDiplomaticRelation(int playerId, const DiplomaticRelation& relation) {
-    m_diplomaticRelations[playerId] = relation;
-}
-
-Player::DiplomaticRelation* Player::getDiplomaticRelation(int playerId) {
-    auto it = m_diplomaticRelations.find(playerId);
-    if (it != m_diplomaticRelations.end()) {
-        return &it->second;
-    }
-    return nullptr;
 }
 
 // ==================== 经济系统 ====================
@@ -752,11 +801,10 @@ bool Player::checkScienceVictory() const {
     return m_vicprogress.hasSatelliteTech && m_vicprogress.hasLaunchedSatellite;
 }
 
-
 bool Player::checkDominationVictory() const {
-    // 需要游戏总信息
-    // TODO: 获取游戏总城市数，控制所有城市即为统治胜利
-    return false;
+    // 现在统治胜利由GameManager全局判断
+    // 这里只返回玩家自己的状态
+    return m_vicprogress.hasDominationVictory;
 }
 
 // ==================== 序列化 ====================
@@ -798,19 +846,259 @@ ValueMap Player::toValueMap() const {
         }
     }
 
-    // TODO: 序列化子系统
-    // 1. 科技树状态
-    // 2. 文化树状态
+    // 1. 序列化科技树状态
+    ValueMap techTreeData;
+    // 当前研究
+    int currentTech = m_techTree.getCurrentResearch();
+    if (currentTech != -1) {
+        techTreeData["currentResearch"] = currentTech;
+    }
+
+    // 已激活的科技
+    ValueVector activatedTechs;
+    const auto& techList = m_techTree.getActivatedTechList();
+    for (int techId : techList) {
+        activatedTechs.push_back(Value(techId));
+
+        // 序列化每个科技的研究进度
+        ValueMap techProgress;
+        const TechNode* techNode = m_techTree.getTechInfo(techId);
+        if (techNode) {
+            techProgress["progress"] = techNode->progress;
+            techTreeData["tech_" + std::to_string(techId)] = techProgress;
+        }
+    }
+    techTreeData["activatedTechs"] = activatedTechs;
+    data["techTree"] = techTreeData;
+
+    // 2. 序列化文化树状态
+    ValueMap cultureTreeData;
+    // 当前研究
+    int currentCivic = m_cultureTree.getCurrentResearch();
+    if (currentCivic != -1) {
+        cultureTreeData["currentResearch"] = currentCivic;
+    }
+
+    // 当前政体
+    GovernmentType currentGov = m_cultureTree.getCurrentGovernment();
+    cultureTreeData["currentGovernment"] = (int)currentGov;
+
+    // 已激活的市政
+    ValueVector activatedCivics;
+    const auto& cultureList = m_cultureTree.getActivatedCultureList();
+    for (int cultureId : cultureList) {
+        activatedCivics.push_back(Value(cultureId));
+
+        // 序列化每个市政的研究进度
+        ValueMap cultureProgress;
+        const CultureNode* cultureNode = m_cultureTree.getCultureInfo(cultureId);
+        if (cultureNode) {
+            cultureProgress["progress"] = cultureNode->progress;
+            cultureTreeData["culture_" + std::to_string(cultureId)] = cultureProgress;
+        }
+    }
+    cultureTreeData["activatedCivics"] = activatedCivics;
+
+    // 政策槽位
+    auto slotInfo = m_cultureTree.getPolicySlotInfo();
+    ValueMap slotData;
+    slotData["military"] = slotInfo.military;
+    slotData["economic"] = slotInfo.economic;
+    slotData["diplomatic"] = slotInfo.diplomatic;
+    slotData["wildcard"] = slotInfo.wildcard;
+    cultureTreeData["policySlots"] = slotData;
+
+    data["cultureTree"] = cultureTreeData;
+
     // 3. 政策管理器状态
-    // 4. 城市列表
-    // 5. 单位列表
-    // 6. 外交关系
+    // TODO: 需要PolicyManager提供序列化接口
+
+    // 4. 胜利进度
+    ValueMap victoryData;
+    victoryData["hasSatelliteTech"] = m_vicprogress.hasSatelliteTech;
+    victoryData["hasLaunchedSatellite"] = m_vicprogress.hasLaunchedSatellite;
+    victoryData["hasDominationVictory"] = m_vicprogress.hasDominationVictory;
+    data["victoryProgress"] = victoryData;
+
+    // TODO: 城市和单位列表的序列化由游戏场景统一管理
+    // 这里只保存城市ID和单位ID的引用
 
     return data;
 }
 
 bool Player::fromValueMap(const ValueMap& data) {
-    // TODO: 反序列化实现
+    // 基本属性
+    if (data.find("playerId") != data.end())
+        m_playerId = data.at("playerId").asInt();
+    if (data.find("playerName") != data.end())
+        m_playerName = data.at("playerName").asString();
+    if (data.find("state") != data.end())
+        m_state = static_cast<PlayerState>(data.at("state").asInt());
+    if (data.find("gold") != data.end())
+        m_gold = data.at("gold").asInt();
+    if (data.find("scienceStock") != data.end())
+        m_scienceStock = data.at("scienceStock").asInt();
+    if (data.find("cultureStock") != data.end())
+        m_cultureStock = data.at("cultureStock").asInt();
+    if (data.find("faith") != data.end())
+        m_faith = data.at("faith").asInt();
+    if (data.find("amenities") != data.end())
+        m_amenities = data.at("amenities").asInt();
+    if (data.find("happiness") != data.end())
+        m_happiness = data.at("happiness").asInt();
+    if (data.find("grievances") != data.end())
+        m_grievances = data.at("grievances").asInt();
+    if (data.find("isHuman") != data.end())
+        m_isHuman = data.at("isHuman").asBool();
+
+    // 颜色
+    if (data.find("color_r") != data.end() &&
+        data.find("color_g") != data.end() &&
+        data.find("color_b") != data.end()) {
+        m_color = cocos2d::Color3B(
+            data.at("color_r").asInt(),
+            data.at("color_g").asInt(),
+            data.at("color_b").asInt()
+        );
+    }
+
+    // 文明类型
+    if (data.find("civilization") != data.end()) {
+        std::string civName = data.at("civilization").asString();
+        CivilizationType civType = CivilizationType::BASIC;
+
+        if (civName == "China") {
+            civType = CivilizationType::CHINA;
+        }
+        else if (civName == "Germany") {
+            civType = CivilizationType::GERMANY;
+        }
+        else if (civName == "Russia") {
+            civType = CivilizationType::RUSSIA;
+        }
+
+        // 重新创建文明
+        createCivilization(civType);
+    }
+
+    // 1. 反序列化科技树状态
+    if (data.find("techTree") != data.end()) {
+        const ValueMap& techTreeData = data.at("techTree").asValueMap();
+
+        // 恢复已激活的科技
+        if (techTreeData.find("activatedTechs") != techTreeData.end()) {
+            const ValueVector& activatedTechs = techTreeData.at("activatedTechs").asValueVector();
+            for (const Value& techVal : activatedTechs) {
+                int techId = techVal.asInt();
+
+                // 检查是否有进度数据
+                std::string techKey = "tech_" + std::to_string(techId);
+                if (techTreeData.find(techKey) != techTreeData.end()) {
+                    const ValueMap& techProgress = techTreeData.at(techKey).asValueMap();
+                    if (techProgress.find("progress") != techProgress.end()) {
+                        int savedProgress = techProgress.at("progress").asInt();
+
+                        // 由于TechTree没有直接设置进度的方法，我们需要模拟研究过程
+                        // 首先设置为当前研究，然后添加进度
+                        m_techTree.setCurrentResearch(techId);
+                        m_techTree.updateProgress(savedProgress);
+
+                        // 如果进度已满，则激活科技
+                        const TechNode* techNode = m_techTree.getTechInfo(techId);
+                        if (techNode && techNode->progress >= techNode->cost) {
+                            // 科技会自动激活，不需要额外操作
+                        }
+                    }
+                }
+            }
+        }
+
+        // 恢复当前研究
+        if (techTreeData.find("currentResearch") != techTreeData.end()) {
+            int savedCurrentTech = techTreeData.at("currentResearch").asInt();
+
+            // 只有当科技未激活时才设置为当前研究
+            if (!m_techTree.isActivated(savedCurrentTech)) {
+                m_techTree.setCurrentResearch(savedCurrentTech);
+            }
+        }
+    }
+
+    // 2. 反序列化文化树状态
+    if (data.find("cultureTree") != data.end()) {
+        const ValueMap& cultureTreeData = data.at("cultureTree").asValueMap();
+
+        // 恢复当前政体
+        if (cultureTreeData.find("currentGovernment") != cultureTreeData.end()) {
+            int govValue = cultureTreeData.at("currentGovernment").asInt();
+            GovernmentType savedGov = static_cast<GovernmentType>(govValue);
+            m_cultureTree.switchGovernment(savedGov);
+        }
+
+        // 恢复已激活的市政
+        if (cultureTreeData.find("activatedCivics") != cultureTreeData.end()) {
+            const ValueVector& activatedCivics = cultureTreeData.at("activatedCivics").asValueVector();
+            for (const Value& cultureVal : activatedCivics) {
+                int cultureId = cultureVal.asInt();
+
+                // 检查是否有进度数据
+                std::string cultureKey = "culture_" + std::to_string(cultureId);
+                if (cultureTreeData.find(cultureKey) != cultureTreeData.end()) {
+                    const ValueMap& cultureProgress = cultureTreeData.at(cultureKey).asValueMap();
+                    if (cultureProgress.find("progress") != cultureProgress.end()) {
+                        int savedProgress = cultureProgress.at("progress").asInt();
+
+                        // 模拟研究过程
+                        m_cultureTree.setCurrentResearch(cultureId);
+                        m_cultureTree.updateProgress(savedProgress);
+                    }
+                }
+            }
+        }
+
+        // 恢复当前研究
+        if (cultureTreeData.find("currentResearch") != cultureTreeData.end()) {
+            int savedCurrentCivic = cultureTreeData.at("currentResearch").asInt();
+
+            // 只有当市政未激活时才设置为当前研究
+            if (!m_cultureTree.isActivated(savedCurrentCivic)) {
+                m_cultureTree.setCurrentResearch(savedCurrentCivic);
+            }
+        }
+
+        // 恢复政策槽位
+        if (cultureTreeData.find("policySlots") != cultureTreeData.end()) {
+            const ValueMap& slotData = cultureTreeData.at("policySlots").asValueMap();
+            // 注意：政策槽位会在解锁市政时自动更新，这里不需要手动设置
+        }
+    }
+
+    // 3. 恢复胜利进度
+    if (data.find("victoryProgress") != data.end()) {
+        const ValueMap& victoryData = data.at("victoryProgress").asValueMap();
+
+        if (victoryData.find("hasSatelliteTech") != victoryData.end())
+            m_vicprogress.hasSatelliteTech = victoryData.at("hasSatelliteTech").asBool();
+        if (victoryData.find("hasLaunchedSatellite") != victoryData.end())
+            m_vicprogress.hasLaunchedSatellite = victoryData.at("hasLaunchedSatellite").asBool();
+        if (victoryData.find("hasDominationVictory") != victoryData.end())
+            m_vicprogress.hasDominationVictory = victoryData.at("hasDominationVictory").asBool();
+    }
+
+    // 重新注册事件监听器
+    m_techTree.addEventListener(this);
+    m_cultureTree.addEventListener(this);
+
+    // 重新设置政策管理器回调
+    setupPolicyManagerCallbacks();
+
+    // 重新应用文明加成
+    applyAllCivilizationBonuses();
+    updateCivilizationBonusState();
+
+    CCLOG("Player %d loaded from saved data", m_playerId);
+    debugPrintStatus();
+
     return true;
 }
 
