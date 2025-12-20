@@ -53,6 +53,22 @@ public:
         return "units/builder.png"; 
     }
 
+    int getCost() const override {
+        return 200;
+    }
+
+    int getMaintenanceCost() const override {
+        return 0;
+	}
+
+    int getProductionCost() const override {
+        return 50;
+    }
+
+    bool ismilitary() const override {
+        return false;
+	}
+
     /**
      * @brief 获取最大生命值
      * @return 100 点生命值

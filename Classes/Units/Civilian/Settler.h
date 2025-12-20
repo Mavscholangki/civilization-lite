@@ -40,6 +40,21 @@ public:
         return "units/settler.png"; 
     }
 
+    int getCost() const override {
+        return 400;
+	}
+
+    int getMaintenanceCost() const override {
+        return 0;
+    }
+
+    int getProductionCost() const override {
+        return 80;
+	}
+
+    bool ismilitary() const override {
+        return false;
+    }
     /**
      * @brief 获取最大生命值
      * @return 100 点生命值

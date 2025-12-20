@@ -33,6 +33,21 @@ public:
         return UnitType::MELEE; 
     }
 
+    int getCost() const override {
+        return 200;
+    }
+
+    int getMaintenanceCost() const override {
+        return 1;
+    }
+
+    int getProductionCost() const override {
+        return 30;
+    }
+
+    bool ismilitary() const override {
+        return true;
+    }
     /**
      * @brief 获取单位精灵图片路径
      * @return 图片文件路径
