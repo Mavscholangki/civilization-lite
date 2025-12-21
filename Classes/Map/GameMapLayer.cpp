@@ -2,6 +2,7 @@
 #include "MapGenerator.h"
 #include "../Units/Melee/Warrior.h"
 #include "../Utils/PathFinder.h"
+#include "../Core/GameManager.h"
 #include "cocos2d.h"
 
 USING_NS_CC;
@@ -344,6 +345,21 @@ void GameMapLayer::onBuildCityAction() {
     city->setPosition(_layout->hexToPixel(pos));
     this->addChild(city, 5);
     _cities.push_back(city);
+
+    GameManager* gameManager = GameManager::getInstance();
+    if (gameManager) {
+        Player* currentPlayer = gameManager->getCurrentPlayer();
+        if (currentPlayer) {
+            // 添加到玩家的城市列表
+            currentPlayer->addCity(city);
+
+            CCLOG("City added to Player %d, total cities: %d",
+                currentPlayer->getPlayerId(), currentPlayer->getCityCount());
+        }
+        else {
+            CCLOG("Warning: No current player found");
+        }
+    }
 
     if (_selectedUnit == _myUnit) {
         _myUnit = nullptr;

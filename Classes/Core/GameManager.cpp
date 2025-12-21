@@ -147,60 +147,67 @@ void GameManager::endTurn() {
         return;
     }
 
-    // 通知当前玩家回合结束
+    CCLOG("=== Ending turn for Player %d ===", currentPlayer->getPlayerId());
+
+    // 1. 当前玩家回合结束
     currentPlayer->onTurnEnd();
     notifyTurnEnd(currentPlayer->getPlayerId());
 
-    // 切换到下一个玩家
+    // 2. 检查当前玩家是否被击败（没有城市）
+    if (currentPlayer->getState() == Player::PlayerState::DEFEATED) {
+        CCLOG("Player %d is defeated, removing from turn order",
+            currentPlayer->getPlayerId());
+        // 处理玩家失败逻辑...
+    }
+
+    // 3. 切换到下一个玩家
     advanceToNextPlayer();
 
-    // 如果一轮结束，开始新回合
+    // 4. 如果一轮结束，增加回合数
     if (m_currentPlayerIndex == 0) {
         beginNewTurn();
     }
 
-    // 开始下一个玩家的回合
+    // 5. 新玩家回合开始
     Player* nextPlayer = getCurrentPlayer();
     if (nextPlayer) {
+        CCLOG("=== Beginning turn for Player %d ===", nextPlayer->getPlayerId());
+
+        // 5.1 玩家回合开始（这里会计算和更新资源）
         nextPlayer->onTurnBegin();
+
+        // 5.2 通知UI玩家切换
         notifyTurnStart(nextPlayer->getPlayerId());
 
-        // 如果是AI玩家，处理AI回合
-        if (!nextPlayer->getIsHuman()) {
-            processAITurn(nextPlayer);
-        }
+        // 5.3 发送玩家切换事件（UI会监听这个事件来更新显示）
+        ValueMap switchData;
+        switchData["player_id"] = nextPlayer->getPlayerId();
+        switchData["turn"] = m_gameStats.currentTurn;
+
+        // 【新增】发送资源更新事件
+        ValueMap resourceData;
+        resourceData["player_id"] = nextPlayer->getPlayerId();
+        resourceData["gold"] = nextPlayer->getGold();
+        resourceData["science"] = nextPlayer->getSciencePerTurn();
+        resourceData["culture"] = nextPlayer->getCulturePerTurn();
+        resourceData["turn"] = m_gameStats.currentTurn;
+        Director::getInstance()->getEventDispatcher()->dispatchCustomEvent(
+            "player_turn_resource_update", &resourceData
+        );
     }
 
-    // 检查胜利条件
+    // 6. 检查胜利条件
     VictoryType victoryType = checkVictoryConditions();
     if (victoryType != VictoryType::NONE) {
         int winnerId = -1;
-
-        // 根据胜利类型确定胜利者
-        if (victoryType == VictoryType::SCIENCE) {
-            // 找到达成科技胜利的玩家
-            for (auto player : m_players) {
-                if (player && player->checkScienceVictory()) {
-                    winnerId = player->getPlayerId();
-                    break;
-                }
-            }
+        for(Player* checked : m_players)
+        {
+            if(checked->m_vicprogress.hasDominationVictory||checked->m_vicprogress.hasLaunchedSatellite)
+                winnerId = checked->getPlayerId();
         }
-        else if (victoryType == VictoryType::DOMINATION) {
-            // 找到控制所有首都的玩家
-            for (auto player : m_players) {
-                if (player && player->checkDominationVictory()) {
-                    winnerId = player->getPlayerId();
-                    break;
-                }
-            }
-        }
-
         if (winnerId != -1) {
             notifyVictory(victoryType, winnerId);
             m_gameState = GameState::GAME_OVER;
-            m_gameStats.victoryType = victoryType;
-            m_gameStats.victoryPlayerId = winnerId;
         }
     }
 }

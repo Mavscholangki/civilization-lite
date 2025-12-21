@@ -47,10 +47,7 @@ bool Player::init(int playerId, CivilizationType civType) {
     m_gold = GameConfig::STARTING_GOLD;
     m_scienceStock = 0;
     m_cultureStock = 0;
-    m_faith = GameConfig::STARTING_FAITH;
     m_amenities = GameConfig::STARTING_AMENITIES;
-    m_happiness = GameConfig::STARTING_HAPPINESS;
-    m_grievances = 0;
 
     // 初始化子系统
     m_techTree.initializeTechTree();
@@ -137,19 +134,37 @@ void Player::onTurnBegin() {
     // 重置回合统计
     m_turnStats = TurnStats();
 
+    // 检查玩家是否还有城市（如果没有，可能已经失败）
+    if (m_cities.empty()) {
+        // 没有城市时的特殊处理
+        CCLOG("Player %d has no cities!", m_playerId);
+
+        // 只有单位维护费（如果还有单位的话）
+        int maintenance = calculateMaintenanceCost();
+        m_gold -= maintenance;
+        if (m_gold < 0) m_gold = 0;
+
+        // 没有城市时不进行科研和文化研究
+        // 但仍然可以触发其他事件
+
+        // 发送资源变化事件（即使为0）
+        dispatchResourceChangedEvent();
+        return;
+    }
+
     // 1. 收集所有城市产出
     Yield totalYield = calculateTotalYield();
 
-    // 更新回合统计
+    // 记录基础产出（用于统计）
+    m_turnStats.goldGenerated = totalYield.goldYield;
     m_turnStats.scienceGenerated = totalYield.scienceYield;
     m_turnStats.cultureGenerated = totalYield.cultureYield;
-    m_turnStats.goldGenerated = totalYield.goldYield;
 
     // 2. 应用文明特性加成
     totalYield.scienceYield = applyScienceBonus(totalYield.scienceYield);
     totalYield.cultureYield = applyCultureBonus(totalYield.cultureYield);
 
-    // TODO: 应用其他资源加成（生产力、金币、信仰等）
+    // 应用其他文明加成
     if (m_civilization) {
         totalYield.productionYield = static_cast<int>(
             totalYield.productionYield * m_civilization->getProductionBonus());
@@ -159,37 +174,113 @@ void Player::onTurnBegin() {
 
     // 3. 应用政策卡加成
     auto policyEffects = m_policyManager.getActivePolicyEffects();
-    // TODO: 根据政策效果调整产出
+    // 实际应用政策效果...
 
     // 4. 更新资源库存
+    m_gold += totalYield.goldYield;
     addScience(totalYield.scienceYield);
     addCulture(totalYield.cultureYield);
-    m_gold += totalYield.goldYield;
 
     // 5. 更新科技和文化进度
-    int currentTechId = m_techTree.getCurrentResearch();
-    if (currentTechId != -1 && m_scienceStock > 0) {
-        m_techTree.updateProgress(m_scienceStock);
-        m_scienceStock = 0;
-    }
+    updateResearchProgress();
 
-    int currentCivicId = m_cultureTree.getCurrentResearch();
-    if (currentCivicId != -1 && m_cultureStock > 0) {
-        m_cultureTree.updateProgress(m_cultureStock);
-        m_cultureStock = 0;
-    }
-
-    // 6. 更新单位状态
+    // 6. 更新单位状态（恢复移动力等）
     for (auto unit : m_units) {
-        // TODO: 恢复单位移动力，治疗单位等
-        // unit->onTurnBegin();
+        unit->onTurnStart();
     }
 
-    // 7. 计算和维护费
+    // 7. 计算和维护费（从总收入中扣除）
     int maintenance = calculateMaintenanceCost();
     m_gold -= maintenance;
     if (m_gold < 0) {
+        // 金币为负时可能有惩罚（如单位叛变）
         m_gold = 0;
+        CCLOG("Player %d has negative gold after maintenance!", m_playerId);
+    }
+
+    // 8. 发送资源变化事件
+    dispatchResourceChangedEvent();
+
+    CCLOG("Player %d turn begin: Gold=%d(+%d-%d), Science=%d(+%d), Culture=%d(+%d)",
+        m_playerId, m_gold, totalYield.goldYield, maintenance,
+        m_scienceStock, totalYield.scienceYield,
+        m_cultureStock, totalYield.cultureYield);
+}
+
+void Player::dispatchResourceChangedEvent() {
+    ValueMap data;
+    data["player_id"] = m_playerId;
+    data["gold"] = m_gold;
+    data["gold_per_turn"] = calculateNetGoldPerTurn();
+    data["science_per_turn"] = getSciencePerTurn();
+    data["culture_per_turn"] = getCulturePerTurn();
+    data["science_stock"] = m_scienceStock;
+    data["culture_stock"] = m_cultureStock;
+
+    Director::getInstance()->getEventDispatcher()->dispatchCustomEvent(
+        "player_resource_changed", &data
+    );
+
+    // 同时发送一个简单事件供HUD直接监听
+    Director::getInstance()->getEventDispatcher()->dispatchCustomEvent(
+        "hud_update_resources"
+    );
+}
+
+void Player::updateResearchProgress() {
+    // 科技研究
+    int currentTechId = m_techTree.getCurrentResearch();
+    if (currentTechId != -1 && m_scienceStock > 0) {
+        // 获取当前科技信息
+        const TechNode* techNode = m_techTree.getTechInfo(currentTechId);
+        if (techNode && !techNode->activated) {
+            int scienceToUse = m_scienceStock;
+
+            // 只使用需要的科技值（不超过剩余所需）
+            int remaining = techNode->cost - techNode->progress;
+            if (scienceToUse > remaining) {
+                scienceToUse = remaining;
+            }
+
+            if (scienceToUse > 0) {
+                // 调用科技树的updateProgress，它会自动处理激活
+                m_techTree.updateProgress(scienceToUse);
+                m_scienceStock -= scienceToUse;
+
+                CCLOG("Player %d used %d science for tech %d. Remaining stock: %d",
+                    m_playerId, scienceToUse, currentTechId, m_scienceStock);
+            }
+        }
+    }
+
+    // 文化研究
+    int currentCivicId = m_cultureTree.getCurrentResearch();
+    if (currentCivicId != -1 && m_cultureStock > 0) {
+        // 获取当前文化信息
+        const CultureNode* cultureNode = m_cultureTree.getCultureInfo(currentCivicId);
+        if (cultureNode && !cultureNode->activated) {
+            int cultureToUse = m_cultureStock;
+
+            // 只使用需要的文化值（不超过剩余所需）
+            int remaining = cultureNode->cost - cultureNode->progress;
+            if (cultureToUse > remaining) {
+                cultureToUse = remaining;
+            }
+
+            if (cultureToUse > 0) {
+                // 调用文化树的updateProgress，它会自动处理激活
+                m_cultureTree.updateProgress(cultureToUse);
+                m_cultureStock -= cultureToUse;
+
+                CCLOG("Player %d used %d culture for civic %d. Remaining stock: %d",
+                    m_playerId, cultureToUse, currentCivicId, m_cultureStock);
+
+                // 文化完成时可能需要更新政策槽位
+                if (cultureToUse >= remaining) {
+                    updatePolicySlots();
+                }
+            }
+        }
     }
 }
 
@@ -197,7 +288,7 @@ void Player::onTurnEnd() {
     // 回合结束时的清理工作
     // TODO: 更新城市状态（生产队列等）
     for (auto city : m_cities) {
-        // city->onTurnEnd();
+        city->onTurnEnd();
     }
 
     CCLOG("Player %d turn end - Final Gold: %d", m_playerId, m_gold);
@@ -278,16 +369,16 @@ Yield Player::calculateTotalYield() const {
 
 Yield Player::calculateBaseYield() const {
     // 计算基础产出（不考虑加成）
-    Yield base;
+    Yield base{};
 
     // 简单实现：每个城市提供基础产出
     for (auto city : m_cities) {
         if (city) {
             base.foodYield += 2;        // 每个城市基础食物
-            base.productionYield += 2;  // 每个城市基础生产力
-            base.goldYield += 2;        // 每个城市基础金币
-            base.scienceYield += 1;     // 每个城市基础科研
-            base.cultureYield += 1;     // 每个城市基础文化
+            base.productionYield += 20;  // 每个城市基础生产力
+            base.goldYield += 20;        // 每个城市基础金币
+            base.scienceYield += 50;     // 每个城市基础科研
+            base.cultureYield += 30;     // 每个城市基础文化
         }
     }
 
@@ -412,7 +503,10 @@ void Player::onEurekaTriggered(int techId, const std::string& techName) {
 void Player::addScience(int amount) {
     if (amount > 0) {
         m_scienceStock += amount;
-        CCLOG("Player %d gained %d science, total: %d",
+        // 立即尝试应用科学值到研究中
+        updateResearchProgress();
+
+        CCLOG("Player %d gained %d science, total stock: %d",
             m_playerId, amount, m_scienceStock);
     }
 }
@@ -489,7 +583,10 @@ void Player::onInspirationTriggered(int cultureId, const std::string& cultureNam
 void Player::addCulture(int amount) {
     if (amount > 0) {
         m_cultureStock += amount;
-        CCLOG("Player %d gained %d culture, total: %d",
+        // 立即尝试应用文化值到研究中
+        updateResearchProgress();
+
+        CCLOG("Player %d gained %d culture, total stock: %d",
             m_playerId, amount, m_cultureStock);
     }
 }
@@ -819,10 +916,7 @@ ValueMap Player::toValueMap() const {
     data["gold"] = m_gold;
     data["scienceStock"] = m_scienceStock;
     data["cultureStock"] = m_cultureStock;
-    data["faith"] = m_faith;
     data["amenities"] = m_amenities;
-    data["happiness"] = m_happiness;
-    data["grievances"] = m_grievances;
     data["isHuman"] = m_isHuman;
 
     // 颜色
@@ -940,14 +1034,8 @@ bool Player::fromValueMap(const ValueMap& data) {
         m_scienceStock = data.at("scienceStock").asInt();
     if (data.find("cultureStock") != data.end())
         m_cultureStock = data.at("cultureStock").asInt();
-    if (data.find("faith") != data.end())
-        m_faith = data.at("faith").asInt();
     if (data.find("amenities") != data.end())
         m_amenities = data.at("amenities").asInt();
-    if (data.find("happiness") != data.end())
-        m_happiness = data.at("happiness").asInt();
-    if (data.find("grievances") != data.end())
-        m_grievances = data.at("grievances").asInt();
     if (data.find("isHuman") != data.end())
         m_isHuman = data.at("isHuman").asBool();
 

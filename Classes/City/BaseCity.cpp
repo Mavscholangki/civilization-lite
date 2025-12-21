@@ -94,10 +94,11 @@ void BaseCity::updateYield() // 更新城市总产出
 		totalYield = totalYield + district->getYield();
 	}
 	for (auto tile : territory) {
-		// 这里可以加入地块的基础产出计算逻辑
-		// 假设每个地块提供1食物和1生产力作为示例
 		totalYield.foodYield += 1;
 		totalYield.productionYield += 1;
+		totalYield.goldYield += 1;       // 增加金币产出
+		totalYield.scienceYield += 1;    // 增加科技产出
+		totalYield.cultureYield += 1;    // 增加文化产出
 	}
 	cityYield = totalYield;
 }
