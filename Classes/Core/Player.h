@@ -8,6 +8,7 @@
 #include "../Development/CultureSystem.h"
 #include "../Development/PolicySystem.h"
 #include "../City/Yield.h"
+#include "../Units/Base/AbstractUnit.h"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -35,30 +36,16 @@ public:
         AI_CONTROLLED   // AI控制
     };
 
-    // 外交关系结构
-    struct DiplomaticRelation {
-        int playerId;
-        int relationship; // -100 到 100
-        bool isAtWar;
-        bool hasOpenBorders;
-        bool hasTradeAgreement;
-
-        DiplomaticRelation()
-            : playerId(-1), relationship(0), isAtWar(false),
-            hasOpenBorders(false), hasTradeAgreement(false) {
-        }
-    };
-
     // 胜利进度结构
     struct VictoryProgress {
         bool hasSatelliteTech;         // 是否解锁卫星科技
-        bool hasLaunchedSatellite;     // 是否成功发射卫星
-        int controlledCityPercentage;  // 控制的城市百分比
+        bool hasLaunchedSatellite;     // 是否发射卫星
         bool hasDominationVictory;     // 是否达成统治胜利
+        std::vector<int> controlledCapitals; // 控制的玩家首都ID列表
 
         VictoryProgress()
             : hasSatelliteTech(false), hasLaunchedSatellite(false),
-            controlledCityPercentage(0), hasDominationVictory(false) {
+            hasDominationVictory(false) {
         }
     };
 
@@ -87,6 +74,8 @@ public:
 
     // ==================== 回合管理 ====================
     void onTurnBegin();
+    void dispatchResourceChangedEvent();
+    void updateResearchProgress();
     void onTurnEnd();
 
     // ==================== 属性访问器 ====================
@@ -99,10 +88,7 @@ public:
 
     // 资源属性
     CC_SYNTHESIZE(int, m_gold, Gold);
-    CC_SYNTHESIZE(int, m_faith, Faith);
     CC_SYNTHESIZE(int, m_amenities, Amenities);
-    CC_SYNTHESIZE(int, m_happiness, Happiness);
-    CC_SYNTHESIZE(int, m_grievances, Grievances);
 
     // 科研和文化相关属性
     CC_SYNTHESIZE(int, m_scienceStock, ScienceStock);     // 科技值储备（未用于研究的）
@@ -127,6 +113,13 @@ public:
     // 计算所有城市的总产出
     Yield calculateTotalYield() const;
     Yield calculateBaseYield() const;  // 基础产出（无加成）
+
+    bool isCapital(BaseCity* city) const;
+    void addControlledCapital(int playerId);
+    void removeControlledCapital(int playerId);
+    std::vector<int> getControlledCapitals() const;
+    bool controlsCapitalOf(int playerId) const;
+    int getCapitalPlayerId() const { return m_playerId; } // 返回玩家ID，用于首都标识
 
     // ==================== 单位管理 ====================
     void addUnit(AbstractUnit* unit);
@@ -163,13 +156,6 @@ public:
     void setCurrentCivic(int cultureId);
     int getCurrentResearchCivicId() const { return m_cultureTree.getCurrentResearch(); }
 
-    // ==================== 外交系统接口 ====================
-    void declareWar(int targetPlayerId);
-    void makePeace(int targetPlayerId);
-    bool isAtWarWith(int playerId) const;
-    void setDiplomaticRelation(int playerId, const DiplomaticRelation& relation);
-    DiplomaticRelation* getDiplomaticRelation(int playerId);
-
     // ==================== 经济系统 ====================
     int calculateMaintenanceCost() const;
     int calculateNetGoldPerTurn() const;
@@ -197,6 +183,7 @@ public:
     void debugPrintStatus() const;
 
 private:
+    friend class GameManager;
     // ==================== 核心子系统 ====================
     BaseCiv* m_civilization;                // 文明特性
     TechTree m_techTree;                    // 科技树
@@ -207,14 +194,12 @@ private:
     std::vector<BaseCity*> m_cities;        // 城市列表
     std::vector<AbstractUnit*> m_units;     // 单位列表
 
-    // ==================== 外交状态 ====================
-    std::unordered_map<int, DiplomaticRelation> m_diplomaticRelations;
-
     // ==================== 回合统计 ====================
     TurnStats m_turnStats;
 
     // ==================== 回合统计 ====================
     VictoryProgress m_vicprogress;
+
     // ==================== 私有方法 ====================
     void setupPolicyManagerCallbacks();
     void updatePolicySlots();
@@ -222,9 +207,6 @@ private:
     void cleanupResources();
     void applyAllCivilizationBonuses();
     void updateCivilizationBonusState();
-
-    // TODO: 待实现系统占位符
-    // 贸易系统接口
 };
 
 #endif // __PLAYER_H__

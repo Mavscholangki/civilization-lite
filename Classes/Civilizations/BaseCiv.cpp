@@ -3,7 +3,7 @@
 #include "District/Base/District.h"
 
 bool BaseCiv::init() {
-    // åˆå§‹åŒ–é»˜è®¤ç‰¹æ€§
+    // ³õÊ¼»¯Ä¬ÈÏÌØĞÔ
     m_traits.name = "Default Civilization";
     m_traits.description = "Standard civilization with no special bonuses";
     m_traits.initialTiles = 3;
@@ -23,7 +23,7 @@ bool BaseCiv::init() {
 }
 
 Yield BaseCiv::calculateDistrictBonus(const District* district) const {
-    // é»˜è®¤æ–‡æ˜æ²¡æœ‰åŒºåŸŸåŠ æˆ
+    // Ä¬ÈÏÎÄÃ÷Ã»ÓĞÇøÓò¼Ó³É
     Yield bonus;
     bonus.foodYield = 0;
     bonus.productionYield = 0;
@@ -34,7 +34,7 @@ Yield BaseCiv::calculateDistrictBonus(const District* district) const {
 }
 
 int BaseCiv::calculateMaxDistricts(int population) const {
-    // é»˜è®¤å…¬å¼ï¼šäººå£é™¤ä»¥3ï¼ˆå‘ä¸‹å–æ•´ï¼‰å†åŠ 1
+    // Ä¬ÈÏ¹«Ê½£ºÈË¿Ú³ıÒÔ3£¨ÏòÏÂÈ¡Õû£©ÔÙ¼Ó1
     if (population <= 0) return 0;
     return std::max(1, population / 3 + 1);
 }
@@ -42,8 +42,8 @@ int BaseCiv::calculateMaxDistricts(int population) const {
 int BaseCiv::applyEurekaBonus(int techId, const TechTree* techTree) const {
     const TechNode* techNode = techTree->getTechInfo(techId);
     if (techNode) {
-        int baseBonus = techNode->cost / 2; // é»˜è®¤50%
-        float boostFactor = getEurekaBoost() / 0.5f; // ç›¸å¯¹äºé»˜è®¤50%çš„æ¯”ä¾‹
+        int baseBonus = techNode->cost / 2; // Ä¬ÈÏ50%
+        float boostFactor = getEurekaBoost() / 0.5f; // Ïà¶ÔÓÚÄ¬ÈÏ50%µÄ±ÈÀı
         return static_cast<int>(baseBonus * boostFactor);
     }
     return 0;
@@ -52,8 +52,8 @@ int BaseCiv::applyEurekaBonus(int techId, const TechTree* techTree) const {
 int BaseCiv::applyInspirationBonus(int cultureId, const CultureTree* cultureTree) const {
     const CultureNode* cultureNode = cultureTree->getCultureInfo(cultureId);
     if (cultureNode) {
-        int baseBonus = cultureNode->cost / 2; // é»˜è®¤50%
-        float boostFactor = getInspirationBoost() / 0.5f; // ç›¸å¯¹äºé»˜è®¤50%çš„æ¯”ä¾‹
+        int baseBonus = cultureNode->cost / 2; // Ä¬ÈÏ50%
+        float boostFactor = getInspirationBoost() / 0.5f; // Ïà¶ÔÓÚÄ¬ÈÏ50%µÄ±ÈÀı
         return static_cast<int>(baseBonus * boostFactor);
     }
     return 0;

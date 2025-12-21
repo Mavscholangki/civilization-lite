@@ -1,10 +1,9 @@
 #include "GameScene.h"
 #include "../Map/GameMapLayer.h"
-#include "../UI/HUDLayer.h" // å¼•ç”¨ UI å¤´æ–‡ä»¶
+#include "../UI/HUDLayer.h"
 #include "../UI/CityProductionPanel.h"
-#include "../Development/TechSystem.h"
-#include "../Units/Base/AbstractUnit.h"  // å¦‚æœéœ€è¦AbstractUnitçš„å®Œæ•´å®šä¹‰
-#include "../Development/CultureSystem.h"
+#include "../Core/GameManager.h"
+#include "../Core/Player.h"
 
 USING_NS_CC;
 
@@ -15,131 +14,113 @@ Scene* GameScene::createScene() {
 bool GameScene::init() {
     if (!Scene::init()) return false;
 
-    // 1. åˆ›å»ºåœ°å›¾å±‚
+    // 1. ³õÊ¼»¯ÓÎÏ·¹ÜÀíÆ÷
+    m_gameManager = GameManager::getInstance();
+
+    GameConfig config;
+    config.maxTurns = 300;
+    config.enableScienceVictory = true;
+    config.enableDominationVictory = true;
+
+    if (!m_gameManager->initialize(config)) {
+        CCLOG("Failed to initialize GameManager");
+        return false;
+    }
+
+    // 2. ´´½¨Íæ¼Ò
+    m_humanPlayer = Player::create(0, CivilizationType::CHINA);
+    if (m_humanPlayer) {
+        m_humanPlayer->setIsHuman(true);
+        m_humanPlayer->setPlayerName("Human Player");
+        m_gameManager->addPlayer(m_humanPlayer);
+        CCLOG("Human player created");
+    }
+
+    // ´´½¨AIÍæ¼Ò
+    Player* aiPlayerGermany = Player::create(1, CivilizationType::GERMANY);
+    if (aiPlayerGermany) {
+        aiPlayerGermany->setIsHuman(false);
+        aiPlayerGermany->setPlayerName("AI Germany");
+        m_gameManager->addPlayer(aiPlayerGermany);
+    }
+
+    Player* aiPlayerRussia = Player::create(2, CivilizationType::RUSSIA);
+    if (aiPlayerRussia) {
+        aiPlayerRussia->setIsHuman(false);
+        aiPlayerRussia->setPlayerName("AI Russia");
+        m_gameManager->addPlayer(aiPlayerRussia);
+    }
+
+    // 3. ´´½¨µØÍ¼²ã
     _mapLayer = GameMapLayer::create();
     if (!_mapLayer) return false;
     this->addChild(_mapLayer, 0);
 
-    // 2. åˆ›å»ºHUDå±‚
+    // 4. ´´½¨HUD²ã
     _hudLayer = HUDLayer::create();
     if (!_hudLayer) return false;
     this->addChild(_hudLayer, 100);
 
-    // --- æ ¸å¿ƒè”åŠ¨ ---
-    // å½“åœ°å›¾å±‚æ±‡æŠ¥â€œé€‰ä¸­äº†å•ä½â€æ—¶ -> è®© HUD å±‚æ˜¾ç¤ºé¢æ¿
-    _mapLayer->setOnUnitSelectedCallback([this](AbstractUnit* unit) {
-        // åˆå§‹åŒ–ç§‘æŠ€æ ‘
-        initTechTree();
+    // 5. ´´½¨Éú²úÃæ°å²ã
+    _productionPanelLayer = CityProductionPanel::create();
+    _productionPanelLayer->setVisible(false);
+    this->addChild(_productionPanelLayer, 120);
 
-        // è®¾ç½®å›è°ƒå‡½æ•°
-        setupCallbacks();
-    });
-
-    // 3. åˆå§‹åŒ–ç§‘æŠ€æ ‘å’Œå›è°ƒ (æ¥è‡ª main åˆ†æ”¯)
+    // 6. ÉèÖÃHUD²ãÊ¹ÓÃÈËÀàÍæ¼ÒµÄÏµÍ³ÊµÀı
+    if (m_humanPlayer) {
+        // ¹Ø¼ü£ºÕâÀïÉèÖÃµÄÊÇPlayerÄÚ²¿µÄTechTree¡¢CultureTree
+        _hudLayer->setTechTree(m_humanPlayer->getTechTree());
+        _hudLayer->setCultureTree(m_humanPlayer->getCultureTree());
+        _hudLayer->setPolicyManager(m_humanPlayer->getPolicyManager());
+        CCLOG("HUDLayer set to use human player's system instances");
+    }
+	// ÏÖÔÚ³õÊ¼»¯ÕâĞ©ÏµÍ³Ö»Ğèµ÷ÓÃPlayerµÄ³õÊ¼»¯·½·¨
     initTechTree();
     initCultureTree();
     initPolicySystem();
+
+    // 7. ÉèÖÃ»Øµ÷
     setupCallbacks();
+
+    // 8. ÉèÖÃÓÎÏ·¹ÜÀíÆ÷»Øµ÷
+    m_gameManager->setOnTurnStartCallback([this](int playerId) {
+        Player* currentPlayer = m_gameManager->getCurrentPlayer();
+        if (currentPlayer && currentPlayer->getIsHuman()) {
+            CCLOG("Human player turn started");
+            // Èç¹ûÊÇÈËÀàÍæ¼Ò»ØºÏ£¬È·±£HUD°ó¶¨µÄÊÇµ±Ç°Íæ¼Ò
+            _hudLayer->setTechTree(currentPlayer->getTechTree());
+            _hudLayer->setCultureTree(currentPlayer->getCultureTree());
+            _hudLayer->setPolicyManager(currentPlayer->getPolicyManager());
+        }
+        });
+
+    m_gameManager->setOnVictoryCallback([this](VictoryType victoryType, int winnerPlayerId) {
+        // Ê¤Àû´¦Àí...
+        });
+
+    CCLOG("GameScene initialized successfully");
 
     return true;
 }
 
+// ÕâĞ©º¯ÊıÏÖÔÚÖ»ĞèÒª³õÊ¼»¯Íæ¼ÒµÄÏµÍ³
 void GameScene::initTechTree() {
-    _techTree = new TechTree();
-    if (!_techTree) {
-        CCLOG("ERROR: Failed to create TechTree!");
-        return;
-    }
-    if (_hudLayer && _techTree) {
-        _hudLayer->setTechTree(_techTree);
-    }
-    CCLOG("TechTree system initialized");
+    // ÏÖÔÚÓÉPlayer¹ÜÀí£¬ÕâÀï²»ĞèÒª×öÈÎºÎÊÂ
+    CCLOG("Note: TechTree is now managed by Player class");
 }
 
 void GameScene::initCultureTree() {
-    // åˆ›å»ºæ–‡åŒ–ç³»ç»Ÿå®ä¾‹
-    _cultureTree = new CultureTree();
-
-    if (!_cultureTree) {
-        CCLOG("ERROR: Failed to create CultureTree!");
-        return;
-    }
-
-    // åˆå§‹åŒ–æ–‡åŒ–æ ‘
-    _cultureTree->initializeCultureTree();
-
-    // è®¾ç½®å½“å‰ç ”ç©¶æ–‡åŒ–ï¼ˆä¾‹å¦‚01ï¼šæ³•å…¸ï¼‰
-    std::vector<int> unlockable = _cultureTree->getUnlockableCultureList();
-    if (!unlockable.empty()) {
-        _cultureTree->setCurrentResearch(unlockable[0]);
-        CCLOG("Set default culture research to: %d", unlockable[0]);
-    }
-    else {
-        CCLOG("No unlockable cultures available");
-    }
-
-    // è®¾ç½®HUDå±‚çš„æ–‡åŒ–ç³»ç»Ÿ
-    if (_hudLayer && _cultureTree) {
-        _hudLayer->setCultureTree(_cultureTree);
-    }
-
-    CCLOG("CultureTree system initialized");
+    // ÏÖÔÚÓÉPlayer¹ÜÀí
+    CCLOG("Note: CultureTree is now managed by Player class");
 }
 
 void GameScene::initPolicySystem() {
-	// åˆ›å»ºæ”¿ç­–ç®¡ç†å™¨å®ä¾‹
-    _policyManager = new PolicyManager();
-
-    if (!_policyManager) {
-        CCLOG("ERROR: Failed to create PolicyManager!");
-        return;
-    }
-
-	// åˆå§‹åŒ–æ”¿ç­–æ•°æ®
-    _policyManager->initializePolicies();
-
-	// å°†æ”¿ç­–ç®¡ç†å™¨ä¸æ–‡åŒ–ç³»ç»Ÿå…³è”
-    if (_cultureTree) {
-        // è®¾ç½®æ”¿åºœè·å–å›è°ƒ
-        _policyManager->setGovernmentGetter([this]() {
-            return _cultureTree->getCurrentGovernment();
-            });
-
-        // è®¾ç½®æ”¿ç­–è·å–å›è°ƒ
-        _policyManager->setPolicyGetter([this](int cultureId) {
-            return _cultureTree->getPoliciesUnlockedByCulture(cultureId);
-            });
-
-        // è®¾ç½®æ”¿ç­–è§£é”å›è°ƒ
-        _policyManager->setPolicyUnlockedCallback([this](int policyId) {
-            CCLOG("Policy %d unlocked via callback", policyId);
-            });
-
-        // å…³é”®ï¼šå°†PolicyManagerä½œä¸ºç›‘å¬å™¨æ·»åŠ åˆ°æ–‡åŒ–ç³»ç»Ÿ
-        _cultureTree->addEventListener(_policyManager);
-        CCLOG("PolicyManager registered as CultureEventListener");
-    }
-
-	// è®¾ç½®åˆå§‹æ”¿ç­–æ§½
-    if (_cultureTree) {
-        const int* slots = _cultureTree->getActivePolicySlots();
-        _policyManager->setPolicySlots(slots[0], slots[1], slots[2], slots[3]);
-        CCLOG("Initial policy slots: Military=%d, Economic=%d, Diplomatic=%d, Wildcard=%d",
-            slots[0], slots[1], slots[2], slots[3]);
-    }
-
-    // è®¾ç½®HUDå±‚çš„æ”¿ç­–ç®¡ç†å±‚
-    if (_hudLayer) {
-        _hudLayer->setPolicyManager(_policyManager);
-        CCLOG("PolicyManager set on HUDLayer");
-    }
-
-    CCLOG("Policy system initialized with %zu unlocked policies",
-        _policyManager->getUnlockedPolicies().size());
+    // ÏÖÔÚÓÉPlayer¹ÜÀí
+    CCLOG("Note: Policy system is now managed by Player class");
 }
 
 void GameScene::setupCallbacks() {
-    // åœ°å›¾å±‚é€‰ä¸­å•ä½ -> æ›´æ–°HUDæ˜¾ç¤º
+    // µØÍ¼²ãÑ¡ÖĞµ¥Î» -> ¸üĞÂHUDÏÔÊ¾
     _mapLayer->setOnUnitSelectedCallback([this](AbstractUnit* unit) {
         if (unit) {
             _hudLayer->showUnitInfo(unit);
@@ -149,57 +130,62 @@ void GameScene::setupCallbacks() {
         }
         });
 
-    // HUDå»ºåŸæŒ‰é’® -> åœ°å›¾å±‚å»ºåŸåŠ¨ç”»
+    // HUD½¨³Ç°´Å¥ -> µØÍ¼²ã½¨³Ç¶¯»­
     _hudLayer->setBuildCityCallback([this]() {
         _mapLayer->onBuildCityAction();
         });
 
-    // ä¸‹ä¸€å›åˆæŒ‰é’®å›è°ƒ
+    // ÏÂÒ»»ØºÏ°´Å¥»Øµ÷ - Ö±½Óµ÷ÓÃGameManager
     _hudLayer->setNextTurnCallback([this]() {
-        _mapLayer->onNextTurnAction();
-        if (_techTree) {
-            int sciencePerTurn = 5; // ï¿½?ï¿½ï¿½ï¿½?ï¿½ï¿½å¸‚ã€å»ºç­‘ç­‰è®¡ç®—
-            _techTree->updateProgress(sciencePerTurn);
-        }
-
-        // æ–‡åŒ–ç³»ç»Ÿæ›´æ–°
-        if (_cultureTree) {
-            int culturePerTurn = 3; // ï¿½?ï¿½ï¿½ï¿½?ï¿½ï¿½å¿µï¿½?ã€å‰§é™¢ç­‰è®¡ç®—
-            _cultureTree->updateProgress(culturePerTurn);
-        }
-
-        // æ–°åŠŸèƒ½ï¼šæ”¿ç­–ç³»ç»Ÿæ›´æ–°ï¼ˆå¦‚æœéœ€è¦æ¯å›åˆå¤„ç†ä»€ä¹ˆï¼‰
-        if (_policyManager) {
-			// ä¾‹å¦‚ï¼šæ£€æŸ¥æ”¿ç­–ç»„åˆæ•ˆæœæ˜¯å¦æŒç»­è§¦å‘
-            _policyManager->checkPolicyCombos();
-        }
-        // æ›´æ–°èµ„æºæ˜¾ç¤º
-        static int turn = 1; turn++;
-        static int gold = 0; gold += 5;
-        static int science = 0; science += 5;
-        static int culture = 0; culture += 3;
-        _hudLayer->updateResources(gold, science, culture, turn);
+        m_gameManager->endTurn();
         });
+
+    _mapLayer->setOnCitySelectedCallback([this](BaseCity* city) {
+        if (city) {
+            _hudLayer->hideUnitInfo();
+            _productionPanelLayer->setVisible(true);
+        }
+        else {
+            _productionPanelLayer->setVisible(false);
+        }
+        });
+
+    // Ìí¼Ó×ÊÔ´¸üĞÂÊÂ¼ş¼àÌı
+    auto resourceListener = cocos2d::EventListenerCustom::create(
+        "player_turn_resource_update",
+        [this](cocos2d::EventCustom* event) {
+            ValueMap* data = static_cast<ValueMap*>(event->getUserData());
+            if (data) {
+                int playerId = data->at("player_id").asInt();
+                Player* player = m_gameManager->getPlayer(playerId);
+                if (player && player->getIsHuman()) {
+                    // ¸üĞÂHUDÏÔÊ¾
+                    _hudLayer->updateResources(
+                        player->getGold(),
+                        player->getSciencePerTurn(),
+                        player->getCulturePerTurn(),
+                        data->at("turn").asInt()
+                    );
+
+                    // ¸üĞÂ¿Æ¼¼Ê÷/ÎÄ»¯Ê÷µÄ½ø¶ÈÏÔÊ¾
+                    _hudLayer->updateSciencePerTurn(player->getSciencePerTurn());
+                    _hudLayer->updateCulturePerTurn(player->getCulturePerTurn());
+                }
+            }
+        });
+    this->getEventDispatcher()->addEventListenerWithSceneGraphPriority(resourceListener, this);
+}
+
+Player* GameScene::getCurrentPlayer() const {
+    return m_gameManager ? m_gameManager->getCurrentPlayer() : nullptr;
 }
 
 void GameScene::onExit() {
-    if (_techTree) {
-        delete _techTree;
-        _techTree = nullptr;
+    // ÇåÀíÓÎÏ·¹ÜÀíÆ÷
+    if (m_gameManager) {
+        m_gameManager->cleanup();
     }
 
-    // æ¸…ç†æ–‡åŒ–æ ‘
-    if (_cultureTree) {
-        delete _cultureTree;
-        _cultureTree = nullptr;
-    }
-
-    // æ¸…ç†æ”¿ç­–ç®¡ç†å±‚
-    if (_policyManager) {
-        delete _policyManager;
-        _policyManager = nullptr;
-    }
-
-    // è°ƒç”¨çˆ¶ç±»çš„onExit
+    // ×¢Òâ£ºÏÖÔÚ²»ĞèÒªÉ¾³ı_techTreeµÈ£¬ÒòÎªËüÃÇÔÚPlayerÄÚ²¿
     Scene::onExit();
 }

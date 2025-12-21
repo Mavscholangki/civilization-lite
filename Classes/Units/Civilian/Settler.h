@@ -1,42 +1,102 @@
 #ifndef __SETTLER_H__
 #define __SETTLER_H__
 
-// 注意路径：Base 在 Settler 的上一级(Civilian)的上一级(Units)里面
-#include "../Base/AbstractUnit.h" 
+#include "../Base/AbstractUnit.h"
 
+/**
+ * @class Settler
+ * @brief 定居者单位
+ * 
+ * 定居者的特点：
+ * - 攻击力为0，无法进行战斗
+ * - 可以建立城市
+ * - 生命值100
+ * - 移动力2格/回合
+ */
 class Settler : public AbstractUnit {
 public:
-    static Settler* create(Hex pos) {
-        Settler* pRet = new Settler();
-        if (pRet && pRet->initUnit(pos)) {
-            pRet->autorelease();
-            return pRet;
-        }
-        delete pRet; return nullptr;
+
+    /**
+     * @brief 获取单位名称
+     * @return 定居者名称
+     */
+    std::string getUnitName() const override {
+        return "Settler"; 
     }
 
-    // 重写基本属性
-    virtual std::string getUnitName() override { return "Settler"; }
-    virtual int getBaseAttack() override { return 0; }
-    virtual int getMaxMoves() override { return 2; }
-    virtual bool canFoundCity() override { return true; }
-
-    // 【关键修改 3】必须实现这个纯虚函数，否则报错 C2259
-    virtual std::string getSpriteName() override { return "units/settler.png"; }
-
-    // 重写初始化
-    virtual bool initUnit(Hex startPos) override {
-        // 先调用父类初始化
-        if (!AbstractUnit::initUnit(startPos)) return false;
-
-        // 修改颜色
-        auto draw = dynamic_cast<cocos2d::DrawNode*>(_visual);
-        if (draw) {
-            draw->clear();
-            draw->drawDot(cocos2d::Vec2(0, 0), 12, cocos2d::Color4F::MAGENTA);
-        }
-        return true;
+    /**
+     * @brief 获取单位类型
+     * @return 民间单位类型
+     */
+    UnitType getUnitType() const override { 
+        return UnitType::CIVILIAN;
     }
+
+    /**
+     * @brief 获取单位精灵图片路径
+     * @return 图片文件路径
+     */
+    std::string getSpritePath() const override { 
+        return "units/settler.png"; 
+    }
+
+    int getCost() const override {
+        return 400;
+	}
+
+    int getMaintenanceCost() const override {
+        return 0;
+    }
+
+    int getProductionCost() const override {
+        return 80;
+	}
+
+    bool ismilitary() const override {
+        return false;
+    }
+    /**
+     * @brief 获取最大生命值
+     * @return 100 点生命值
+     */
+    int getMaxHp() const override {
+        return 100; 
+    }
+
+    /**
+     * @brief 获取基础攻击力
+     * @return 0（定居者无法攻击）
+     */
+    int getBaseAttack() const override { 
+        return 0; 
+    }
+
+    /**
+     * @brief 获取最大移动力
+     * @return 2 格/回合
+     */
+    int getMaxMoves() const override { 
+        return 2;
+    }
+
+    /**
+     * @brief 获取攻击范围
+     * @return 0（定居者无法攻击）
+     */
+    int getAttackRange() const override {
+        return 0; 
+    }
+
+    /**
+     * @brief 是否能建立城市
+     * @return true（定居者可以建城）
+     */
+    bool canFoundCity() const override {
+        return true; 
+    }
+
+    // Cocos2d-x 标准宏，自动实现 create() 工厂函数
+    CREATE_FUNC(Settler);
 };
 
-#endif
+#endif // __SETTLER_H__

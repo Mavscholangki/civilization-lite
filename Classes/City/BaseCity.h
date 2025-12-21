@@ -44,7 +44,7 @@ public:
 	std::vector<Hex> territory; // 城市领土范围(包含城市所在格子)
 	std::map<Hex, int> populationDistribution; // 人口分配情况(地块坐标 -> 分配人口数)
 
-
+    
     // 回合结算逻辑
     void onTurnEnd();
 

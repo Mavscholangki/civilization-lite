@@ -2,48 +2,94 @@
 #include "MapGenerator.h"
 #include "../Units/Melee/Warrior.h"
 #include "../Utils/PathFinder.h"
+#include "../Core/GameManager.h"
+#include "cocos2d.h"
 
 USING_NS_CC;
 
 bool GameMapLayer::init() {
-if (!Layer::init()) return false;
+    if (!Layer::init()) return false;
 
     _isDragging = false;
-    _layout = new HexLayout(40.0f);
+    _layout = new HexLayout(50.0f); // 尖顶六边形布局
 
-    auto listener = EventListenerTouchOneByOne::create();
-    listener->setSwallowTouches(true);
-    listener->onTouchBegan = CC_CALLBACK_2(GameMapLayer::onTouchBegan, this);
-    listener->onTouchMoved = CC_CALLBACK_2(GameMapLayer::onTouchMoved, this);
-    listener->onTouchEnded = CC_CALLBACK_2(GameMapLayer::onTouchEnded, this);
-    _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, this);
+    // 1. 初始化双击变量
+    _lastClickHex = Hex(-999, -999);
+    _lastClickTime = std::chrono::steady_clock::now();
+
+    // 2. 注册 Touch 监听器 (拖拽 + 单击 + 双击)
+    auto touchListener = EventListenerTouchOneByOne::create();
+    touchListener->setSwallowTouches(true);
+    touchListener->onTouchBegan = CC_CALLBACK_2(GameMapLayer::onTouchBegan, this);
+    touchListener->onTouchMoved = CC_CALLBACK_2(GameMapLayer::onTouchMoved, this);
+    touchListener->onTouchEnded = CC_CALLBACK_2(GameMapLayer::onTouchEnded, this);
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(touchListener, this);
 
     _selectionNode = DrawNode::create();
     this->addChild(_selectionNode, 20);
 
-    // 创建单个 DrawNode 用于所有地块
     _tilesDrawNode = DrawNode::create();
     this->addChild(_tilesDrawNode, 0);
 
-    generateMap();
+    _allUnits.clear();
+    _cities.clear();
+    _selectedUnit = nullptr;
+    _myUnit = nullptr;
 
-    Hex startHex(0, 0);
-    while (getTerrainCost(startHex) < 0) {
-        startHex.q++;
-        startHex.r++;
+    generateMap(); // 地图大小是 120 x 50
+
+    // ============================================================
+    // 【修改点】：设置出生地在地图中心
+    // ============================================================
+    // 假设 generateMap 里的宽是120，高是50
+    // 轴向坐标的中心大概在 q=60, r=10 左右 (取决于具体的地图生成算法)
+    // 这里我们取一个大概的中间值
+    Hex startHex(55, 15);
+
+    // 寻找最近的陆地 (防止生在海里)
+    // 如果当前点是海 (Cost < 0)，就向右寻找
+    int safeGuard = 0;
+    while (getTerrainCost(startHex) < 0 && safeGuard < 500) {
+        startHex.q++; // 向右移动
+
+        // 如果一行找完了还没找到，换一行继续找
+        if (safeGuard % 20 == 0) {
+            startHex.q -= 20; // 回退
+            startHex.r++;     // 下一行
+        }
+        safeGuard++;
     }
+    // ============================================================
 
-    _myUnit = Settler::create(startHex);
+    auto unit = Settler::create();
+    unit->initUnit(0, startHex);
+    this->addChild(unit, 10);
+
+    unit->onCheckCity = [this](Hex h) {
+        return this->getCityAt(h) != nullptr;
+        };
+    _myUnit = unit;
+    _allUnits.push_back(unit);
+
     if (_myUnit) {
         _myUnit->setPosition(_layout->hexToPixel(startHex));
-        this->addChild(_myUnit, 30);
     }
 
+    // ============================================================
+    // 【修改点】：镜头跟随出生点
+    // ============================================================
     auto visibleSize = Director::getInstance()->getVisibleSize();
-    this->setPosition(visibleSize.width / 2, visibleSize.height / 2);
+    Vec2 unitPos = _layout->hexToPixel(startHex);
+
+    // 计算 Layer 的偏移量，使单位处于屏幕中心
+    // LayerPos + UnitPos = ScreenCenter
+    // LayerPos = ScreenCenter - UnitPos
+    Vec2 centerOffset = Vec2(visibleSize.width / 2, visibleSize.height / 2) - unitPos;
+    this->setPosition(centerOffset);
 
     return true;
 }
+
 
 void GameMapLayer::generateMap() {
     int mapWidth = 120;
@@ -135,47 +181,142 @@ int GameMapLayer::getTerrainCost(Hex h) {
     return 1;
 }
 
-bool GameMapLayer::onTouchBegan(Touch* t, Event* e) {
+bool GameMapLayer::onTouchBegan(Touch* touch, Event* event) {
     _isDragging = false;
-    return true;
+    return true; // 返回 true 才能接收后续的 Moved 和 Ended
 }
 
-void GameMapLayer::onTouchMoved(Touch* t, Event* e) {
-    Vec2 delta = t->getDelta();
+void GameMapLayer::onTouchMoved(Touch* touch, Event* event) {
+    Vec2 delta = touch->getDelta();
+
+    // 防抖动阈值
     if (delta.getLengthSq() > 5.0f) {
         _isDragging = true;
+        // 直接叠加 delta，实现跟随手指拖动
         this->setPosition(this->getPosition() + delta);
     }
 }
 
-void GameMapLayer::onTouchEnded(Touch* t, Event* e) {
+void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
+    // 如果是拖拽操作结束，不处理点击逻辑
     if (_isDragging) return;
 
-    Vec2 clickPos = this->convertToNodeSpace(t->getLocation());
+    // 1. 坐标转换 (Touch -> NodeSpace -> Hex)
+    Vec2 clickPos = this->convertToNodeSpace(touch->getLocation());
     Hex clickHex = _layout->pixelToHex(clickPos);
 
-    CCLOG("点击地块: %d, %d", clickHex.q, clickHex.r);
+    CCLOG("Touch Hex: %d, %d", clickHex.q, clickHex.r);
 
-    updateSelection(clickHex);
+    // ------------------------------------------------------------
+    // 双击检测逻辑
+    // ------------------------------------------------------------
+    auto now = std::chrono::steady_clock::now();
+    long long diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastClickTime).count();
 
-    if (_myUnit) {
-        std::vector<Hex> path = PathFinder::findPath(
-            _myUnit->gridPos,
-            clickHex,
-            [this](Hex h) { return this->getTerrainCost(h); }
-        );
-
-        if (!path.empty()) {
-            _myUnit->moveTo(clickHex, _layout);
-        }
-        else {
-            CCLOG("无法到达目的地");
-        }
+    bool isDoubleTap = false;
+    // 如果点击的是同一个格子，且间隔小于 300ms
+    if (clickHex == _lastClickHex && diff < 300) {
+        isDoubleTap = true;
     }
 
-    if (_myUnit && _myUnit->gridPos == clickHex) {
-        _selectedUnit = _myUnit;
-        if (_onUnitSelected) _onUnitSelected(_myUnit);
+    // 更新记录
+    _lastClickTime = now;
+    _lastClickHex = clickHex;
+
+    // ------------------------------------------------------------
+    // 分支 A: 双击事件 (执行移动/攻击)
+    // ------------------------------------------------------------
+    if (isDoubleTap) {
+        // 只有当前选中了己方单位才处理
+        if (_selectedUnit && _selectedUnit->getOwnerId() == 0) {
+
+            // 排除点击自己脚下
+            if (clickHex != _selectedUnit->getGridPos()) {
+
+                // 1. 检查攻击
+                AbstractUnit* enemy = getUnitAt(clickHex);
+                if (enemy && enemy->getOwnerId() != 0) {
+                    // handleAttack(enemy);
+                    CCLOG("Double Tap -> Attack Enemy!");
+
+                    // 重置双击状态，防止三击
+                    _lastClickHex = Hex(-999, -999);
+                    return;
+                }
+
+                // 2. 检查移动
+                auto costFunc = [this](Hex h) { return this->getTerrainCost(h); };
+                std::vector<Hex> path = PathFinder::findPath(_selectedUnit->getGridPos(), clickHex, costFunc);
+
+                if (!path.empty() && (int)path.size() - 1 <= _selectedUnit->getCurrentMoves()) {
+                    // 执行移动
+                    _selectedUnit->moveTo(clickHex, _layout);
+
+                    // 移动后更新视觉状态
+                    updateSelection(clickHex);
+                    _selectedUnit->hideMoveRange();
+
+                    // 重置双击状态
+                    _lastClickHex = Hex(-999, -999);
+                }
+                else {
+                    CCLOG("无法移动：不可达或太远");
+                }
+            }
+        }
+        return; // 双击处理完毕，直接返回
+    }
+
+    // ------------------------------------------------------------
+    // 分支 B: 单击事件 (执行选中/切换)
+    // ------------------------------------------------------------
+
+    // 无论点哪里，先更新黄色选中框，提供视觉反馈
+    updateSelection(clickHex);
+
+    AbstractUnit* clickedUnit = getUnitAt(clickHex);
+    BaseCity* clickedCity = getCityAt(clickHex);
+
+    if (clickedUnit) {
+        // --- 情况1: 点中单位 ---
+        if (_selectedUnit == clickedUnit) {
+            _selectedUnit->hideMoveRange();
+            _selectedUnit = nullptr;
+            _selectionNode->clear(); // 清除黄框
+            if (_onUnitSelected) _onUnitSelected(nullptr);
+            return; // 结束
+        }
+
+        if (_selectedUnit != clickedUnit) {
+            // 切换选中目标
+            if (_selectedUnit) _selectedUnit->hideMoveRange();
+            _selectedUnit = clickedUnit;
+
+            // 通知 UI
+            if (_onUnitSelected) _onUnitSelected(_selectedUnit);
+
+            // 显示移动范围
+            auto costFunc = [this](Hex h) { return this->getTerrainCost(h); };
+            _selectedUnit->showMoveRange(_layout, costFunc);
+        }
+        // 点单位时关闭城市面板
+        if (_onCitySelected) _onCitySelected(nullptr);
+    }
+    else if (clickedCity) {
+        // --- 情况2: 点中城市 ---
+        if (_selectedUnit) {
+            _selectedUnit->hideMoveRange();
+            _selectedUnit = nullptr;
+            if (_onUnitSelected) _onUnitSelected(nullptr);
+        }
+        // 打开城市面板
+        if (_onCitySelected) _onCitySelected(clickedCity);
+    }
+    else {
+        // --- 情况3: 点中空地 ---
+        // 【关键】点空地不取消单位选中！这样才能允许你再次点击(双击)来移动。
+        // 只关闭城市面板
+        if (_onCitySelected) _onCitySelected(nullptr);
     }
 }
 
@@ -198,12 +339,27 @@ void GameMapLayer::setOnUnitSelectedCallback(const std::function<void(AbstractUn
 void GameMapLayer::onBuildCityAction() {
     if (!_selectedUnit) return;
 
-    Hex pos = _selectedUnit->gridPos;
+    Hex pos = _selectedUnit->getGridPos();
 
     auto city = BaseCity::create(pos, "Rome");
     city->setPosition(_layout->hexToPixel(pos));
     this->addChild(city, 5);
     _cities.push_back(city);
+
+    GameManager* gameManager = GameManager::getInstance();
+    if (gameManager) {
+        Player* currentPlayer = gameManager->getCurrentPlayer();
+        if (currentPlayer) {
+            // 添加到玩家的城市列表
+            currentPlayer->addCity(city);
+
+            CCLOG("City added to Player %d, total cities: %d",
+                currentPlayer->getPlayerId(), currentPlayer->getCityCount());
+        }
+        else {
+            CCLOG("Warning: No current player found");
+        }
+    }
 
     if (_selectedUnit == _myUnit) {
         _myUnit = nullptr;
@@ -230,4 +386,27 @@ TileData GameMapLayer::getTileData(Hex h)
 		return _mapData[h];
 	}
 	return TileData();
+}
+// 1. 实现设置回调
+void GameMapLayer::setOnCitySelectedCallback(const std::function<void(BaseCity*)>& cb) {
+    _onCitySelected = cb;
+}
+
+// 2. 实现查找城市
+BaseCity* GameMapLayer::getCityAt(Hex hex) {
+    for (auto city : _cities) {
+        if (city->gridPos == hex) {
+            return city;
+        }
+    }
+    return nullptr;
+}
+
+AbstractUnit* GameMapLayer::getUnitAt(Hex hex) {
+    for (auto unit : _allUnits) { // 使用统一的变量名
+        if (unit->isAlive() && unit->getGridPos() == hex) {
+            return unit;
+        }
+    }
+    return nullptr;
 }
