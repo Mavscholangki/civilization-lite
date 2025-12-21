@@ -53,6 +53,21 @@ public:
         return "units/biplane.png"; 
     }
 
+    int getCost() const override {
+        return 1000; 
+	}
+
+    int getMaintenanceCost() const override {
+        return 5;
+    }
+
+    int getProductionCost() const override {
+        return 60;
+	}
+
+    bool ismilitary() const override {
+        return true; 
+	}
     /**
      * @brief 获取最大生命值
      * @return 120 点生命值

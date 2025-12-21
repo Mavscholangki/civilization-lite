@@ -74,6 +74,8 @@ public:
 
     // ==================== 回合管理 ====================
     void onTurnBegin();
+    void dispatchResourceChangedEvent();
+    void updateResearchProgress();
     void onTurnEnd();
 
     // ==================== 属性访问器 ====================
@@ -86,10 +88,7 @@ public:
 
     // 资源属性
     CC_SYNTHESIZE(int, m_gold, Gold);
-    CC_SYNTHESIZE(int, m_faith, Faith);
     CC_SYNTHESIZE(int, m_amenities, Amenities);
-    CC_SYNTHESIZE(int, m_happiness, Happiness);
-    CC_SYNTHESIZE(int, m_grievances, Grievances);
 
     // 科研和文化相关属性
     CC_SYNTHESIZE(int, m_scienceStock, ScienceStock);     // 科技值储备（未用于研究的）

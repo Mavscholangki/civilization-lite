@@ -4,6 +4,7 @@
 #include "cocos2d.h"
 #include "../../Utils/HexUtils.h"
 #include "../../Utils/PathFinder.h"
+#include <functional>
 
 /**
  * @brief 单位类型枚举
@@ -41,6 +42,9 @@ public:
     AbstractUnit();
     virtual ~AbstractUnit();
 
+    using CheckCityCallback = std::function<bool(Hex)>;
+    CheckCityCallback onCheckCity;
+
     // ==========================================
     // 1. 初始化与生命周期
     // ==========================================
@@ -64,6 +68,16 @@ public:
      */
     virtual void onTurnStart();
 
+    /**
+	*  @brief 设置是否已行动
+    */
+    void setActed(bool acted) { _hasActed = acted; }
+
+    /**
+	* @brief 查询是否已行动
+    */
+    bool hasActed() const { return _hasActed; }
+
     // ==========================================
     // 2. 纯虚函数 (必须由子类实现 - 配置数据)
     // ==========================================
@@ -78,11 +92,14 @@ public:
     virtual int getMaxMoves() const = 0;    // 最大移动力
     virtual int getAttackRange() const = 0; // 攻击距离 (1=近战)
     virtual int getVisionRange() const { return 2; } // 视野范围 (默认2)
+	virtual int getCost() const = 0;          // 购买/训练成本
+	virtual int getMaintenanceCost() const = 0; // 维护费用
+	virtual int getProductionCost() const = 0;   // 生产力所需
 
     // ==========================================
     // 3. 特殊能力开关 (虚函数，默认为 false)
     // ==========================================
-
+    virtual bool ismilitary() const { return true; } // 是否为军队
     virtual bool canFoundCity() const { return false; } // 能否建城
     virtual bool canFly() const { return false; }       // 能否飞行
     virtual bool canMoveAfterAttack() const { return false; } // 攻击后能否移动
@@ -177,6 +194,7 @@ protected:
     int _currentHp;          // 当前血量
     int _currentMoves;       // 当前移动力
     UnitState _state;        // 动作状态
+    bool _hasActed;
 
     // --- 视觉节点 ---
     cocos2d::Sprite* _unitSprite;    // 单位外观
@@ -184,6 +202,7 @@ protected:
     cocos2d::DrawNode* _hpBarNode;       // 血条绘制节点
 
     cocos2d::DrawNode* _rangeNode; // 可达边框
+
 };
 
 #endif // __ABSTRACT_UNIT_H__

@@ -41,6 +41,22 @@ public:
         return "units/archer.png"; 
     }
 
+    int getCost() const override {
+        return 400;
+    }
+
+    int getMaintenanceCost() const override {
+        return 2;
+    }
+
+    int getProductionCost() const override {
+        return 30;
+    }
+
+    bool ismilitary() const override {
+        return true;
+    }
+
     /**
      * @brief 获取最大生命值
      * @return 80 点生命值

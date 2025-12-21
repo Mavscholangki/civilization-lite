@@ -48,6 +48,22 @@ public:
         return UnitType::RANGED; 
     }
 
+    int getCost() const override {
+        return 600;
+    }
+
+    int getMaintenanceCost() const override {
+        return 5;
+    }
+
+    int getProductionCost() const override {
+        return 80;
+    }
+
+    bool ismilitary() const override {
+        return true;
+    }
+
     /**
      * @brief 获取单位精灵图片路径
      * @return 图片文件路径

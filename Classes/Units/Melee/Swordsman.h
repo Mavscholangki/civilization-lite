@@ -48,14 +48,30 @@ public:
         return UnitType::MELEE; 
     }
 
+    int getCost() const override {
+        return 500;
+    }
+
+    int getMaintenanceCost() const override {
+        return 2;
+    }
+
+    int getProductionCost() const override {
+        return 40;
+    }
+
+    bool ismilitary() const override {
+        return true;
+    }
     /**
      * @brief 获取单位精灵图片路径
      * @return 图片文件路径
      */
+
     std::string getSpritePath() const override { 
         return "units/swordsman.png"; 
     }
-
+    i
     /**
      * @brief 获取最大生命值
      * @return 150 点生命值

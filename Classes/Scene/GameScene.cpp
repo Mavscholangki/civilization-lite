@@ -133,29 +133,6 @@ void GameScene::setupCallbacks() {
 
     // 下一回合按钮回调 - 直接调用GameManager
     _hudLayer->setNextTurnCallback([this]() {
-        // 获取当前玩家（人类玩家）
-        Player* currentPlayer = m_gameManager->getCurrentPlayer();
-        if (currentPlayer && currentPlayer->getIsHuman()) {
-            // 1. 先手动更新玩家的资源（模拟回合结束）
-            currentPlayer->onTurnBegin(); // 开始新回合，收集资源
-
-            // 2. 更新HUD显示
-            const GameStats& stats = m_gameManager->getGameStats();
-            _hudLayer->updateResources(
-                currentPlayer->getGold(),
-                currentPlayer->getSciencePerTurn(),
-                currentPlayer->getCulturePerTurn(),
-                stats.currentTurn
-            );
-
-            // 3. 更新科技和文化进度显示
-            _hudLayer->updateSciencePerTurn(currentPlayer->getSciencePerTurn());
-            _hudLayer->updateCulturePerTurn(currentPlayer->getCulturePerTurn());
-
-            CCLOG("Player %d resources updated", currentPlayer->getPlayerId());
-        }
-
-        // 4. 调用GameManager结束回合
         m_gameManager->endTurn();
         });
 
@@ -168,6 +145,31 @@ void GameScene::setupCallbacks() {
             _productionPanelLayer->setVisible(false);
         }
         });
+
+    // 添加资源更新事件监听
+    auto resourceListener = cocos2d::EventListenerCustom::create(
+        "player_turn_resource_update",
+        [this](cocos2d::EventCustom* event) {
+            ValueMap* data = static_cast<ValueMap*>(event->getUserData());
+            if (data) {
+                int playerId = data->at("player_id").asInt();
+                Player* player = m_gameManager->getPlayer(playerId);
+                if (player && player->getIsHuman()) {
+                    // 更新HUD显示
+                    _hudLayer->updateResources(
+                        player->getGold(),
+                        player->getSciencePerTurn(),
+                        player->getCulturePerTurn(),
+                        data->at("turn").asInt()
+                    );
+
+                    // 更新科技树/文化树的进度显示
+                    _hudLayer->updateSciencePerTurn(player->getSciencePerTurn());
+                    _hudLayer->updateCulturePerTurn(player->getCulturePerTurn());
+                }
+            }
+        });
+    this->getEventDispatcher()->addEventListenerWithSceneGraphPriority(resourceListener, this);
 }
 
 Player* GameScene::getCurrentPlayer() const {
