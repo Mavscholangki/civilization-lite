@@ -3,10 +3,12 @@
 
 #include "cocos2d.h"
 
+// 前向声明
 class TechTree;
 class CultureTree;
 class PolicyManager;
-
+class GameManager;
+class Player;
 
 class HUDLayer;
 class GameMapLayer;
@@ -19,23 +21,28 @@ public:
     virtual bool init();
     virtual void onExit() override;
 
+    // 添加获取当前玩家的方法
+    Player* getCurrentPlayer() const;
+
     CREATE_FUNC(GameScene);
 
 private:
-    // 私有实现方法
-    void initTechTree();
-    void initCultureTree();
-    void initPolicySystem();
+    // 私有实现方法 - 现在这些只是包装器，调用Player的方法
+    void initTechTree();    // 已废弃，保持为空
+    void initCultureTree(); // 已废弃，保持为空
+    void initPolicySystem(); // 已废弃，保持为空
     void setupCallbacks();
 
-    // 私有成员（使用前向声明的指针）
-    TechTree* _techTree;    // 科技系统实例
-    CultureTree* _cultureTree;  // 文化系统实例
-    PolicyManager* _policyManager = nullptr;// 政策系统实例
-    HUDLayer* _hudLayer;    // HUD层引用
-    GameMapLayer* _mapLayer; // 地图层引用
+    // 游戏管理器
+    GameManager* m_gameManager;
 
-    CityProductionPanel* _productionPanelLayer; ///<
+    // 玩家引用（现在系统实例都在Player中）
+    Player* m_humanPlayer;
+
+    // 场景层引用
+    HUDLayer* _hudLayer;
+    GameMapLayer* _mapLayer;
+    CityProductionPanel* _productionPanelLayer;
 };
 
 #endif
