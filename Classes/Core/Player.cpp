@@ -264,7 +264,7 @@ BaseCity* Player::getCapital() const {
 }
 
 Yield Player::calculateTotalYield() const {
-    Yield total;
+    Yield total{};
 
     // 累加所有城市的产出
     for (auto city : m_cities) {

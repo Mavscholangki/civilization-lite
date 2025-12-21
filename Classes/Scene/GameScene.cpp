@@ -1,10 +1,9 @@
 #include "GameScene.h"
 #include "../Map/GameMapLayer.h"
-#include "../UI/HUDLayer.h" // 引用 UI 头文件
+#include "../UI/HUDLayer.h"
 #include "../UI/CityProductionPanel.h"
-#include "../Development/TechSystem.h"
-#include "../Units/Base/AbstractUnit.h"  // 如果需要AbstractUnit的完整定义
-#include "../Development/CultureSystem.h"
+#include "../Core/GameManager.h"
+#include "../Core/Player.h"
 
 USING_NS_CC;
 
@@ -15,124 +14,105 @@ Scene* GameScene::createScene() {
 bool GameScene::init() {
     if (!Scene::init()) return false;
 
-    // 1. 创建地图层
+    // 1. 初始化游戏管理器
+    m_gameManager = GameManager::getInstance();
+
+    GameConfig config;
+    config.maxTurns = 300;
+    config.enableScienceVictory = true;
+    config.enableDominationVictory = true;
+
+    if (!m_gameManager->initialize(config)) {
+        CCLOG("Failed to initialize GameManager");
+        return false;
+    }
+
+    // 2. 创建玩家
+    m_humanPlayer = Player::create(0, CivilizationType::CHINA);
+    if (m_humanPlayer) {
+        m_humanPlayer->setIsHuman(true);
+        m_humanPlayer->setPlayerName("Human Player");
+        m_gameManager->addPlayer(m_humanPlayer);
+        CCLOG("Human player created");
+    }
+
+    // 创建AI玩家
+    Player* aiPlayerGermany = Player::create(1, CivilizationType::GERMANY);
+    if (aiPlayerGermany) {
+        aiPlayerGermany->setIsHuman(false);
+        aiPlayerGermany->setPlayerName("AI Germany");
+        m_gameManager->addPlayer(aiPlayerGermany);
+    }
+
+    Player* aiPlayerRussia = Player::create(2, CivilizationType::RUSSIA);
+    if (aiPlayerRussia) {
+        aiPlayerRussia->setIsHuman(false);
+        aiPlayerRussia->setPlayerName("AI Russia");
+        m_gameManager->addPlayer(aiPlayerRussia);
+    }
+
+    // 3. 创建地图层
     _mapLayer = GameMapLayer::create();
     if (!_mapLayer) return false;
     this->addChild(_mapLayer, 0);
 
-    // 2. 创建HUD层
+    // 4. 创建HUD层
     _hudLayer = HUDLayer::create();
     if (!_hudLayer) return false;
     this->addChild(_hudLayer, 100);
 
-
-    // 3. ??????????? (???? feature/productionPanel ???)
+    // 5. 创建生产面板层
     _productionPanelLayer = CityProductionPanel::create();
     _productionPanelLayer->setVisible(false);
     this->addChild(_productionPanelLayer, 120);
 
+    // 6. 设置HUD层使用人类玩家的系统实例
+    if (m_humanPlayer) {
+        // 关键：这里设置的是Player内部的TechTree、CultureTree
+        _hudLayer->setTechTree(m_humanPlayer->getTechTree());
+        _hudLayer->setCultureTree(m_humanPlayer->getCultureTree());
+        _hudLayer->setPolicyManager(m_humanPlayer->getPolicyManager());
+        CCLOG("HUDLayer set to use human player's system instances");
+    }
 
-    // 4. 初始化科技树和回调 (来自 main 分支)
-    initTechTree();
-    initCultureTree();
-    initPolicySystem();
+    // 7. 设置回调
     setupCallbacks();
+
+    // 8. 设置游戏管理器回调
+    m_gameManager->setOnTurnStartCallback([this](int playerId) {
+        Player* currentPlayer = m_gameManager->getCurrentPlayer();
+        if (currentPlayer && currentPlayer->getIsHuman()) {
+            CCLOG("Human player turn started");
+            // 如果是人类玩家回合，确保HUD绑定的是当前玩家
+            _hudLayer->setTechTree(currentPlayer->getTechTree());
+            _hudLayer->setCultureTree(currentPlayer->getCultureTree());
+            _hudLayer->setPolicyManager(currentPlayer->getPolicyManager());
+        }
+        });
+
+    m_gameManager->setOnVictoryCallback([this](VictoryType victoryType, int winnerPlayerId) {
+        // 胜利处理...
+        });
+
+    CCLOG("GameScene initialized successfully");
 
     return true;
 }
 
+// 这些函数现在只需要初始化玩家的系统
 void GameScene::initTechTree() {
-    _techTree = new TechTree();
-    if (!_techTree) {
-        CCLOG("ERROR: Failed to create TechTree!");
-        return;
-    }
-    if (_hudLayer && _techTree) {
-        _hudLayer->setTechTree(_techTree);
-    }
-    CCLOG("TechTree system initialized");
+    // 现在由Player管理，这里不需要做任何事
+    CCLOG("Note: TechTree is now managed by Player class");
 }
 
 void GameScene::initCultureTree() {
-    // 创建文化系统实例
-    _cultureTree = new CultureTree();
-
-    if (!_cultureTree) {
-        CCLOG("ERROR: Failed to create CultureTree!");
-        return;
-    }
-
-    // 初始化文化树
-    _cultureTree->initializeCultureTree();
-
-    // 设置当前研究文化（例如01：法典）
-    std::vector<int> unlockable = _cultureTree->getUnlockableCultureList();
-    if (!unlockable.empty()) {
-        _cultureTree->setCurrentResearch(unlockable[0]);
-        CCLOG("Set default culture research to: %d", unlockable[0]);
-    }
-    else {
-        CCLOG("No unlockable cultures available");
-    }
-
-    // 设置HUD层的文化系统
-    if (_hudLayer && _cultureTree) {
-        _hudLayer->setCultureTree(_cultureTree);
-    }
-
-    CCLOG("CultureTree system initialized");
+    // 现在由Player管理
+    CCLOG("Note: CultureTree is now managed by Player class");
 }
 
 void GameScene::initPolicySystem() {
-	// 创建政策管理器实例
-    _policyManager = new PolicyManager();
-
-    if (!_policyManager) {
-        CCLOG("ERROR: Failed to create PolicyManager!");
-        return;
-    }
-
-	// 初始化政策数据
-    _policyManager->initializePolicies();
-
-	// 将政策管理器与文化系统关联
-    if (_cultureTree) {
-        // 设置政府获取回调
-        _policyManager->setGovernmentGetter([this]() {
-            return _cultureTree->getCurrentGovernment();
-            });
-
-        // 设置政策获取回调
-        _policyManager->setPolicyGetter([this](int cultureId) {
-            return _cultureTree->getPoliciesUnlockedByCulture(cultureId);
-            });
-
-        // 设置政策解锁回调
-        _policyManager->setPolicyUnlockedCallback([this](int policyId) {
-            CCLOG("Policy %d unlocked via callback", policyId);
-            });
-
-        // 关键：将PolicyManager作为监听器添加到文化系统
-        _cultureTree->addEventListener(_policyManager);
-        CCLOG("PolicyManager registered as CultureEventListener");
-    }
-
-	// 设置初始政策槽
-    if (_cultureTree) {
-        const int* slots = _cultureTree->getActivePolicySlots();
-        _policyManager->setPolicySlots(slots[0], slots[1], slots[2], slots[3]);
-        CCLOG("Initial policy slots: Military=%d, Economic=%d, Diplomatic=%d, Wildcard=%d",
-            slots[0], slots[1], slots[2], slots[3]);
-    }
-
-    // 设置HUD层的政策管理层
-    if (_hudLayer) {
-        _hudLayer->setPolicyManager(_policyManager);
-        CCLOG("PolicyManager set on HUDLayer");
-    }
-
-    CCLOG("Policy system initialized with %zu unlocked policies",
-        _policyManager->getUnlockedPolicies().size());
+    // 现在由Player管理
+    CCLOG("Note: Policy system is now managed by Player class");
 }
 
 void GameScene::setupCallbacks() {
@@ -151,70 +131,55 @@ void GameScene::setupCallbacks() {
         _mapLayer->onBuildCityAction();
         });
 
-    // 下一回合按钮回调
+    // 下一回合按钮回调 - 直接调用GameManager
     _hudLayer->setNextTurnCallback([this]() {
-        _mapLayer->onNextTurnAction();
-        if (_techTree) {
-            int sciencePerTurn = 5; // ????????市、建筑等计算
-            _techTree->updateProgress(sciencePerTurn);
+        // 获取当前玩家（人类玩家）
+        Player* currentPlayer = m_gameManager->getCurrentPlayer();
+        if (currentPlayer && currentPlayer->getIsHuman()) {
+            // 1. 先手动更新玩家的资源（模拟回合结束）
+            currentPlayer->onTurnBegin(); // 开始新回合，收集资源
+
+            // 2. 更新HUD显示
+            const GameStats& stats = m_gameManager->getGameStats();
+            _hudLayer->updateResources(
+                currentPlayer->getGold(),
+                currentPlayer->getSciencePerTurn(),
+                currentPlayer->getCulturePerTurn(),
+                stats.currentTurn
+            );
+
+            // 3. 更新科技和文化进度显示
+            _hudLayer->updateSciencePerTurn(currentPlayer->getSciencePerTurn());
+            _hudLayer->updateCulturePerTurn(currentPlayer->getCulturePerTurn());
+
+            CCLOG("Player %d resources updated", currentPlayer->getPlayerId());
         }
 
-        // 文化系统更新
-        if (_cultureTree) {
-            int culturePerTurn = 3; // ????????念??、剧院等计算
-            _cultureTree->updateProgress(culturePerTurn);
-        }
-
-        // 新功能：政策系统更新（如果需要每回合处理什么）
-        if (_policyManager) {
-			// 例如：检查政策组合效果是否持续触发
-            _policyManager->checkPolicyCombos();
-        }
-        // 更新资源显示
-        static int turn = 1; turn++;
-        static int gold = 0; gold += 5;
-        static int science = 0; science += 5;
-        static int culture = 0; culture += 3;
-        _hudLayer->updateResources(gold, science, culture, turn);
+        // 4. 调用GameManager结束回合
+        m_gameManager->endTurn();
         });
 
     _mapLayer->setOnCitySelectedCallback([this](BaseCity* city) {
         if (city) {
-            // 1. ?????λ???????????????У?
             _hudLayer->hideUnitInfo();
-
-            // 2. ??????????
             _productionPanelLayer->setVisible(true);
-
-            // 3. ????е?????????????壬????????????????
-            // _productionPanelLayer->setTargetCity(city); 
         }
         else {
-            // ??????????????
             _productionPanelLayer->setVisible(false);
         }
         });
+}
 
+Player* GameScene::getCurrentPlayer() const {
+    return m_gameManager ? m_gameManager->getCurrentPlayer() : nullptr;
 }
 
 void GameScene::onExit() {
-    if (_techTree) {
-        delete _techTree;
-        _techTree = nullptr;
+    // 清理游戏管理器
+    if (m_gameManager) {
+        m_gameManager->cleanup();
     }
 
-    // 清理文化树
-    if (_cultureTree) {
-        delete _cultureTree;
-        _cultureTree = nullptr;
-    }
-
-    // 清理政策管理层
-    if (_policyManager) {
-        delete _policyManager;
-        _policyManager = nullptr;
-    }
-
-    // 调用父类的onExit
+    // 注意：现在不需要删除_techTree等，因为它们在Player内部
     Scene::onExit();
 }

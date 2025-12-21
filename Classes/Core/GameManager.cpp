@@ -57,6 +57,9 @@ void GameManager::addPlayer(Player* player) {
         }
     }
 
+    // ========== 关键：增加引用计数 ==========
+    player->retain();  // 防止被自动释放
+
     m_players.push_back(player);
     m_playerOrder.push_back(player->getPlayerId());
 
@@ -67,9 +70,9 @@ void GameManager::addPlayer(Player* player) {
 
     // 更新游戏统计
     m_gameStats.totalPlayers = m_players.size();
-    m_gameStats.activePlayers = m_players.size(); // 初始所有玩家都活跃
+    m_gameStats.activePlayers = m_players.size();
 
-    CCLOG("Player %d added to game. Total players: %d",
+    CCLOG("Player %d added to game. Total players: %d (retained)",
         player->getPlayerId(), m_players.size());
 }
 
@@ -91,7 +94,9 @@ void GameManager::removePlayer(int playerId) {
             }
         }
 
-        // 从玩家列表中移除
+        // ========== 关键：减少引用计数 ==========
+        (*it)->release();  // 对应上面的retain
+
         m_players.erase(it);
 
         // 更新游戏统计
@@ -568,4 +573,8 @@ void GameManager::cleanup() {
     CCLOG("GameManager cleanup completed");
 }
 
-
+// 添加setGameState方法（如果不存在）
+void GameManager::setGameState(GameState state) {
+    m_gameState = state;
+    CCLOG("Game state changed to: %d", (int)state);
+}

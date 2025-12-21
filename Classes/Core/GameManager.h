@@ -113,6 +113,8 @@ public:
     // 清理资源
     void cleanup();
 
+    void setGameState(GameState state);
+
     // 事件回调设置
     void setOnTurnStartCallback(std::function<void(int)> callback) { m_onTurnStartCallback = callback; }
     void setOnTurnEndCallback(std::function<void(int)> callback) { m_onTurnEndCallback = callback; }
