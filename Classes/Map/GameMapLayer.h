@@ -10,6 +10,8 @@
 #include "../Units/Civilian/Settler.h"
 #include "../City/BaseCity.h"
 
+class BaseCity;
+
 class GameMapLayer : public cocos2d::Layer {
 public:
     virtual bool init();
@@ -17,7 +19,7 @@ public:
     void setOnUnitSelectedCallback(const std::function<void(AbstractUnit*)>& cb);
     void onBuildCityAction();
     void onNextTurnAction();
-    
+	TileData getTileData(Hex h);
 private:
     void generateMap();
     void drawHexOnNode(cocos2d::DrawNode* node, cocos2d::Vec2 pos, float size, cocos2d::Color4F color);

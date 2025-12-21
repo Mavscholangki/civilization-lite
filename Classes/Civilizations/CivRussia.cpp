@@ -7,13 +7,13 @@ bool CivRussia::init() {
         return false;
     }
 
-    // è®¾ç½®ä¿„ç½—æ–¯ç‰¹æ€§
-    m_traits.name = "å½¼å¾—å¤§å¸";
-    m_traits.description = "åˆå§‹é¢†åœŸæ‰©å¤§ï¼ˆ+8åœ°å—ï¼‰ï¼Œå­¦é™¢å’Œå‰§é™¢å¹¿åœºäº§å‡º+20%ï¼Œå†›äº‹å•ä½ç”Ÿäº§æˆæœ¬é™ä½Ž";
-    m_traits.initialTiles = 8;               // åˆå§‹åœ°å—+8
-    m_traits.scienceBonus = 1.2f;           // ç§‘ç ”åŠ æˆ20%
-    m_traits.cultureBonus = 1.2f;           // æ–‡åŒ–åŠ æˆ20%
-    m_traits.militaryProductionBonus = 0.8f; // å†›äº‹ç”Ÿäº§åŠ›æˆæœ¬å‡å°‘20%
+    // ÉèÖÃ¶íÂÞË¹ÌØÐÔ
+    m_traits.name = "±ËµÃ´óµÛ";
+    m_traits.description = "³õÊ¼ÁìÍÁÀ©´ó£¨+8µØ¿é£©£¬Ñ§ÔººÍ¾çÔº¹ã³¡²ú³ö+20%£¬¾üÊÂµ¥Î»Éú²ú³É±¾½µµÍ";
+    m_traits.initialTiles = 8;               // ³õÊ¼µØ¿é+8
+    m_traits.scienceBonus = 1.2f;           // ¿ÆÑÐ¼Ó³É20%
+    m_traits.cultureBonus = 1.2f;           // ÎÄ»¯¼Ó³É20%
+    m_traits.militaryProductionBonus = 0.8f; // ¾üÊÂÉú²úÁ¦³É±¾¼õÉÙ20%
     m_traits.halfCostIndustrial = false;
     m_traits.extraDistrictSlot = false;
     m_traits.eurekaBoost = 0.5f;
@@ -37,18 +37,18 @@ Yield CivRussia::calculateDistrictBonus(const District* district) const {
         return bonus;
     }
 
-    // èŽ·å–åŒºåŸŸç±»åž‹
+    // »ñÈ¡ÇøÓòÀàÐÍ
     District::DistrictType districtType = district->getType();
 
-    // å¦‚æžœæ˜¯å­¦é™¢åŒºåŸŸï¼Œæä¾›é¢å¤–çš„ç§‘ç ”åŠ æˆ
-    if (districtType.typeName == District::DistrictTypeName::CAMPUS) {
-        // èŽ·å–åŸºç¡€äº§å‡º
+    // Èç¹ûÊÇÑ§ÔºÇøÓò£¬Ìá¹©¶îÍâµÄ¿ÆÑÐ¼Ó³É
+    if (districtType == District::DistrictType::CAMPUS) {
+        // »ñÈ¡»ù´¡²ú³ö
         Yield baseYield = district->getYield();
         bonus.scienceYield = static_cast<int>(baseYield.scienceYield * 0.2f); // +20%
     }
 
-    // å¦‚æžœæ˜¯å‰§é™¢å¹¿åœºåŒºåŸŸï¼Œæä¾›é¢å¤–çš„æ–‡åŒ–åŠ æˆ
-    if (districtType.typeName == District::DistrictTypeName::THEATER_SQUARE) {
+    // Èç¹ûÊÇ¾çÔº¹ã³¡ÇøÓò£¬Ìá¹©¶îÍâµÄÎÄ»¯¼Ó³É
+    if (districtType == District::DistrictType::THEATER_SQUARE) {
         Yield baseYield = district->getYield();
         bonus.cultureYield = static_cast<int>(baseYield.cultureYield * 0.2f); // +20%
     }

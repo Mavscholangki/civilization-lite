@@ -8,24 +8,24 @@ USING_NS_CC;
 bool GameMapLayer::init() {
 if (!Layer::init()) return false;
 
-_isDragging = false;
-_layout = new HexLayout(40.0f);
+    _isDragging = false;
+    _layout = new HexLayout(40.0f);
 
-auto listener = EventListenerTouchOneByOne::create();
-listener->setSwallowTouches(true);
-listener->onTouchBegan = CC_CALLBACK_2(GameMapLayer::onTouchBegan, this);
-listener->onTouchMoved = CC_CALLBACK_2(GameMapLayer::onTouchMoved, this);
-listener->onTouchEnded = CC_CALLBACK_2(GameMapLayer::onTouchEnded, this);
-_eventDispatcher->addEventListenerWithSceneGraphPriority(listener, this);
+    auto listener = EventListenerTouchOneByOne::create();
+    listener->setSwallowTouches(true);
+    listener->onTouchBegan = CC_CALLBACK_2(GameMapLayer::onTouchBegan, this);
+    listener->onTouchMoved = CC_CALLBACK_2(GameMapLayer::onTouchMoved, this);
+    listener->onTouchEnded = CC_CALLBACK_2(GameMapLayer::onTouchEnded, this);
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, this);
 
-_selectionNode = DrawNode::create();
-this->addChild(_selectionNode, 20);
+    _selectionNode = DrawNode::create();
+    this->addChild(_selectionNode, 20);
 
-// 创建单个 DrawNode 用于所有地块
-_tilesDrawNode = DrawNode::create();
-this->addChild(_tilesDrawNode, 0);
+    // 创建单个 DrawNode 用于所有地块
+    _tilesDrawNode = DrawNode::create();
+    this->addChild(_tilesDrawNode, 0);
 
-generateMap();
+    generateMap();
 
     Hex startHex(0, 0);
     while (getTerrainCost(startHex) < 0) {
@@ -221,4 +221,13 @@ void GameMapLayer::onNextTurnAction() {
     for (auto city : _cities) {
         city->onTurnEnd();
     }
+}
+
+// 获取指定地块的数据
+TileData GameMapLayer::getTileData(Hex h)
+{
+	if (_mapData.find(h) != _mapData.end()) {
+		return _mapData[h];
+	}
+	return TileData();
 }

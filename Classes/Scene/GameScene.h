@@ -2,6 +2,8 @@
 #define __GAME_SCENE_H__
 
 #include "cocos2d.h"
+#include "Map/TileData.h"
+#include "Map/GameMapLayer.h"
 
 class TechTree;
 class CultureTree;
@@ -17,7 +19,7 @@ public:
     static cocos2d::Scene* createScene();
     virtual bool init();
     virtual void onExit() override;
-
+	TileData getTileData(Hex h) { return _mapLayer->getTileData(h); }
     CREATE_FUNC(GameScene);
 
 private:
@@ -35,4 +37,4 @@ private:
     GameMapLayer* _mapLayer; // µØÍ¼²ãÒıÓÃ
 };
 
-#endif
+#endif // __GAME_SCENE_H__

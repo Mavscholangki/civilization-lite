@@ -35,11 +35,7 @@ bool GameScene::init() {
         setupCallbacks();
     });
 
-    // 3. 创建生产面板 (来自 feature/productionPanel 分支)
-    auto productionPanelLayer = CityProductionPanel::create();
-    this->addChild(productionPanelLayer, 120);
-
-    // 4. 初始化科技树和回调 (来自 main 分支)
+    // 3. 初始化科技树和回调 (来自 main 分支)
     initTechTree();
     initCultureTree();
     initPolicySystem();
