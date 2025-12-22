@@ -2,6 +2,8 @@
 #define __GAME_SCENE_H__
 
 #include "cocos2d.h"
+#include "Map/TileData.h"
+#include "Utils/HexUtils.h"
 
 // 前向声明
 class TechTree;
@@ -10,8 +12,8 @@ class PolicyManager;
 class GameManager;
 class Player;
 
-class HUDLayer;
 class GameMapLayer;
+class HUDLayer;
 class AbstractUnit;
 class CityProductionPanel;
 
@@ -20,6 +22,7 @@ public:
     static cocos2d::Scene* createScene();
     virtual bool init();
     virtual void onExit() override;
+    TileData getTileData(Hex h);
 
     // 添加获取当前玩家的方法
     Player* getCurrentPlayer() const;
@@ -45,4 +48,4 @@ private:
     CityProductionPanel* _productionPanelLayer;
 };
 
-#endif
+#endif // __GAME_SCENE_H__

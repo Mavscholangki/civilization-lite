@@ -4,14 +4,14 @@
 #include "../Utils/PathFinder.h"
 #include "../Core/GameManager.h"
 #include "cocos2d.h"
-
+#define RADIUS 50.0f
 USING_NS_CC;
 
 bool GameMapLayer::init() {
     if (!Layer::init()) return false;
 
     _isDragging = false;
-    _layout = new HexLayout(50.0f); // 尖顶六边形布局
+    _layout = new HexLayout(RADIUS); // 尖顶六边形布局
 
     // 1. 初始化双击变量
     _lastClickHex = Hex(-999, -999);
@@ -341,7 +341,7 @@ void GameMapLayer::onBuildCityAction() {
 
     Hex pos = _selectedUnit->getGridPos();
 
-    auto city = BaseCity::create(pos, "Rome");
+    auto city = BaseCity::create(0, pos, "Rome");
     city->setPosition(_layout->hexToPixel(pos));
     this->addChild(city, 5);
     _cities.push_back(city);
@@ -379,6 +379,14 @@ void GameMapLayer::onNextTurnAction() {
     }
 }
 
+// 获取指定地块的数据
+TileData GameMapLayer::getTileData(Hex h)
+{
+	if (_mapData.find(h) != _mapData.end()) {
+		return _mapData[h];
+	}
+	return TileData();
+}
 // 1. 实现设置回调
 void GameMapLayer::setOnCitySelectedCallback(const std::function<void(BaseCity*)>& cb) {
     _onCitySelected = cb;

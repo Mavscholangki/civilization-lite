@@ -2,25 +2,29 @@
 * 城市基类
 */
 #include "BaseCity.h"
-
+#define RADIUS 50.0f
 USING_NS_CC;
 
-BaseCity* BaseCity::create(Hex pos, std::string name) {
+BaseCity* BaseCity::create(int player, Hex pos, std::string name) {
     BaseCity* pRet = new BaseCity();
-    if (pRet && pRet->initCity(pos, name)) {
+    if (pRet && pRet->initCity(player, pos, name)) {
         pRet->autorelease();
         return pRet;
     }
     delete pRet; return nullptr;
 }
 
-bool BaseCity::initCity(Hex pos, std::string name) {
+bool BaseCity::initCity(int player, Hex pos, std::string name) {
     if (!Node::init()) return false;
 
+	this->ownerPlayer = player;
     this->gridPos = pos;
     this->cityName = name;
     this->population = 1;
 	this->unallocated = population; // 初始时所有人口未分配
+	this->maxHealth = 100;
+	this->currentHealth = maxHealth;
+	this->addedHealth = 0;
 	// 初始化领土范围 (城市所在格子及其六个邻接格子)
 	this->addToTerritory(Hex(pos.q, pos.r));
     this->addToTerritory(Hex(pos.q + 1, pos.r));
@@ -29,15 +33,12 @@ bool BaseCity::initCity(Hex pos, std::string name) {
 	this->addToTerritory(Hex(pos.q, pos.r - 1));
 	this->addToTerritory(Hex(pos.q + 1, pos.r - 1));
 	this->addToTerritory(Hex(pos.q - 1, pos.r + 1));
-	updateDistribution(); // 更新分配信息
-	updateYield(); // 更新城市总产出
-	drawBoundary(); // 绘制城市边界
-    // 绘制城市 (蓝色方块)
-    auto draw = DrawNode::create();
-    draw->drawSolidRect(Vec2(-15, -15), Vec2(15, 15), Color4F::BLUE);
-    // 加个城墙轮廓
-    draw->drawRect(Vec2(-15, -15), Vec2(15, 15), Color4F::WHITE);
-    _visual = draw;
+	// 创建并添加市中心区
+	Downtown* downtownDistrict = new Downtown(pos, name + " Downtown");
+	this->addDistrict(static_cast<District*>(downtownDistrict)); // 添加市中心区
+
+	_visual = Node::create();
+    _visual->addChild(downtownDistrict->_downtownVisual);
     this->addChild(_visual);
 
 	// 创建生产面板 
@@ -60,20 +61,22 @@ bool BaseCity::initCity(Hex pos, std::string name) {
 		}
 		});
     
-    this->addChild(_nameLabel);
-
+    this->addChild(_nameLabel, 100);
+	updateDistribution(); // 更新分配信息
+	updateYield(); // 更新城市总产出
+	drawTerritory(); // 绘制城市边界
 	updatePanel();
 
 	Director::getInstance()->getRunningScene()->addChild(productionPanelLayer, 100);
     return true;
 }
 
-void BaseCity::drawBoundary() // 绘制城市边界
+void BaseCity::drawTerritory() // 绘制城市边界
 {
 	auto draw = DrawNode::create();
 	for (auto tile : territory) {
 		// 计算每个格子的像素位置
-		HexLayout layout(40.0f); // 假设六边形大小为40
+		HexLayout layout(RADIUS); // 假设六边形大小为40
 		Vec2 center = layout.hexToPixel(tile) - layout.hexToPixel(this->gridPos); // 相对于城市中心的位置
 		// 画出边界
 		Vec2 vertices[6];
@@ -81,10 +84,29 @@ void BaseCity::drawBoundary() // 绘制城市边界
 			float rad = CC_DEGREES_TO_RADIANS(60 * i - 30);
 			vertices[i] = Vec2(center.x + layout.size * cos(rad), center.y + layout.size * sin(rad)); // 六边形顶点
 		}
-		draw->drawPoly(vertices, 6, false, Color4F::RED); // 红色边界
+		draw->drawSolidPoly(vertices, 6, Color4F(1.f, 0, 0, 0.3)); // 红色，半透明
 	}
 	_boundaryVisual = draw;
     this->addChild(_boundaryVisual, 10);
+}
+
+void BaseCity::deduceHealth(int damage)
+{
+	if (addedHealth > 0) // 先扣除额外健康度
+	{
+		int remainingDamage = damage - addedHealth;
+		addedHealth -= damage;
+		if (addedHealth < 0)
+			addedHealth = 0;
+		if (remainingDamage > 0)
+		{
+			currentHealth -= remainingDamage;
+		}
+	}
+	else
+	{
+		currentHealth -= damage;
+	}
 }
 
 void BaseCity::updateYield() // 更新城市总产出
@@ -93,7 +115,7 @@ void BaseCity::updateYield() // 更新城市总产出
 	for (auto district : districts) {
 		totalYield = totalYield + district->getYield();
 	}
-	for (auto tile : territory) {
+	for (auto& tile : territory) {
 		totalYield.foodYield += 1;
 		totalYield.productionYield += 1;
 		totalYield.goldYield += 1;       // 增加金币产出
@@ -106,7 +128,7 @@ void BaseCity::updateYield() // 更新城市总产出
 void BaseCity::updateDistribution() // 更新分配信息
 {
 	int i = 0;
-	for (auto tile : populationDistribution) {
+	for (auto& tile : populationDistribution) {
 		if (unallocated == 0)
 			break;
 		if(populationDistribution[tile.first] == 0)

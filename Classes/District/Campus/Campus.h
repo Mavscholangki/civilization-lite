@@ -5,11 +5,17 @@
 #include "City/Yield.h"
 class Campus : public District {
 public:
-	static Campus* create(Hex pos);
-	bool initCampus(Hex pos);
-	// 校园特有属性和方法
-	Yield getCampusYield(); // 获取校园的产出
+	Campus(Hex pos, std::string name);
+	virtual void calculateBonus();
+	virtual bool canErectDistrict(Hex where);
+	virtual bool addBuilding(Building::BuildingType building);
+	enum class BuildingType {
+		LIBRARY, // 图书馆
+		UNIVERSITY, // 大学
+		RESEARCH_LAB // 研究实验室
+	};
 private:
+	static int campusCount; // 校园区计数器
 	cocos2d::Node* _campusVisual;
 };
 #endif

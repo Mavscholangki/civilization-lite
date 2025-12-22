@@ -41,14 +41,14 @@ Yield CivRussia::calculateDistrictBonus(const District* district) const {
     District::DistrictType districtType = district->getType();
 
     // 如果是学院区域，提供额外的科研加成
-    if (districtType.typeName == District::DistrictTypeName::CAMPUS) {
+    if (districtType == District::DistrictType::CAMPUS) {
         // 获取基础产出
         Yield baseYield = district->getYield();
         bonus.scienceYield = static_cast<int>(baseYield.scienceYield * 0.2f); // +20%
     }
 
     // 如果是剧院广场区域，提供额外的文化加成
-    if (districtType.typeName == District::DistrictTypeName::THEATER_SQUARE) {
+    if (districtType == District::DistrictType::THEATER_SQUARE) {
         Yield baseYield = district->getYield();
         bonus.cultureYield = static_cast<int>(baseYield.cultureYield * 0.2f); // +20%
     }

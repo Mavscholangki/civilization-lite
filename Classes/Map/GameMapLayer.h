@@ -19,6 +19,8 @@
 #include "../Units/Civilian/Settler.h"
 #include "../City/BaseCity.h"
 
+class BaseCity;
+
 /**
  * @class GameMapLayer
  * @brief 游戏地图层
@@ -95,7 +97,7 @@ public:
      * 3. 触发回合相关事件
      */
     void onNextTurnAction();
-    
+	TileData getTileData(Hex h);
 private:
     /**
      * @brief 生成六边形网格地图

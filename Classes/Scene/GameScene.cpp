@@ -74,6 +74,10 @@ bool GameScene::init() {
         _hudLayer->setPolicyManager(m_humanPlayer->getPolicyManager());
         CCLOG("HUDLayer set to use human player's system instances");
     }
+	// 现在初始化这些系统只需调用Player的初始化方法
+    initTechTree();
+    initCultureTree();
+    initPolicySystem();
 
     // 7. 设置回调
     setupCallbacks();
@@ -185,3 +189,5 @@ void GameScene::onExit() {
     // 注意：现在不需要删除_techTree等，因为它们在Player内部
     Scene::onExit();
 }
+
+TileData GameScene::getTileData(Hex h) { return _mapLayer->getTileData(h); }
