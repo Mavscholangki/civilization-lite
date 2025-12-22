@@ -1,4 +1,3 @@
-// Player.h
 #ifndef __PLAYER_H__
 #define __PLAYER_H__
 
@@ -20,7 +19,6 @@ enum class CivilizationType {
     CHINA,      // 中国
     RUSSIA      // 俄罗斯
 };
-
 
 // 前向声明
 class BaseCity;
@@ -62,6 +60,9 @@ public:
             unitsTrained(0), buildingsConstructed(0) {
         }
     };
+
+    // 构造函数声明 (修改点：必须显式声明以初始化 PolicyManager)
+    Player();
 
     // 创建玩家
     static Player* create(int playerId, CivilizationType civType);
@@ -185,8 +186,9 @@ public:
 private:
     friend class GameManager;
     // ==================== 核心子系统 ====================
-    BaseCiv* m_civilization;                // 文明特性
+    BaseCiv* m_civilization = nullptr;      // 文明特性
     TechTree m_techTree;                    // 科技树
+    // 注意：m_cultureTree 必须在 m_policyManager 之前声明，以确保初始化顺序正确
     CultureTree m_cultureTree;              // 文化树
     PolicyManager m_policyManager;          // 政策管理器
 
@@ -197,11 +199,10 @@ private:
     // ==================== 回合统计 ====================
     TurnStats m_turnStats;
 
-    // ==================== 回合统计 ====================
+    // ==================== 胜利进度 ====================
     VictoryProgress m_vicprogress;
 
     // ==================== 私有方法 ====================
-    void setupPolicyManagerCallbacks();
     void updatePolicySlots();
     void createCivilization(CivilizationType civType);
     void cleanupResources();
