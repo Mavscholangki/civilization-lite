@@ -458,6 +458,12 @@ void GameMapLayer::setOnUnitSelectedCallback(const std::function<void(AbstractUn
 void GameMapLayer::onBuildCityAction() {
     if (!_selectedUnit) return;
 
+    // 【核心修复】：检查单位是否属于人类玩家
+    if (_selectedUnit->getOwnerId() != 0) {
+        CCLOG("只有玩家 0 的单位可以建城！当前单位属于玩家 %d", _selectedUnit->getOwnerId());
+        return;
+    }
+
     Hex pos = _selectedUnit->getGridPos();
 
     auto city = BaseCity::create(0, pos, "Rome");
@@ -472,7 +478,7 @@ void GameMapLayer::onBuildCityAction() {
             // 添加到玩家的城市列表
             currentPlayer->addCity(city);
 
-            CCLOG("City added to Player %d, total cities: %d",
+            CCLOG("城市已添加到玩家 %d，城市总数: %d",
                 currentPlayer->getPlayerId(), currentPlayer->getCityCount());
         }
         else {
