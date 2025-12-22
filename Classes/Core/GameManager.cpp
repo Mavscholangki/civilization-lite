@@ -253,6 +253,20 @@ void GameManager::beginNewTurn() {
     }
 }
 
+bool GameManager::hasPendingDecisions(int playerId) const {
+    Player* player = getPlayer(playerId);
+    if (!player) return false;
+
+    // 检查科技树：如果没有当前研究，则有待决事项
+    bool techIdle = (player->getCurrentResearchTechId() == -1);
+
+    // 检查文化树：如果没有当前研究，则有待决事项
+    bool cultureIdle = (player->getCurrentResearchCivicId() == -1);
+
+    // 注意：这里只检查了“未选择研究”，未来可以扩展其他待决事项（如政策卡、单位指令）
+    return (techIdle || cultureIdle);
+}
+
 void GameManager::processAITurn(Player* aiPlayer) {
     if (!aiPlayer || aiPlayer->getIsHuman()) {
         return;

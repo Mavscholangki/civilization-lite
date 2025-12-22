@@ -110,6 +110,9 @@ public:
     // 调试信息
     void debugPrintGameState() const;
 
+    // 检查本回合是否还有未完成决策
+    bool hasPendingDecisions(int playerId) const;
+
     // 清理资源
     void cleanup();
 
