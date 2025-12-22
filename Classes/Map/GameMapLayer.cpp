@@ -61,20 +61,6 @@ bool GameMapLayer::init() {
     }
     // ============================================================
 
-    auto unit = Settler::create();
-    unit->initUnit(0, startHex);
-    this->addChild(unit, 10);
-
-    unit->onCheckCity = [this](Hex h) {
-        return this->getCityAt(h) != nullptr;
-        };
-    _myUnit = unit;
-    _allUnits.push_back(unit);
-
-    if (_myUnit) {
-        _myUnit->setPosition(_layout->hexToPixel(startHex));
-    }
-
     // ============================================================
     // 【修改点】：镜头跟随出生点
     // ============================================================
@@ -87,9 +73,117 @@ bool GameMapLayer::init() {
     Vec2 centerOffset = Vec2(visibleSize.width / 2, visibleSize.height / 2) - unitPos;
     this->setPosition(centerOffset);
 
+    initGameManagerAndPlayers();
+
     return true;
 }
 
+void GameMapLayer::initGameManagerAndPlayers() {
+    // 获取游戏管理器
+    auto gameManager = GameManager::getInstance();
+    if (!gameManager) {
+        CCLOG("GameManager not initialized");
+        return;
+    }
+
+    // 如果游戏管理器没有玩家，创建默认玩家
+    if (gameManager->getAllPlayers().empty()) {
+        CCLOG("Creating default player...");
+
+        // 创建游戏配置
+        GameConfig config;
+        config.maxTurns = 500;
+        config.enableScienceVictory = true;
+        config.enableDominationVictory = true;
+
+        // 初始化游戏管理器
+        gameManager->initialize(config);
+
+        // 创建玩家
+        auto player = Player::create(0, CivilizationType::BASIC);
+        if (player) {
+            gameManager->addPlayer(player);
+            CCLOG("Default player created with ID 0");
+        }
+    }
+
+    // 初始化玩家起始单位后，设置游戏状态为PLAYING
+    gameManager->setGameState(GameState::PLAYING);
+
+    // 确保当前玩家索引正确
+    gameManager->setCurrentPlayer(0);  // 或者通过其他方式设置
+
+    // 创建玩家起始位置的函数
+    auto getStartHexForPlayer = [this](int playerId) -> Hex {
+        // 为不同玩家选择不同的起始位置
+        // 这里简化处理：玩家0在地图中心，其他玩家在随机位置
+        if (playerId == 0) {
+            return Hex(55, 15); // 玩家0在地图中心
+        }
+        else {
+            // 为AI玩家选择随机位置（确保是陆地）
+            int maxQ = 120; // 地图宽度
+            int maxR = 50;  // 地图高度
+
+            for (int attempt = 0; attempt < 100; attempt++) {
+                int q = cocos2d::random(10, maxQ - 10);
+                int r = cocos2d::random(10, maxR - 10);
+                Hex testHex(q, r);
+
+                if (getTerrainCost(testHex) > 0) {
+                    return testHex;
+                }
+            }
+
+            // 如果找不到合适位置，返回默认位置
+            return Hex(55 + playerId * 10, 15 + playerId * 5);
+        }
+        };
+
+    // 添加单位到地图的函数
+    auto addUnitToMap = [this](AbstractUnit* unit) {
+        if (unit) {
+            this->addChild(unit, 10);
+            _allUnits.push_back(unit);
+
+            // 设置单位位置
+            Hex pos = unit->getGridPos();
+            unit->setPosition(_layout->hexToPixel(pos));
+
+            // 如果是玩家0的单位，设置镜头跟随
+            if (unit->getOwnerId() == 0) {
+                _myUnit = unit;
+
+                // 镜头跟随出生点
+                auto visibleSize = Director::getInstance()->getVisibleSize();
+                Vec2 unitPos = _layout->hexToPixel(pos);
+                Vec2 centerOffset = Vec2(visibleSize.width / 2, visibleSize.height / 2) - unitPos;
+                this->setPosition(centerOffset);
+
+                CCLOG("Player 0 unit created, camera focused at (%d, %d)", pos.q, pos.r);
+            }
+        }
+        };
+
+    // 检查城市存在的函数
+    auto checkCityAt = [this](Hex hex) -> bool {
+        return getCityAt(hex) != nullptr;
+        };
+
+    // 获取地形消耗的函数
+    auto getTerrainCost = [this](Hex hex) -> int {
+        return this->getTerrainCost(hex);
+        };
+
+    // 初始化玩家起始单位
+    gameManager->initializePlayerStartingUnits(
+        this,               // 父节点
+        getStartHexForPlayer, // 获取起始位置的函数
+        addUnitToMap,       // 添加单位到地图的函数
+        checkCityAt,        // 检查城市存在的函数
+        getTerrainCost      // 获取地形消耗的函数
+    );
+}
 
 void GameMapLayer::generateMap() {
     int mapWidth = 120;
