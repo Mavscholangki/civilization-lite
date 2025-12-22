@@ -137,17 +137,29 @@ void GameScene::setupCallbacks() {
 
     // 下一回合按钮回调 - 直接调用GameManager
     _hudLayer->setNextTurnCallback([this]() {
-        m_gameManager->endTurn();
-        });
+        Player* currentPlayer = m_gameManager->getCurrentPlayer();
+        if (!currentPlayer || !currentPlayer->getIsHuman()) {
+            //return; // 不是人类玩家回合，理论上按钮应不可点，此处做安全保护
+        }
 
-    _mapLayer->setOnCitySelectedCallback([this](BaseCity* city) {
-        if (city) {
-            _hudLayer->hideUnitInfo();
-            _productionPanelLayer->setVisible(true);
+        // --- 新增：快捷研究逻辑 ---
+        if (currentPlayer->getIsHuman() && m_gameManager->hasPendingDecisions(currentPlayer->getPlayerId())) {
+            // 有待决事项，优先处理
+            if (currentPlayer->getCurrentResearchTechId() == -1) {
+                CCLOG("Tech tree idle. Opening tech panel...");
+                _hudLayer->openTechTree(); // 打开科技树面板
+                return; // 不进入下一回合
+            }
+            else if (currentPlayer->getCurrentResearchCivicId() == -1) {
+                CCLOG("Culture tree idle. Opening culture panel...");
+                _hudLayer->openCultureTree(); // 打开文化树面板
+                return; // 不进入下一回合
+            }
         }
-        else {
-            _productionPanelLayer->setVisible(false);
-        }
+        // --- 结束新增 ---
+
+        // 没有待决事项，正常结束回合
+        m_gameManager->endTurn();
         });
 
     // 添加资源更新事件监听
