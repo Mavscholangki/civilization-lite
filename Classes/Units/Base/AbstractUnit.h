@@ -37,6 +37,7 @@ enum class UnitState {
  * 2. 处理通用视觉表现（移动动画、血条更新、选中高亮）
  * 3. 定义子类必须实现的接口（攻击力、移动力等配置）
  */
+
 class AbstractUnit : public cocos2d::Node {
 public:
     AbstractUnit();

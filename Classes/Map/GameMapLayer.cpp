@@ -198,23 +198,28 @@ void GameMapLayer::onTouchMoved(Touch* touch, Event* event) {
 }
 
 void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
-    // 如果是拖拽操作结束，不处理点击逻辑
+    // 首先判断是否是拖拽，如果是就不处理单元逻辑
     if (_isDragging) return;
 
-    // 1. 坐标转换 (Touch -> NodeSpace -> Hex)
+    // 1. 将触摸转换 (Touch -> NodeSpace -> Hex)
     Vec2 clickPos = this->convertToNodeSpace(touch->getLocation());
     Hex clickHex = _layout->pixelToHex(clickPos);
 
     CCLOG("Touch Hex: %d, %d", clickHex.q, clickHex.r);
 
-    // ------------------------------------------------------------
-    // 双击检测逻辑
-    // ------------------------------------------------------------
+    // 【修复：添加调试日志】
+    CCLOG("SelectedUnit: %s, moves: %d", 
+          _selectedUnit ? _selectedUnit->getUnitName().c_str() : "NULL",
+          _selectedUnit ? _selectedUnit->getCurrentMoves() : -1);
+
+    // ============================================================
+    // 双击逻辑处理
+    // ============================================================
     auto now = std::chrono::steady_clock::now();
     long long diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastClickTime).count();
 
     bool isDoubleTap = false;
-    // 如果点击的是同一个格子，且间隔小于 300ms
+    // 检查是否同一个六边形，且间隔小于 300ms
     if (clickHex == _lastClickHex && diff < 300) {
         isDoubleTap = true;
     }
@@ -223,14 +228,14 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
     _lastClickTime = now;
     _lastClickHex = clickHex;
 
-    // ------------------------------------------------------------
-    // 分支 A: 双击事件 (执行移动/攻击)
-    // ------------------------------------------------------------
+    // ============================================================
+    // 分支 A: 双击事件（执行移动/攻击）
+    // ============================================================
     if (isDoubleTap) {
-        // 只有当前选中了己方单位才处理
+        // 只有当前选中的我方单位才能执行
         if (_selectedUnit && _selectedUnit->getOwnerId() == 0) {
 
-            // 排除点击自己脚下
+            // 排除攻击自己目标
             if (clickHex != _selectedUnit->getGridPos()) {
 
                 // 1. 检查攻击
@@ -239,52 +244,72 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
                     // handleAttack(enemy);
                     CCLOG("Double Tap -> Attack Enemy!");
 
-                    // 重置双击状态，防止三击
+                    // 重置双击状态以防止再次触发
                     _lastClickHex = Hex(-999, -999);
                     return;
                 }
 
-                // 2. 检查移动
+                // 2. 执行移动 【核心修复】
                 auto costFunc = [this](Hex h) { return this->getTerrainCost(h); };
                 std::vector<Hex> path = PathFinder::findPath(_selectedUnit->getGridPos(), clickHex, costFunc);
 
-                if (!path.empty() && (int)path.size() - 1 <= _selectedUnit->getCurrentMoves()) {
-                    // 执行移动
-                    _selectedUnit->moveTo(clickHex, _layout);
+                if (!path.empty()) {
+                    // 【修复：计算实际需要的移动力消耗】
+                    int pathCost = 0;
+                    for (size_t i = 1; i < path.size(); i++) {
+                        int tileCost = getTerrainCost(path[i]);
+                        if (tileCost < 0) {
+                            // 路径无法通过
+                            pathCost = INT_MAX;
+                            break;
+                        }
+                        pathCost += tileCost;
+                    }
 
-                    // 移动后更新视觉状态
-                    updateSelection(clickHex);
-                    _selectedUnit->hideMoveRange();
+                    // 【修复：检查移动力是否足够】
+                    if (pathCost <= _selectedUnit->getCurrentMoves()) {
+                        // 执行移动
+                        _selectedUnit->moveTo(clickHex, _layout);
 
-                    // 重置双击状态
-                    _lastClickHex = Hex(-999, -999);
+                        // 移动成功更新视觉状态
+                        updateSelection(clickHex);
+                        _selectedUnit->hideMoveRange();
+
+                        // 重置双击状态
+                        _lastClickHex = Hex(-999, -999);
+                        CCLOG("Double Tap Move -> Cost: %d, Remaining: %d", 
+                              pathCost, _selectedUnit->getCurrentMoves());
+                    }
+                    else {
+                        CCLOG("移动力不足！需要：%d，当前：%d", pathCost, _selectedUnit->getCurrentMoves());
+                    }
                 }
                 else {
-                    CCLOG("无法移动：不可达或太远");
+                    CCLOG("无法找到路径到目标");
                 }
             }
         }
-        return; // 双击处理完毕，直接返回
+        return; // 双击事件处理完毕，直接返回
     }
 
-    // ------------------------------------------------------------
-    // 分支 B: 单击事件 (执行选中/切换)
-    // ------------------------------------------------------------
+    // ============================================================
+    // 分支 B: 单击事件（执行选择/切换）
+    // ============================================================
 
-    // 无论点哪里，先更新黄色选中框，提供视觉反馈
+    // 更新浅蓝色背景选中框框提示用户
     updateSelection(clickHex);
 
     AbstractUnit* clickedUnit = getUnitAt(clickHex);
     BaseCity* clickedCity = getCityAt(clickHex);
 
     if (clickedUnit) {
-        // --- 情况1: 点中单位 ---
+        // --- 情况1: 点击单位 ---
         if (_selectedUnit == clickedUnit) {
             _selectedUnit->hideMoveRange();
             _selectedUnit = nullptr;
-            _selectionNode->clear(); // 清除黄框
+            _selectionNode->clear(); // 清除框
             if (_onUnitSelected) _onUnitSelected(nullptr);
-            return; // 结束
+            return; // 退出
         }
 
         if (_selectedUnit != clickedUnit) {
@@ -299,11 +324,11 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
             auto costFunc = [this](Hex h) { return this->getTerrainCost(h); };
             _selectedUnit->showMoveRange(_layout, costFunc);
         }
-        // 点单位时关闭城市面板
+        // 单击单位时关闭城市面板
         if (_onCitySelected) _onCitySelected(nullptr);
     }
     else if (clickedCity) {
-        // --- 情况2: 点中城市 ---
+        // --- 情况2: 点击城市 ---
         if (_selectedUnit) {
             _selectedUnit->hideMoveRange();
             _selectedUnit = nullptr;
@@ -313,8 +338,8 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
         if (_onCitySelected) _onCitySelected(clickedCity);
     }
     else {
-        // --- 情况3: 点中空地 ---
-        // 【关键】点空地不取消单位选中！这样才能允许你再次点击(双击)来移动。
+        // --- 情况3: 点击空地 ---
+        // 空地位置可以通过点击移动，或需要再次点击(双击)来移动。
         // 只关闭城市面板
         if (_onCitySelected) _onCitySelected(nullptr);
     }

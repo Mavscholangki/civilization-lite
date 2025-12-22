@@ -84,7 +84,6 @@ void PolicyPanel::initLayout() {
 
 void PolicyPanel::setPolicyManager(PolicyManager* mgr) {
     _policyManager = mgr;
-    if (_policyManager) _policyManager->updateGovernmentSlots();
     refreshUI();
 }
 
