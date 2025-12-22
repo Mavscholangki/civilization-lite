@@ -189,3 +189,5 @@ void GameScene::onExit() {
     // 注意：现在不需要删除_techTree等，因为它们在Player内部
     Scene::onExit();
 }
+
+TileData GameScene::getTileData(Hex h) { return _mapLayer->getTileData(h); }

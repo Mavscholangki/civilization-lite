@@ -72,7 +72,7 @@ bool TheaterSquare::canErectDistrict(Hex where)
 		tileData.type != TerrainType::COAST &&
 		tileData.type != TerrainType::MOUNTAIN)
 	{
-		if (prereqCivic.empty() || gameScene->getPlayer()->isCivicCompleted(prereqCivic))
+		// if (prereqCivic.empty() || gameScene->getPlayer()->isCivicCompleted(prereqCivic))
 			return true;
 	}
 	return false;

@@ -45,20 +45,20 @@ void Harbor::calculateBonus()
 	adjacencyBonus = { 0, 0, 0, 0, 0 }; // 重置加成产出
 	// 港口的加成产出计算逻辑
 	// 例如：每个相邻的海洋地块增加2点金币产出
-	auto gameScene = static_cast<GameScene*>(Director::getInstance()->getRunningScene());
-	if (!gameScene) return;
-	std::vector<Hex> neighbors = getHexNeighbors(_pos);
-	int districtCount = 0;
-	for (const auto& neighbor : neighbors)
-	{
-		// 相邻的每两个区域+1点金币
-		District* adjacentDistrict = gameScene->getDistrictAtHex(neighbor);
-		if (adjacentDistrict && adjacentDistrict->getType() == District::DistrictType::THEATER_SQUARE)
-		{
-			districtCount++;
-		}
-	}
-	adjacencyBonus.goldYield += (districtCount / 2); // 每两个相邻区域+1金币
+	//auto gameScene = static_cast<GameScene*>(Director::getInstance()->getRunningScene());
+	//if (!gameScene) return;
+	//std::vector<Hex> neighbors = getHexNeighbors(_pos);
+	//int districtCount = 0;
+	//for (const auto& neighbor : neighbors)
+	//{
+	//	// 相邻的每两个区域+1点金币
+	//	District* adjacentDistrict = gameScene->getDistrictAtHex(neighbor);
+	//	if (adjacentDistrict && adjacentDistrict->getType() == District::DistrictType::THEATER_SQUARE)
+	//	{
+	//		districtCount++;
+	//	}
+	//}
+	//adjacencyBonus.goldYield += (districtCount / 2); // 每两个相邻区域+1金币
 }
 
 bool Harbor::canErectDistrict(Hex where)
@@ -69,7 +69,7 @@ bool Harbor::canErectDistrict(Hex where)
 	// 港口只能建在海岸上
 	if (tileData.type == TerrainType::OCEAN)
 	{
-		if (prereqTech.empty() || gameScene->getPlayer()->isTechResearched(prereqTech))
+		// if (prereqTech.empty() || gameScene->getPlayer()->isTechResearched(prereqTech))
 			return true;
 	}
 	return false;

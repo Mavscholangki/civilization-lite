@@ -1,6 +1,9 @@
 #include "CommercialHub.h"
 #include "Scene/GameScene.h"
 USING_NS_CC;
+
+
+int CommercialHub::commercialHubCount = 0;
 CommercialHub::CommercialHub(Hex pos, std::string name)
 	: District(pos, DistrictType(District::DistrictType::COMMERCIAL_HUB), name)
 {
@@ -92,7 +95,7 @@ bool CommercialHub::canErectDistrict(Hex where)
 		tileData.type != TerrainType::COAST &&
 		tileData.type != TerrainType::MOUNTAIN)
 	{
-		if (prereqTech.empty() || gameScene->getPlayer()->isTechResearched(prereqTech))
+		// if (prereqTech.empty() || gameScene->getPlayer()->isTechResearched(prereqTech))
 			return true;
 	}
 	return true;

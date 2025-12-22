@@ -2,7 +2,7 @@
 * 城市基类
 */
 #include "BaseCity.h"
-
+#define RADIUS 50.0f
 USING_NS_CC;
 
 BaseCity* BaseCity::create(int player, Hex pos, std::string name) {
@@ -37,6 +37,7 @@ bool BaseCity::initCity(int player, Hex pos, std::string name) {
 	Downtown* downtownDistrict = new Downtown(pos, name + " Downtown");
 	this->addDistrict(static_cast<District*>(downtownDistrict)); // 添加市中心区
 
+	_visual = Node::create();
     _visual->addChild(downtownDistrict->_downtownVisual);
     this->addChild(_visual);
 
@@ -60,22 +61,22 @@ bool BaseCity::initCity(int player, Hex pos, std::string name) {
 		}
 		});
     
-    this->addChild(_nameLabel);
+    this->addChild(_nameLabel, 100);
 	updateDistribution(); // 更新分配信息
 	updateYield(); // 更新城市总产出
-	drawBoundary(); // 绘制城市边界
+	drawTerritory(); // 绘制城市边界
 	updatePanel();
 
 	Director::getInstance()->getRunningScene()->addChild(productionPanelLayer, 100);
     return true;
 }
 
-void BaseCity::drawBoundary() // 绘制城市边界
+void BaseCity::drawTerritory() // 绘制城市边界
 {
 	auto draw = DrawNode::create();
 	for (auto tile : territory) {
 		// 计算每个格子的像素位置
-		HexLayout layout(40.0f); // 假设六边形大小为40
+		HexLayout layout(RADIUS); // 假设六边形大小为40
 		Vec2 center = layout.hexToPixel(tile) - layout.hexToPixel(this->gridPos); // 相对于城市中心的位置
 		// 画出边界
 		Vec2 vertices[6];
@@ -83,7 +84,7 @@ void BaseCity::drawBoundary() // 绘制城市边界
 			float rad = CC_DEGREES_TO_RADIANS(60 * i - 30);
 			vertices[i] = Vec2(center.x + layout.size * cos(rad), center.y + layout.size * sin(rad)); // 六边形顶点
 		}
-		draw->drawPoly(vertices, 6, false, Color4F::RED); // 红色边界
+		draw->drawSolidPoly(vertices, 6, Color4F(1.f, 0, 0, 0.3)); // 红色，半透明
 	}
 	_boundaryVisual = draw;
     this->addChild(_boundaryVisual, 10);

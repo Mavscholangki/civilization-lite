@@ -158,25 +158,18 @@ Building::Building(BuildingType type)
 	}
 }
 
-// 获取建筑的邻接加成
-Yield Building::getAdjacencyBonus()
-{
-	// 默认没有邻接加成
-	return { 0,0,0,0,0 };
-}
-
 // 检查是否可以建造该建筑
 bool Building::canErectBuilding()
 {
 	// 检查前置科技
-	if (!prereqTech.empty() && !TechSystem::getInstance().isTechResearched(prereqTech))
-	{
-		return false;
-	}
-	// 检查前置市政
-	if (!prereqCivic.empty() && !CultureSystem::getInstance().isCivicUnlocked(prereqCivic))
-	{
-		return false;
-	}
+	//if (!prereqTech.empty() && !TechSystem::getInstance().isTechResearched(prereqTech))
+	//{
+	//	return false;
+	//}
+	//// 检查前置市政
+	//if (!prereqCivic.empty() && !CultureSystem::getInstance().isCivicUnlocked(prereqCivic))
+	//{
+	//	return false;
+	//}
 	return true;
 }

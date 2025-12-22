@@ -71,7 +71,7 @@ bool IndustryZone::canErectDistrict(Hex where)
 		tileData.type != TerrainType::COAST &&
 		tileData.type != TerrainType::MOUNTAIN)
 	{
-		if (prereqTech.empty() || gameScene->getPlayer()->isTechResearched(prereqTech))
+		// if (prereqTech.empty() || gameScene->getPlayer()->isTechResearched(prereqTech))
 			return true;
 	}
 	return false;

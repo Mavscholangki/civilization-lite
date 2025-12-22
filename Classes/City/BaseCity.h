@@ -24,7 +24,7 @@ public:
 		}
 	}
 	bool initCity(int player, Hex pos, std::string name);
-	void drawBoundary(); // 绘制城市边界
+	void drawTerritory(); // 绘制城市边界
 	void updateYield(); // 更新城市总产出
 	void deduceHealth(int damage); // 扣除健康度
     void updateDistribution(); // 更新分配信息
