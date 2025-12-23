@@ -244,7 +244,7 @@ void CivilizationSelectionScene::createPlayerCivilizationPanel() {
 
     // 领袖画像占位矩形（全身照比例，大约2:3）
     float portraitWidth = portraitArea->getContentSize().width * 0.9f;
-    float portraitHeight = portraitWidth * 1.5f;  // 2:3比例
+    float portraitHeight = portraitWidth * 1.075f;  // 2:3比例
 
     _portraitFrame = LayerColor::create(Color4B(60, 60, 80, 255), portraitWidth, portraitHeight);
     _portraitFrame->setPosition((portraitArea->getContentSize().width - portraitWidth) * 0.5f,
@@ -480,14 +480,14 @@ void CivilizationSelectionScene::updateSelection(CivilizationType selectedCiv) {
                     break;
             }
 
-            //// 创建并显示领袖图片
-            // auto leaderSprite = Sprite::create(portraitPath);
-            // if (leaderSprite) {
-            //     leaderSprite->setPosition(_portraitFrame->getContentSize().width * 0.5f, 
-            //                              _portraitFrame->getContentSize().height * 0.5f);
-            //     leaderSprite->setScale(0.9f); // 适当缩放
-            //     _portraitFrame->addChild(leaderSprite);
-            // }
+            // 创建并显示领袖图片
+             auto leaderSprite = Sprite::create(portraitPath);
+             if (leaderSprite) {
+                 leaderSprite->setPosition(_portraitFrame->getContentSize().width * 0.5f, 
+                                          _portraitFrame->getContentSize().height * 0.5f);
+                 leaderSprite->setScale(0.9f); // 适当缩放
+                 _portraitFrame->addChild(leaderSprite);
+             }
 
             break;
         }
