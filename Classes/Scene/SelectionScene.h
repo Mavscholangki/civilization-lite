@@ -77,6 +77,8 @@ private:
     void updateSelection(CivilizationType selectedCiv);
     void updateAISettingsDisplay();
     void updateAICountLabel();
+    std::string generateNaturalDescription(const CivilizationInfo& civ);
+    void updatePortraitColor(const cocos2d::Color3B& civColor);
 
     // 获取可用的AI文明（排除玩家选择的）
     std::vector<CivilizationType> getAvailableAICivilizations();
@@ -101,6 +103,13 @@ private:
     // AI玩家设置
     std::vector<AIPlayerSetting> _aiSettings;
     int _aiPlayerCount;
+
+    std::vector<cocos2d::ui::Button*> _civButtons;  // 存储文明按钮
+
+    cocos2d::Label* _leaderLabel;        // 领袖名称
+    cocos2d::Label* _descriptionLabel;   // 自然语言描述
+
+    cocos2d::LayerColor* _portraitFrame; // 领袖画像边框
 
     // 静态变量存储选择
     static CivilizationType s_selectedCivilization;
