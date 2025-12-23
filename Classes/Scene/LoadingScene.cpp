@@ -184,7 +184,7 @@ void LoadingScene::onLoadingUpdate(float dt) {
             break;
 
         case LoadingState::LOADING_TEXTURES:
-            _loadingLabel->setString("Loading game assets...");
+            _loadingLabel->setString("Loading basic assets...");
 
             // 计算真实进度
             if (_totalResources > 0) {
@@ -217,7 +217,7 @@ void LoadingScene::onLoadingUpdate(float dt) {
             break;
 
         case LoadingState::PRE_CREATING_SCENE:
-            _loadingLabel->setString("Initializing game world...");
+            _loadingLabel->setString("Initializing game instances...");
 
             // 计算进度
             if (_elapsedTime < 0.5f) {
@@ -233,7 +233,7 @@ void LoadingScene::onLoadingUpdate(float dt) {
             break;
 
         case LoadingState::FINALIZING:
-            _loadingLabel->setString("Finalizing game state...");
+            _loadingLabel->setString("Shifting the layer...");
 
             // 模拟最终阶段
             if (_elapsedTime < 0.5f) {
@@ -246,7 +246,7 @@ void LoadingScene::onLoadingUpdate(float dt) {
             break;
 
         case LoadingState::COMPLETE:
-            _loadingLabel->setString("Loading complete! Starting game...");
+            _loadingLabel->setString("Updating global state...");
             realProgress = 100.0f;
 
             // 确保最小显示时间
@@ -336,9 +336,10 @@ void LoadingScene::goToNextScene() {
     }
 
     if (targetScene) {
-        // 使用淡入淡出效果切换场景
-        auto transition = TransitionFade::create(0.8f, targetScene, Color3B::BLACK);
-        Director::getInstance()->replaceScene(transition);
+        // 直接切换到GameScene
+    // GameScene会自己显示覆盖层并完成初始化
+        auto gameScene = GameScene::createScene();
+        Director::getInstance()->replaceScene(gameScene);
     }
     else {
         CCLOGERROR("Failed to create target scene!");
