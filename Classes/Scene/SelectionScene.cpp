@@ -467,6 +467,28 @@ void CivilizationSelectionScene::updateSelection(CivilizationType selectedCiv) {
             // 更新领袖画像占位符颜色（根据不同文明）
             updatePortraitColor(civ.color);
 
+            std::string portraitPath;
+            switch (civ.type) {
+                case CivilizationType::CHINA:
+                    portraitPath = "Images/Leaders/civChina.png";
+                    break;
+                case CivilizationType::GERMANY:
+                    portraitPath = "Images/Leaders/civGerman.png";
+                    break;
+                case CivilizationType::RUSSIA:
+                    portraitPath = "Images/Leaders/civRussia.png";
+                    break;
+            }
+
+            //// 创建并显示领袖图片
+            // auto leaderSprite = Sprite::create(portraitPath);
+            // if (leaderSprite) {
+            //     leaderSprite->setPosition(_portraitFrame->getContentSize().width * 0.5f, 
+            //                              _portraitFrame->getContentSize().height * 0.5f);
+            //     leaderSprite->setScale(0.9f); // 适当缩放
+            //     _portraitFrame->addChild(leaderSprite);
+            // }
+
             break;
         }
     }
