@@ -1,5 +1,9 @@
 #include "PolicyPanel.h"
 
+// =========================================================
+// 初始化与基础设置
+// =========================================================
+
 bool PolicyPanel::init() {
     if (!Layer::init()) return false;
 
@@ -21,7 +25,7 @@ bool PolicyPanel::init() {
     btnClose->setTitleFontSize(24);
     btnClose->setPosition(Vec2(vs.width - 60, vs.height - 40));
     btnClose->addClickEventListener([this](Ref*) {
-        // 使用 removeFromParent 彻底关闭
+        // 发送关闭事件
         cocos2d::EventCustom event("policy_panel_closed");
         _eventDispatcher->dispatchEvent(&event);
         });
@@ -48,29 +52,14 @@ void PolicyPanel::initLayout() {
     _govLabel = Label::createWithSystemFont(u8"当前政体", "Arial", 28);
     _govLabel->setPosition(midX / 2, vs.height - 50);
     _govLabel->setColor(Color3B(255, 220, 100));
-    _leftPanel->addChild(_govLabel); // 只保留这就行了
+    _leftPanel->addChild(_govLabel);
 
     // 创建专门放槽位的容器
     _leftSlotsContainer = Node::create();
     _leftSlotsContainer->setPosition(0, 0);
     _leftPanel->addChild(_leftSlotsContainer);
 
-    // --- 右侧面板 ---
-    _rightPanel = Node::create();
-    _rightPanel->setPosition(midX, 0);
-    this->addChild(_rightPanel);
-
-    // 右侧标题
-    auto listLabel = Label::createWithSystemFont(u8"可选政策库 (拖拽装备)", "Arial", 24);
-    listLabel->setPosition((vs.width - midX) / 2, vs.height - 50);
-    _rightPanel->addChild(listLabel);
-
-    // ▼▼▼▼▼▼ 删除下面这两行重复的代码 ▼▼▼▼▼▼
-    // _govLabel->setColor(Color3B(255, 220, 100)); 
-    // _leftPanel->addChild(_govLabel); 
-    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
-    // 新增：更换政体按钮
+    // 更换政体按钮
     auto btnChange = Button::create();
     btnChange->setTitleText(u8"【更换政体】");
     btnChange->setTitleFontSize(20);
@@ -80,6 +69,16 @@ void PolicyPanel::initLayout() {
         this->onChangeGovClicked();
         });
     _leftPanel->addChild(btnChange);
+
+    // --- 右侧面板 ---
+    _rightPanel = Node::create();
+    _rightPanel->setPosition(midX, 0);
+    this->addChild(_rightPanel);
+
+    // 右侧标题
+    auto listLabel = Label::createWithSystemFont(u8"可选政策库 (拖拽装备/点击详情)", "Arial", 24);
+    listLabel->setPosition((vs.width - midX) / 2, vs.height - 50);
+    _rightPanel->addChild(listLabel);
 }
 
 void PolicyPanel::setPolicyManager(PolicyManager* mgr) {
@@ -94,7 +93,7 @@ void PolicyPanel::setCultureTree(CultureTree* tree) {
 void PolicyPanel::refreshUI() {
     if (!_policyManager) return;
 
-    // 更新政体名称 (不再崩溃，因为 _govLabel 没有被删除)
+    // 更新政体名称
     const auto& govConfig = _policyManager->getCurrentGovConfig();
     if (_govLabel) {
         _govLabel->setString(govConfig.name);
@@ -105,34 +104,160 @@ void PolicyPanel::refreshUI() {
 }
 
 // =========================================================
-// 左侧：槽位生成
+// 核心：通用卡牌外观绘制
+// =========================================================
+Node* PolicyPanel::createCardVisual(const PolicyCard& card, bool isGhost) {
+    auto node = Node::create();
+    node->setContentSize(Size(CARD_W, CARD_H));
+    node->setAnchorPoint(Vec2::ANCHOR_MIDDLE);
+
+    // 1. 背景底板
+    auto bg = DrawNode::create();
+    Color4F colorF;
+    Color3B c3b = getTypeColor(card.type);
+    colorF = Color4F(c3b.r / 255.f, c3b.g / 255.f, c3b.b / 255.f, isGhost ? 0.6f : 1.0f);
+
+    // 绘制实心矩形
+    bg->drawSolidRect(Vec2::ZERO, Vec2(CARD_W, CARD_H), colorF);
+    // 绘制边框
+    bg->drawRect(Vec2::ZERO, Vec2(CARD_W, CARD_H), Color4F(1, 1, 1, 0.5f));
+    node->addChild(bg);
+
+    // 2. 顶部类型条 (装饰)
+    auto topBar = DrawNode::create();
+    topBar->drawSolidRect(Vec2(5, CARD_H - 35), Vec2(CARD_W - 5, CARD_H - 5), Color4F(0, 0, 0, 0.2f));
+    node->addChild(topBar);
+
+    // 3. 类型图标/文字
+    std::string typeIcon = getTypeName(card.type);
+    auto typeLabel = Label::createWithSystemFont(typeIcon, "Arial", 16);
+    typeLabel->setPosition(CARD_W / 2, CARD_H - 20);
+    typeLabel->setColor(Color3B(255, 255, 255));
+    node->addChild(typeLabel);
+
+    // 4. 卡牌名称 (居中，自动换行)
+    auto nameLabel = Label::createWithSystemFont(card.name, "Arial", 22);
+    nameLabel->setPosition(CARD_W / 2, CARD_H * 0.5f); // 稍微居中一点
+    nameLabel->setDimensions(CARD_W - 20, 0); // 限制宽度支持换行
+    nameLabel->setHorizontalAlignment(TextHAlignment::CENTER);
+    nameLabel->setColor(Color3B::WHITE);
+    // 加阴影
+    nameLabel->enableShadow(Color4B::BLACK, Size(2, -2), 1);
+    node->addChild(nameLabel);
+
+    // 【已删除】：底部提示文字 "点按详情\n拖拽装备"
+
+    return node;
+}
+
+// =========================================================
+// 右侧列表：创建可拖拽卡牌
+// =========================================================
+Node* PolicyPanel::createDraggableCard(const PolicyCard& card) {
+    // 1. 创建外观
+    Node* cardNode = createCardVisual(card, false);
+    cardNode->setUserData((void*)(intptr_t)card.id);
+
+    // 2. 添加复杂的触摸监听 (区分点击和拖拽)
+    auto listener = EventListenerTouchOneByOne::create();
+    listener->setSwallowTouches(false); // 允许 ScrollView 滚动
+
+    struct TouchState {
+        Vec2 startPos;
+        bool isDragging;
+        bool validStart;
+    };
+    auto state = std::make_shared<TouchState>();
+
+    listener->onTouchBegan = [this, cardNode, card, state](Touch* touch, Event* event) -> bool {
+        Vec2 p = cardNode->getParent()->convertToNodeSpace(touch->getLocation());
+        Rect bbox = cardNode->getBoundingBox();
+
+        if (bbox.containsPoint(p)) {
+            state->startPos = touch->getLocation(); // 记录世界坐标
+            state->isDragging = false;
+            state->validStart = true;
+            return true; // 吞噬这次触摸，开始追踪
+        }
+        return false;
+        };
+
+    listener->onTouchMoved = [this, card, state](Touch* touch, Event* event) {
+        if (!state->validStart) return;
+
+        Vec2 currentPos = touch->getLocation();
+        float dist = currentPos.distance(state->startPos);
+
+        // 如果移动超过 10 像素，判定为拖拽
+        if (dist > 10.0f && !state->isDragging) {
+            state->isDragging = true;
+            this->onCardDragBegan(card.id, card.type, currentPos);
+        }
+
+        if (state->isDragging) {
+            this->onCardDragMoved(currentPos);
+        }
+        };
+
+    listener->onTouchEnded = [this, card, state](Touch* touch, Event* event) {
+        if (!state->validStart) return;
+
+        if (state->isDragging) {
+            // 拖拽结束
+            this->onCardDragEnded(touch->getLocation());
+        }
+        else {
+            // 点击
+            this->onCardClicked(card.id, card);
+        }
+
+        state->validStart = false;
+        state->isDragging = false;
+        };
+
+    // 必须设置 true 才能拦截后续 Move/End，但为了 ScrollView，通常需要处理
+    // 这里设为 true 并自己在 onTouchMoved 判断是否传递可能比较复杂
+    // 简单的做法是设为 true，自己处理。
+    listener->setSwallowTouches(true);
+
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, cardNode);
+
+    return cardNode;
+}
+
+// =========================================================
+// 左侧：槽位与布局
 // =========================================================
 void PolicyPanel::createLeftSlots() {
-    // 【关键修复】只清理容器内的槽位，保留标题和背景
-    if (_leftSlotsContainer) {
-        _leftSlotsContainer->removeAllChildren();
-    }
+    if (_leftSlotsContainer) _leftSlotsContainer->removeAllChildren();
     _slotTargets.clear();
 
     const auto& govConfig = _policyManager->getCurrentGovConfig();
     auto equipped = _policyManager->getEquippedPolicies();
 
     auto vs = Director::getInstance()->getVisibleSize();
-    float midX = vs.width * 0.4f;
-    float startY = vs.height - 120;
-    float gapY = 80.0f;
-    float centerX = midX / 2;
 
-    auto buildSection = [&](PolicyType type, int count, const std::string& typeName) {
+    float startY = vs.height - 120; // 初始高度
+    float categoryGap = 30.0f;     // 类别之间的垂直间距
+    float cardGapX = 15.0f;        // 槽位之间的水平间距
+
+    // 辅助函数：构建一行槽位
+    auto buildRow = [&](PolicyType type, int count, const std::string& title) {
         if (count <= 0) return;
 
-        // 类型小标题
-        auto label = Label::createWithSystemFont(typeName, "Arial", 20);
-        label->setPosition(centerX, startY);
+        // 1. 标题
+        auto label = Label::createWithSystemFont(title, "Arial", 20);
+        label->setAnchorPoint(Vec2::ANCHOR_MIDDLE_LEFT);
+        label->setPosition(30, startY);
         label->setColor(getTypeColor(type));
         _leftSlotsContainer->addChild(label);
-        startY -= 40;
 
+        startY -= 30; // 标题高度占位
+
+        // 2. 计算起始 X
+        float currentX = 50.0f + CARD_W / 2;
+
+        // 3. 生成槽位
         for (int i = 0; i < count; ++i) {
             int equippedId = -1;
             for (const auto& eq : equipped) {
@@ -142,15 +267,14 @@ void PolicyPanel::createLeftSlots() {
                 }
             }
 
-            auto slotNode = createSlotUI(type, i, equippedId);
-            slotNode->setPosition(centerX, startY);
+            Node* slotNode = createSlotUI(type, i, equippedId);
+            slotNode->setPosition(currentX, startY - CARD_H / 2);
             _leftSlotsContainer->addChild(slotNode);
 
-            // 计算碰撞包围盒 (基于世界坐标)
-            // 注意：因为是在刚创建时计算，位置可能需要加上父节点的偏移
+            // 记录碰撞信息
             Vec2 worldPos = _leftSlotsContainer->convertToWorldSpace(slotNode->getPosition());
-            Size size = Size(220, 60);
-            Rect bbox(worldPos.x - size.width / 2, worldPos.y - size.height / 2, size.width, size.height);
+            // 碰撞盒稍微收缩一点，使得必须拖到中心才算
+            Rect bbox(worldPos.x - CARD_W / 2, worldPos.y - CARD_H / 2, CARD_W, CARD_H);
 
             SlotTarget target;
             target.type = type;
@@ -159,74 +283,77 @@ void PolicyPanel::createLeftSlots() {
             target.isOccupied = (equippedId != -1);
             _slotTargets.push_back(target);
 
-            startY -= gapY;
+            // 移动 X 坐标
+            currentX += (CARD_W + cardGapX);
         }
-        startY -= 20;
+
+        // 移动 Y 坐标到下一行
+        startY -= (CARD_H + categoryGap);
         };
 
-    buildSection(PolicyType::MILITARY, govConfig.militarySlots, u8"军事槽位");
-    buildSection(PolicyType::ECONOMIC, govConfig.economicSlots, u8"经济槽位");
-    buildSection(PolicyType::WILDCARD, govConfig.wildcardSlots, u8"通用槽位");
+    buildRow(PolicyType::MILITARY, govConfig.militarySlots, u8"军事政策");
+    buildRow(PolicyType::ECONOMIC, govConfig.economicSlots, u8"经济政策");
+    buildRow(PolicyType::WILDCARD, govConfig.wildcardSlots, u8"通用政策");
 }
-
-// PolicyPanel.cpp
 
 Node* PolicyPanel::createSlotUI(PolicyType type, int index, int equippedCardId) {
     auto container = Node::create();
 
-    // 背景框 (空槽显示深色)
-    auto bg = Layout::create();
-    bg->setAnchorPoint(Vec2::ANCHOR_MIDDLE);
-    bg->setContentSize(Size(220, 60));
-    bg->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-    bg->setBackGroundColor(Color3B(40, 40, 45)); // 默认底色
+    // 1. 空槽位背景
+    auto bg = DrawNode::create();
+    bg->drawSolidRect(Vec2(-CARD_W / 2, -CARD_H / 2), Vec2(CARD_W / 2, CARD_H / 2), Color4F(0.15f, 0.15f, 0.18f, 0.8f));
+    bg->drawRect(Vec2(-CARD_W / 2, -CARD_H / 2), Vec2(CARD_W / 2, CARD_H / 2), Color4F(0.5f, 0.5f, 0.5f, 0.3f));
     container->addChild(bg);
 
-    // 文字 "空闲"
-    auto label = Label::createWithSystemFont(u8"空闲", "Arial", 18);
-    label->setPosition(0, 0);
+    auto label = Label::createWithSystemFont(u8"空槽位", "Arial", 18);
+    label->setColor(Color3B::GRAY);
     container->addChild(label);
 
-    // 如果已装备，覆盖一张“卡牌”在上面，并支持拖拽
+    // 2. 如果已装备，覆盖卡牌
     if (equippedCardId != -1) {
-        label->setVisible(false); // 隐藏"空闲"文字
+        label->setVisible(false);
 
-        auto card = _policyManager->getPolicyCard(equippedCardId);
-        if (card) {
-            // 创建一个和右侧一样的卡牌外观
-            auto cardNode = Layout::create();
-            cardNode->setAnchorPoint(Vec2::ANCHOR_MIDDLE);
-            cardNode->setContentSize(Size(220, 60)); // 和槽位一样大
-            cardNode->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-            cardNode->setBackGroundColor(getTypeColor(card->type));
-            cardNode->setPosition({ 0, 0 }); // 居中覆盖
+        auto cardPtr = _policyManager->getPolicyCard(equippedCardId);
+        if (cardPtr) {
+            Node* cardNode = createCardVisual(*cardPtr, false);
+            cardNode->setPosition(0, 0);
             container->addChild(cardNode);
 
-            auto nameLabel = Label::createWithSystemFont(card->name, "Arial", 18);
-            nameLabel->setPosition(110, 30); // 相对 Layout 居中
-            cardNode->addChild(nameLabel);
-
-            // --- 添加拖拽监听 (实现拖拽卸下) ---
+            // --- 卸载拖拽 ---
             auto listener = EventListenerTouchOneByOne::create();
             listener->setSwallowTouches(true);
 
-            listener->onTouchBegan = [this, cardNode, equippedCardId, type](Touch* touch, Event* event) {
-                Vec2 p = cardNode->getParent()->convertToNodeSpace(touch->getLocation());
-                if (cardNode->getBoundingBox().containsPoint(p)) {
-                    // 开始拖拽：传入 cardId 和 type
-                    this->onCardDragBegan(cardNode, equippedCardId, type, touch);
+            struct DragState { bool dragging = false; Vec2 startP; };
+            auto st = std::make_shared<DragState>();
+
+            listener->onTouchBegan = [this, cardNode, equippedCardId, type, st](Touch* t, Event*) {
+                Vec2 p = cardNode->getParent()->convertToNodeSpace(t->getLocation());
+                Rect bbox = Rect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H);
+                if (bbox.containsPoint(p)) {
+                    st->startP = t->getLocation();
+                    st->dragging = false;
                     return true;
                 }
                 return false;
                 };
 
-            listener->onTouchMoved = [this](Touch* touch, Event* event) {
-                this->onCardDragMoved(touch);
+            listener->onTouchMoved = [this, equippedCardId, type, st](Touch* t, Event*) {
+                if (t->getLocation().distance(st->startP) > 10 && !st->dragging) {
+                    st->dragging = true;
+                    this->onCardDragBegan(equippedCardId, type, t->getLocation());
+                }
+                if (st->dragging) {
+                    this->onCardDragMoved(t->getLocation());
+                }
                 };
 
-            listener->onTouchEnded = [this](Touch* touch, Event* event) {
-                // 这是一个特殊的 End 处理，用于卸下
-                this->onEquippedCardDragEnded(touch);
+            listener->onTouchEnded = [this, cardPtr, st](Touch* t, Event*) {
+                if (st->dragging) {
+                    this->onEquippedCardDragEnded(t);
+                }
+                else {
+                    this->onCardClicked(cardPtr->id, *cardPtr);
+                }
                 };
 
             _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, cardNode);
@@ -235,178 +362,55 @@ Node* PolicyPanel::createSlotUI(PolicyType type, int index, int equippedCardId) 
 
     return container;
 }
-// =========================================================
-// 右侧：统一卡牌列表 (不分栏)
-// =========================================================
-void PolicyPanel::createRightList() {
-    // 移除右侧除了标题和背景之外的内容
-    // 简单起见，我们移除所有名为 "cards_scroll" 的子节点，或者直接重建
-    // 这里我们简单重建 ScrollView
-    _rightPanel->removeChildByName("cards_scroll");
-
-    auto vs = Director::getInstance()->getVisibleSize();
-    float midX = vs.width * 0.4f;
-    float panelW = vs.width - midX;
-    float panelH = vs.height;
-
-    // 创建一个大的 ScrollView
-    auto scrollView = ScrollView::create();
-    scrollView->setContentSize(Size(panelW - 20, panelH - 100));
-    scrollView->setAnchorPoint(Vec2(0, 0));
-    scrollView->setPosition(Vec2(10, 20));
-    scrollView->setDirection(ScrollView::Direction::VERTICAL);
-    scrollView->setScrollBarEnabled(true);
-    scrollView->setName("cards_scroll");
-    _rightPanel->addChild(scrollView);
-
-    // 收集所有未装备的解锁卡牌
-    std::vector<PolicyCard> allCards;
-
-    // 按顺序添加：军事 -> 经济 -> 通用
-    auto militaryCards = _policyManager->getUnlockedCards(PolicyType::MILITARY);
-    auto economicCards = _policyManager->getUnlockedCards(PolicyType::ECONOMIC);
-    auto wildcardCards = _policyManager->getUnlockedCards(PolicyType::WILDCARD);
-
-    for (const auto& c : militaryCards) if (!c.isActive) allCards.push_back(c);
-    for (const auto& c : economicCards) if (!c.isActive) allCards.push_back(c);
-    for (const auto& c : wildcardCards) if (!c.isActive) allCards.push_back(c);
-
-    if (allCards.empty()) {
-        auto emptyLabel = Label::createWithSystemFont(u8"暂无更多可选政策", "Arial", 22);
-        emptyLabel->setPosition(panelW / 2, panelH / 2);
-        emptyLabel->setColor(Color3B::GRAY);
-        scrollView->addChild(emptyLabel);
-        return;
-    }
-
-    // 网格布局参数
-    int colCount = 3; // 一行3个
-    float paddingX = 10;
-    float paddingY = 15;
-    float startX = paddingX + CARD_W / 2;
-
-    // 计算总高度
-    int rowCount = (allCards.size() + colCount - 1) / colCount;
-    float totalHeight = rowCount * (CARD_H + paddingY) + paddingY;
-    float viewHeight = scrollView->getContentSize().height;
-
-    scrollView->setInnerContainerSize(Size(scrollView->getContentSize().width, std::max(viewHeight, totalHeight)));
-
-    // 开始填充
-    float currentY = std::max(viewHeight, totalHeight) - paddingY - CARD_H / 2;
-
-    for (int i = 0; i < allCards.size(); ++i) {
-        auto cardNode = createDraggableCard(allCards[i]);
-
-        int col = i % colCount;
-        int row = i / colCount;
-
-        float x = startX + col * (CARD_W + paddingX);
-        float y = std::max(viewHeight, totalHeight) - paddingY - CARD_H / 2 - row * (CARD_H + paddingY);
-
-        cardNode->setPosition(x, y);
-        scrollView->addChild(cardNode);
-    }
-}
-
-Node* PolicyPanel::createDraggableCard(const PolicyCard& card) {
-    auto node = Layout::create();
-    node->setAnchorPoint(Vec2::ANCHOR_MIDDLE);
-    node->setContentSize(Size(CARD_W, CARD_H));
-    node->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-    node->setBackGroundColor(getTypeColor(card.type)); // 颜色区分类型
-
-    // 卡名
-    auto label = Label::createWithSystemFont(card.name, "Arial", 16);
-    label->setPosition(CARD_W / 2, CARD_H / 2);
-    node->addChild(label);
-
-    // 拖拽监听
-    auto listener = EventListenerTouchOneByOne::create();
-    listener->setSwallowTouches(true);
-
-    listener->onTouchBegan = [this, node, card](Touch* touch, Event* event) {
-        Vec2 p = node->getParent()->convertToNodeSpace(touch->getLocation());
-        if (node->getBoundingBox().containsPoint(p)) {
-            this->onCardDragBegan(node, card.id, card.type, touch);
-            return true;
-        }
-        return false;
-        };
-
-    listener->onTouchMoved = [this](Touch* touch, Event* event) {
-        this->onCardDragMoved(touch);
-        };
-
-    listener->onTouchEnded = [this](Touch* touch, Event* event) {
-        this->onCardDragEnded(touch);
-        };
-
-    _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, node);
-
-    return node;
-}
 
 // =========================================================
-// 拖拽逻辑 (保持不变)
+// 拖拽逻辑实现
 // =========================================================
 
-void PolicyPanel::onCardDragBegan(Node* cardNode, int cardId, PolicyType type, Touch* touch) {
+void PolicyPanel::onCardDragBegan(int cardId, PolicyType type, Vec2 touchPos) {
+    if (_isDragActive) return;
+
+    _isDragActive = true;
     _draggedCardId = cardId;
     _draggedCardType = type;
 
+    auto cardPtr = _policyManager->getPolicyCard(cardId);
+    if (!cardPtr) return;
+
     // 创建替身
-    _draggedNode = Layout::create();
-    static_cast<Layout*>(_draggedNode)->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-    static_cast<Layout*>(_draggedNode)->setBackGroundColor(getTypeColor(type));
-    static_cast<Layout*>(_draggedNode)->setOpacity(200);
-    _draggedNode->setContentSize(Size(CARD_W, CARD_H));
-    _draggedNode->setAnchorPoint(Vec2::ANCHOR_MIDDLE);
-
-    // 复制文字
-    if (auto layout = dynamic_cast<Layout*>(cardNode)) {
-        if (!layout->getChildren().empty()) {
-            if (auto lbl = dynamic_cast<Label*>(layout->getChildren().at(0))) {
-                auto newLbl = Label::createWithSystemFont(lbl->getString(), "Arial", 16);
-                newLbl->setPosition(CARD_W / 2, CARD_H / 2);
-                _draggedNode->addChild(newLbl);
-            }
-        }
-    }
-
-    Vec2 nodePos = this->convertToNodeSpace(touch->getLocation());
-    _draggedNode->setPosition(nodePos);
-    _draggedNode->setLocalZOrder(999);
-    this->addChild(_draggedNode);
+    _draggedNode = createCardVisual(*cardPtr, true);
+    _draggedNode->setOpacity(200);
+    _draggedNode->setScale(1.1f);
+    _draggedNode->setPosition(this->convertToNodeSpace(touchPos));
+    this->addChild(_draggedNode, 999);
 }
 
-void PolicyPanel::onCardDragMoved(Touch* touch) {
+void PolicyPanel::onCardDragMoved(Vec2 touchPos) {
     if (_draggedNode) {
-        Vec2 nodePos = this->convertToNodeSpace(touch->getLocation());
-        _draggedNode->setPosition(nodePos);
+        _draggedNode->setPosition(this->convertToNodeSpace(touchPos));
     }
 }
 
-void PolicyPanel::onCardDragEnded(Touch* touch) {
-    if (!_draggedNode) return;
+void PolicyPanel::onCardDragEnded(Vec2 touchPos) {
+    if (!_draggedNode) {
+        _isDragActive = false;
+        return;
+    }
 
-    bool equipped = false;
-    Vec2 touchLocation = touch->getLocation();
+    bool success = false;
 
+    // 检查落在哪个槽位
     for (const auto& slot : _slotTargets) {
-        if (slot.worldBoundingBox.containsPoint(touchLocation)) {
-            // 类型检查
+        if (slot.worldBoundingBox.containsPoint(touchPos)) {
             bool isCompatible = false;
             if (slot.type == PolicyType::WILDCARD) isCompatible = true;
             else if (slot.type == _draggedCardType) isCompatible = true;
 
             if (isCompatible) {
                 if (_policyManager->equipPolicy(_draggedCardId, slot.type, slot.index)) {
-                    equipped = true;
+                    success = true;
+                    CCLOG("Equipped card %d to slot %d", _draggedCardId, slot.index);
                 }
-            }
-            else {
-                CCLOG("Type mismatch!");
             }
             break;
         }
@@ -415,11 +419,109 @@ void PolicyPanel::onCardDragEnded(Touch* touch) {
     _draggedNode->removeFromParent();
     _draggedNode = nullptr;
     _draggedCardId = -1;
+    _isDragActive = false;
 
-    if (equipped) {
+    if (success) {
         refreshUI();
     }
 }
+
+void PolicyPanel::onEquippedCardDragEnded(Touch* touch) {
+    if (!_draggedNode) {
+        _isDragActive = false;
+        return;
+    }
+
+    Vec2 pos = touch->getLocation();
+    auto vs = Director::getInstance()->getVisibleSize();
+    float leftPanelWidth = vs.width * 0.4f;
+
+    bool hitSlot = false;
+    for (const auto& slot : _slotTargets) {
+        if (slot.worldBoundingBox.containsPoint(pos)) {
+            hitSlot = true;
+            // 支持重新装备（即交换或放回原位）
+            if (_policyManager->equipPolicy(_draggedCardId, slot.type, slot.index)) {
+                refreshUI();
+            }
+            break;
+        }
+    }
+
+    // 拖到右侧或空白处卸载
+    if (!hitSlot) {
+        if (pos.x > leftPanelWidth) {
+            _policyManager->unequipPolicy(_draggedCardId);
+            refreshUI();
+        }
+    }
+
+    _draggedNode->removeFromParent();
+    _draggedNode = nullptr;
+    _draggedCardId = -1;
+    _isDragActive = false;
+}
+
+// =========================================================
+// 右侧卡牌列表
+// =========================================================
+
+void PolicyPanel::createRightList() {
+    _rightPanel->removeChildByName("cards_scroll");
+
+    auto vs = Director::getInstance()->getVisibleSize();
+    float midX = vs.width * 0.4f;
+    float panelW = vs.width - midX;
+    float panelH = vs.height;
+
+    auto scrollView = ScrollView::create();
+    scrollView->setContentSize(Size(panelW - 20, panelH - 80));
+    scrollView->setAnchorPoint(Vec2(0, 0));
+    scrollView->setPosition(Vec2(10, 20));
+    scrollView->setDirection(ScrollView::Direction::VERTICAL);
+    scrollView->setName("cards_scroll");
+    _rightPanel->addChild(scrollView);
+
+    std::vector<PolicyCard> allCards;
+    auto militaryCards = _policyManager->getUnlockedCards(PolicyType::MILITARY);
+    auto economicCards = _policyManager->getUnlockedCards(PolicyType::ECONOMIC);
+    auto wildcardCards = _policyManager->getUnlockedCards(PolicyType::WILDCARD);
+
+    for (const auto& c : militaryCards) if (!c.isActive) allCards.push_back(c);
+    for (const auto& c : economicCards) if (!c.isActive) allCards.push_back(c);
+    for (const auto& c : wildcardCards) if (!c.isActive) allCards.push_back(c);
+
+    // 网格计算
+    int colCount = floor((panelW - 20) / (CARD_W + 10));
+    if (colCount < 1) colCount = 1;
+
+    float paddingX = 15;
+    float paddingY = 20;
+
+    int totalCount = allCards.size();
+    int rowCount = (totalCount + colCount - 1) / colCount;
+
+    float totalH = rowCount * (CARD_H + paddingY) + paddingY;
+    float viewH = scrollView->getContentSize().height;
+
+    scrollView->setInnerContainerSize(Size(scrollView->getContentSize().width, std::max(viewH, totalH)));
+
+    float startX = paddingX + CARD_W / 2;
+    float startY = std::max(viewH, totalH) - paddingY - CARD_H / 2;
+
+    for (int i = 0; i < totalCount; ++i) {
+        int r = i / colCount;
+        int c = i % colCount;
+
+        auto cardNode = createDraggableCard(allCards[i]);
+        cardNode->setPosition(startX + c * (CARD_W + paddingX), startY - r * (CARD_H + paddingY));
+        scrollView->addChild(cardNode);
+    }
+}
+
+// =========================================================
+// 辅助函数与政体界面
+// =========================================================
 
 Color3B PolicyPanel::getTypeColor(PolicyType type) {
     switch (type) {
@@ -439,56 +541,85 @@ std::string PolicyPanel::getTypeName(PolicyType type) {
     return "";
 }
 
-// PolicyPanel.cpp
+// 简介面板相关
+void PolicyPanel::createDescriptionPanel() {
+    _descriptionPanel = Node::create();
 
-void PolicyPanel::onEquippedCardDragEnded(Touch* touch) {
-    if (!_draggedNode) return;
+    // 背景底板
+    auto background = DrawNode::create();
+    // 使用更深的黑色背景 (0,0,0, 0.95) 提高可读性
+    background->drawSolidRect(Vec2(0, 0), Vec2(300, 200), Color4F(0.1f, 0.1f, 0.1f, 0.95f));
+    // 加一个白色边框
+    background->drawRect(Vec2(0, 0), Vec2(300, 200), Color4F::WHITE);
+    _descriptionPanel->addChild(background);
 
-    Vec2 touchLocation = touch->getLocation();
+    // ... 其余代码不变 (Title, Text, CloseBtn) ...
 
-    // 1. 移除拖拽替身
-    _draggedNode->removeFromParent();
-    _draggedNode = nullptr;
+    _descriptionTitle = Label::createWithSystemFont("", "Arial", 18);
+    _descriptionTitle->setAnchorPoint(Vec2(0, 1));
+    _descriptionTitle->setPosition(10, 190);
+    _descriptionTitle->setColor(Color3B(255, 220, 100)); // 标题改成金色更好看
+    _descriptionPanel->addChild(_descriptionTitle);
 
-    // 2. 判断是否还在原来的槽位附近？
-    // 简单逻辑：如果拖到了右侧区域 (x > 屏幕宽度的40%)，或者是空白区域，则卸下
-    auto vs = Director::getInstance()->getVisibleSize();
-    float splitLineX = vs.width * 0.4f;
+    _descriptionText = Label::createWithSystemFont("", "Arial", 16); // 字体稍微大一点
+    _descriptionText->setAnchorPoint(Vec2(0, 1));
+    _descriptionText->setPosition(10, 160);
+    _descriptionText->setColor(Color3B(220, 220, 220));
+    _descriptionText->setDimensions(280, 150);
+    _descriptionText->setHorizontalAlignment(TextHAlignment::LEFT);
+    _descriptionText->setVerticalAlignment(TextVAlignment::TOP);
+    _descriptionPanel->addChild(_descriptionText);
 
-    bool shouldUnequip = false;
+    auto closeBtn = ui::Button::create();
+    closeBtn->setScale9Enabled(true);
+    closeBtn->setContentSize(Size(30, 30));
+    closeBtn->setPosition(Vec2(285, 185));
+    closeBtn->setTitleFontSize(20);
+    closeBtn->setTitleText(u8"×");
+    closeBtn->setTitleColor(Color3B::WHITE);
+    closeBtn->addClickEventListener([this](Ref*) {
+        this->hidePolicyDescription();
+        });
+    _descriptionPanel->addChild(closeBtn);
 
-    // 条件A: 拖到了右侧列表区
-    if (touchLocation.x > splitLineX) {
-        shouldUnequip = true;
-    }
-    // 条件B: 虽然在左侧，但没有落在任何有效槽位上 (稍微复杂点，暂用条件A即可满足大部分需求)
-    // 如果你想做的更精细，可以遍历 _slotTargets，如果都没命中，也算卸下。
-    else {
-        bool hitAnySlot = false;
-        for (const auto& slot : _slotTargets) {
-            if (slot.worldBoundingBox.containsPoint(touchLocation)) {
-                hitAnySlot = true;
-                // 这里其实可以做“交换卡牌”的逻辑，目前先不做，只要落在槽位里就不卸下
-                break;
-            }
-        }
-        if (!hitAnySlot) {
-            shouldUnequip = true; // 拖到左侧空白处也卸下
-        }
-    }
-
-    if (shouldUnequip) {
-        if (_policyManager->unequipPolicy(_draggedCardId)) {
-            refreshUI(); // 刷新界面，卡牌回到右侧
-            CCLOG("Card %d unequipped by drag.", _draggedCardId);
-        }
-    }
-
-    _draggedCardId = -1;
+    _descriptionPanel->setVisible(false);
+    this->addChild(_descriptionPanel, 100); // 确保在最上层
 }
 
-// PolicyPanel.cpp 底部
+void PolicyPanel::showPolicyDescription(const PolicyCard& card) {
+    if (!_descriptionPanel) {
+        createDescriptionPanel();
+    }
+    _descriptionTitle->setString(card.name);
+    std::string descText = u8"类型: " + getTypeName(card.type) + "\n\n" + card.desc;
+    _descriptionText->setString(descText);
 
+    // 获取屏幕尺寸
+    auto vs = Director::getInstance()->getVisibleSize();
+
+    // 面板固定大小是 300x200 (在 createDescriptionPanel 中定义的)
+    float panelW = 300.0f;
+    float panelH = 200.0f;
+    float margin = 20.0f; // 边距
+
+    // 设置位置为右下角
+    // 坐标原点在左下角，所以 x = 屏幕宽 - 面板宽 - 边距, y = 边距
+    _descriptionPanel->setPosition(Vec2(vs.width - panelW - margin, margin));
+
+    _descriptionPanel->setVisible(true);
+}
+
+void PolicyPanel::hidePolicyDescription() {
+    if (_descriptionPanel) {
+        _descriptionPanel->setVisible(false);
+    }
+}
+
+void PolicyPanel::onCardClicked(int cardId, const PolicyCard& card) {
+    showPolicyDescription(card);
+}
+
+// 政体选择界面相关
 void PolicyPanel::onChangeGovClicked() {
     showGovSelectLayer();
 }
@@ -496,24 +627,18 @@ void PolicyPanel::onChangeGovClicked() {
 void PolicyPanel::showGovSelectLayer() {
     auto vs = Director::getInstance()->getVisibleSize();
 
-    // 1. 创建遮罩层 (半透明黑底)
     auto layer = LayerColor::create(Color4B(0, 0, 0, 220), vs.width, vs.height);
-
-    // 吞噬点击，防止点穿到底层
     auto listener = EventListenerTouchOneByOne::create();
     listener->setSwallowTouches(true);
     listener->onTouchBegan = [](Touch*, Event*) { return true; };
     _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, layer);
+    this->addChild(layer, 999);
 
-    this->addChild(layer, 999); // 最上层
-
-    // 2. 标题
     auto title = Label::createWithSystemFont(u8"选择政体", "Arial", 36);
     title->setPosition(vs.width / 2, vs.height - 50);
     title->setColor(Color3B::YELLOW);
     layer->addChild(title);
 
-    // 3. 关闭按钮 (点空白处关闭也可以，这里加个显式按钮)
     auto btnClose = Button::create();
     btnClose->setTitleText(u8"返回");
     btnClose->setTitleFontSize(28);
@@ -523,7 +648,6 @@ void PolicyPanel::showGovSelectLayer() {
         });
     layer->addChild(btnClose);
 
-    // 4. 创建滚动列表
     auto scrollView = ScrollView::create();
     scrollView->setContentSize(Size(vs.width - 100, vs.height - 120));
     scrollView->setAnchorPoint(Vec2(0.5, 0));
@@ -531,56 +655,43 @@ void PolicyPanel::showGovSelectLayer() {
     scrollView->setDirection(ScrollView::Direction::VERTICAL);
     layer->addChild(scrollView);
 
-    // 5. 填充政体列表
     auto allTypes = getAllGovTypes();
-    float itemH = 120.0f; // 每个条目的高度
+    float itemH = 120.0f;
     float gap = 20.0f;
     float contentH = (itemH + gap) * allTypes.size();
     float innerH = std::max(scrollView->getContentSize().height, contentH);
-
     scrollView->setInnerContainerSize(Size(scrollView->getContentSize().width, innerH));
 
     float currentY = innerH - itemH / 2;
 
     for (auto type : allTypes) {
-        // 创建单个条目 UI
         Node* itemNode = createGovOptionUI(type);
         itemNode->setPosition(scrollView->getContentSize().width / 2, currentY);
 
-        // 只有解锁的政体才能点击选择
-        // 注意：CultureTree 负责解锁状态判断
         bool isUnlocked = false;
         bool isCurrent = false;
         if (_cultureTree) {
-            // 注意：你需要确保 CultureTree 有 isGovernmentUnlocked 接口
-            // 之前的代码里实现了 isGovernmentUnlocked(type)
             isUnlocked = _cultureTree->isGovernmentUnlocked(type);
             isCurrent = (_cultureTree->getCurrentGovernment() == type);
         }
 
-        // 添加按钮逻辑
         auto bg = dynamic_cast<Layout*>(itemNode->getChildByName("bg"));
         if (bg) {
             if (isUnlocked) {
                 bg->setTouchEnabled(true);
                 bg->addClickEventListener([this, type, layer, isCurrent](Ref*) {
                     if (isCurrent) {
-                        layer->removeFromParent(); // 已经是当前政体，直接关闭
+                        layer->removeFromParent();
                         return;
                     }
-
-                    // 执行切换
                     if (_cultureTree->switchGovernment(type)) {
-                        // 切换成功，刷新数据和UI
                         _policyManager->updateGovernmentSlots();
                         this->refreshUI();
                         layer->removeFromParent();
-                        CCLOG("Switched government!");
                     }
                     });
             }
             else {
-                // 未解锁变灰
                 itemNode->setOpacity(100);
                 if (auto lbl = dynamic_cast<Label*>(itemNode->getChildByName("status"))) {
                     lbl->setString(u8"未解锁");
@@ -588,7 +699,6 @@ void PolicyPanel::showGovSelectLayer() {
                 }
             }
         }
-
         scrollView->addChild(itemNode);
         currentY -= (itemH + gap);
     }
@@ -596,68 +706,32 @@ void PolicyPanel::showGovSelectLayer() {
 
 Node* PolicyPanel::createGovOptionUI(GovernmentType type) {
     const auto& config = _policyManager->getGovConfig(type);
-
     auto container = Node::create();
 
-    // 背景
     auto bg = Layout::create();
-    bg->setName("bg"); // 方便获取
+    bg->setName("bg");
     bg->setAnchorPoint(Vec2::ANCHOR_MIDDLE);
     bg->setContentSize(Size(600, 100));
     bg->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
     bg->setBackGroundColor(Color3B(60, 60, 70));
     container->addChild(bg);
 
-    // 政体名称
     auto nameLabel = Label::createWithSystemFont(config.name, "Arial", 28);
     nameLabel->setAnchorPoint(Vec2::ANCHOR_MIDDLE_LEFT);
     nameLabel->setPosition(-280, 20);
     nameLabel->setColor(Color3B::WHITE);
     container->addChild(nameLabel);
 
-    // 槽位信息 (用彩色文字拼接)
-    std::string slotText = u8"槽位: ";
-    auto slotInfo = Label::createWithSystemFont(slotText, "Arial", 20);
+    // 简易显示槽位
+    std::string info = u8"军事:" + std::to_string(config.militarySlots) +
+        u8" 经济:" + std::to_string(config.economicSlots) +
+        u8" 通用:" + std::to_string(config.wildcardSlots);
+    auto slotInfo = Label::createWithSystemFont(info, "Arial", 20);
     slotInfo->setAnchorPoint(Vec2::ANCHOR_MIDDLE_LEFT);
     slotInfo->setPosition(-280, -20);
+    slotInfo->setColor(Color3B(200, 200, 200));
     container->addChild(slotInfo);
 
-    // 动态生成槽位图标（简单用文字代替：[红2] [黄1]）
-    float startX = -220;
-
-    auto addSlotIcon = [&](const std::string& txt, Color3B col) {
-        auto lbl = Label::createWithSystemFont(txt, "Arial", 20);
-        lbl->setColor(col);
-        lbl->setAnchorPoint(Vec2::ANCHOR_MIDDLE_LEFT);
-        lbl->setPosition(startX, -20);
-        container->addChild(lbl);
-        startX += 60;
-        };
-
-    if (config.militarySlots > 0) addSlotIcon(u8"军" + std::to_string(config.militarySlots), COLOR_MIL);
-    if (config.economicSlots > 0) addSlotIcon(u8"经" + std::to_string(config.economicSlots), COLOR_ECO);
-    if (config.wildcardSlots > 0) addSlotIcon(u8"通" + std::to_string(config.wildcardSlots), COLOR_WILD);
-
-    // 固有加成描述
-    std::string bonusText = u8"加成: 无";
-    if (!config.inherentBonuses.empty()) {
-        // 简单展示第一个效果
-        float val = config.inherentBonuses[0].value;
-        switch (config.inherentBonuses[0].type) {
-        case EffectType::COMBAT_STRENGTH: bonusText = u8"所有单位战斗力 +" + std::to_string((int)val); break;
-        case EffectType::MODIFIER_CULTURE: bonusText = u8"文化值 +" + std::to_string((int)val) + "%"; break;
-        case EffectType::MODIFIER_SCIENCE: bonusText = u8"科技值 +" + std::to_string((int)val) + "%"; break;
-        case EffectType::MODIFIER_PRODUCTION: bonusText = u8"生产力 +" + std::to_string((int)val) + "%"; break;
-        default: bonusText = u8"特殊加成"; break;
-        }
-    }
-    auto bonusLabel = Label::createWithSystemFont(bonusText, "Arial", 18);
-    bonusLabel->setColor(Color3B(200, 200, 255));
-    bonusLabel->setAnchorPoint(Vec2::ANCHOR_MIDDLE_RIGHT);
-    bonusLabel->setPosition(280, 0);
-    container->addChild(bonusLabel);
-
-    // 状态标签 (默认空白，在外部控制)
     auto statusLabel = Label::createWithSystemFont("", "Arial", 20);
     statusLabel->setName("status");
     statusLabel->setPosition(250, -30);
@@ -667,7 +741,6 @@ Node* PolicyPanel::createGovOptionUI(GovernmentType type) {
 }
 
 std::vector<GovernmentType> PolicyPanel::getAllGovTypes() {
-    // 按 Tier 顺序排列
     return {
         GovernmentType::CHIEFDOM,
         GovernmentType::AUTOCRACY,
@@ -675,6 +748,5 @@ std::vector<GovernmentType> PolicyPanel::getAllGovTypes() {
         GovernmentType::CLASSICAL_REPUBLIC,
         GovernmentType::MONARCHY,
         GovernmentType::DEMOCRACY
-        // ... 其他政体 ...
     };
 }

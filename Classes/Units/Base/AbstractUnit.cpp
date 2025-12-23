@@ -150,28 +150,31 @@ void AbstractUnit::onTurnStart() {
     }
 }
 
-// 移动逻辑（修复：使用六边形之间的实际距离作为移动力消耗）
-void AbstractUnit::moveTo(Hex targetPos, HexLayout* layout) {
+// 移动逻辑（修复：接受路径成本参数）
+void AbstractUnit::moveTo(Hex targetPos, HexLayout* layout, int pathCost) {
     if (_state != UnitState::IDLE) return;
     if (!layout) return;
-    if (_currentMoves <= 0) return; // 检查移动力
+    if (_currentMoves <= 0) return;
 
-    // 【关键修复】计算当前位置到目标位置的实际距离
-    int distanceCost = _gridPos.distance(targetPos);
+    // 如果没有传入路径成本，使用直线距离作为后备
+    int actualCost = (pathCost > 0) ? pathCost : _gridPos.distance(targetPos);
     
     // 检查移动力是否足够
-    if (_currentMoves < distanceCost) {
+    if (_currentMoves < actualCost) {
         CCLOG("Unit %s: Insufficient movement points. Need %d, have %d", 
-              getUnitName().c_str(), distanceCost, _currentMoves);
+              getUnitName().c_str(), actualCost, _currentMoves);
         return;
     }
 
     _state = UnitState::MOVING;
     _gridPos = targetPos;
 
-    // 【关键修复】扣除实际距离对应的移动力（而非固定值 1）
-    _currentMoves = std::max(0, _currentMoves - distanceCost);
+    // 扣除实际路径成本
+    _currentMoves = std::max(0, _currentMoves - actualCost);
     _hasActed = true;
+
+    CCLOG("Unit %s moved. Cost: %d, Remaining moves: %d", 
+          getUnitName().c_str(), actualCost, _currentMoves);
 
     Vec2 pixelPos = layout->hexToPixel(targetPos);
     auto moveAction = MoveTo::create(0.3f, pixelPos);
@@ -182,7 +185,7 @@ void AbstractUnit::moveTo(Hex targetPos, HexLayout* layout) {
         if (_currentMoves <= 0) {
             if (_unitSprite) _unitSprite->setColor(Color3B::GRAY);
         }
-        });
+    });
 
     this->runAction(Sequence::create(ease, callback, nullptr));
 }

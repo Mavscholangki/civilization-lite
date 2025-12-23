@@ -454,9 +454,9 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
                 std::vector<Hex> path = PathFinder::findPath(_selectedUnit->getGridPos(), clickHex, costFunc);
 
                 if (!path.empty()) {
-                    // 【修复：计算实际需要的移动力消耗】
+                    // 【修复：从索引0开始计算，因为findPath返回的路径不包含起点】
                     int pathCost = 0;
-                    for (size_t i = 1; i < path.size(); i++) {
+                    for (size_t i = 0; i < path.size(); i++) {
                         int tileCost = getTerrainCost(path[i]);
                         if (tileCost < 0) {
                             // 路径无法通过
@@ -468,8 +468,8 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
 
                     // 【修复：检查移动力是否足够】
                     if (pathCost <= _selectedUnit->getCurrentMoves()) {
-                        // 执行移动
-                        _selectedUnit->moveTo(clickHex, _layout);
+                        // 执行移动，传递计算好的路径成本
+                        _selectedUnit->moveTo(clickHex, _layout, pathCost);
 
                         // 移动成功更新视觉状态
                         updateSelection(clickHex);

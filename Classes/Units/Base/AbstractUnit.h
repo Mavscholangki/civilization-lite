@@ -111,10 +111,11 @@ public:
 
     /**
      * @brief 移动到目标位置
-     * @param targetPos 目标网格坐标
-     * @param layout 用于将Hex转换为屏幕像素坐标
+     * @param targetPos 目标六边形坐标
+     * @param layout 用于将Hex转换为屏幕坐标的布局
+     * @param pathCost 路径消耗的移动力（默认-1表示使用直线距离）
      */
-    void moveTo(Hex targetPos, HexLayout* layout);
+    void moveTo(Hex targetPos, HexLayout* layout, int pathCost = -1);
 
     /**
      * @brief 受到伤害

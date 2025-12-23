@@ -3,7 +3,7 @@
 
 #include "cocos2d.h"
 #include "ui/CocosGUI.h"
-#include "../Development/PolicySystem.h" // 请确保路径正确指向你的 PolicySystem.h
+#include "../Development/PolicySystem.h"
 
 USING_NS_CC;
 using namespace ui;
@@ -13,30 +13,30 @@ public:
     CREATE_FUNC(PolicyPanel);
     virtual bool init() override;
 
-    // 注入依赖
     void setPolicyManager(PolicyManager* mgr);
     void setCultureTree(CultureTree* tree);
-
-    // 刷新界面数据
     void refreshUI();
 
 private:
-    // 系统引用
     PolicyManager* _policyManager = nullptr;
     CultureTree* _cultureTree = nullptr;
 
-    // --- UI 容器 ---
     Node* _leftPanel = nullptr;
     Node* _rightPanel = nullptr;
-    Node* _leftSlotsContainer = nullptr; // 用于存放槽位，防止刷新时误删标题
-    Label* _govLabel = nullptr;          // 政体标题
+    Node* _leftSlotsContainer = nullptr;
+    Label* _govLabel = nullptr;
 
-    // --- 拖拽状态 ---
+    // 拖拽相关
     Node* _draggedNode = nullptr; // 拖拽时的替身节点
-    int _draggedCardId = -1;      // 当前拖拽的卡牌ID
-    PolicyType _draggedCardType;  // 当前拖拽的卡牌类型
+    int _draggedCardId = -1;
+    PolicyType _draggedCardType;
+    bool _isDragActive = false;   // 标记当前是否处于拖拽状态
 
-    // --- 槽位碰撞检测结构 ---
+    // 简介面板
+    Node* _descriptionPanel = nullptr;
+    Label* _descriptionTitle = nullptr;
+    Label* _descriptionText = nullptr;
+
     struct SlotTarget {
         PolicyType type;
         int index;
@@ -45,36 +45,41 @@ private:
     };
     std::vector<SlotTarget> _slotTargets;
 
-    // --- UI常量 ---
-    const float CARD_W = 180.0f;
-    const float CARD_H = 60.0f;
-    const Color3B COLOR_MIL = Color3B(220, 80, 80);
-    const Color3B COLOR_ECO = Color3B(240, 200, 60);
-    const Color3B COLOR_WILD = Color3B(140, 60, 200);
+    // 【修改点】：变大，变成竖着的长方形
+    const float CARD_W = 140.0f;
+    const float CARD_H = 220.0f;
 
-    // --- 内部方法 ---
-    void initLayout();       // 初始化左右布局
+    // 颜色配置
+    const Color3B COLOR_MIL = Color3B(180, 40, 40);   // 深红
+    const Color3B COLOR_ECO = Color3B(220, 180, 40);  // 金黄
+    const Color3B COLOR_WILD = Color3B(100, 40, 180); // 紫色
+    const Color3B COLOR_BG_SLOT = Color3B(30, 30, 35); // 槽位底色
 
-    void createLeftSlots();  // 创建左侧槽位
-    void createRightList();  // 创建右侧统一列表 (取代了原来的 Tabs)
+    void initLayout();
+    void createLeftSlots();
+    void createRightList();
 
-    // 创建UI组件
+    // 核心 UI 创建
     Node* createDraggableCard(const PolicyCard& card);
     Node* createSlotUI(PolicyType type, int index, int equippedCardId);
+    Node* createCardVisual(const PolicyCard& card, bool isGhost); // 提取出来的通用外观创建函数
 
     // 拖拽逻辑
-    void onCardDragBegan(Node* cardNode, int cardId, PolicyType type, Touch* touch);
-    void onCardDragMoved(Touch* touch);
-    void onCardDragEnded(Touch* touch);         // 从右侧拖入左侧结束
-    void onEquippedCardDragEnded(Touch* touch); // 从左侧槽位拖出结束(卸下)
+    void onCardDragBegan(int cardId, PolicyType type, Vec2 touchPos);
+    void onCardDragMoved(Vec2 touchPos);
+    void onCardDragEnded(Vec2 touchPos);
+    void onEquippedCardDragEnded(Touch* touch); // 从槽位卸载的逻辑
 
-    // --- 政体选择相关 ---
-    void onChangeGovClicked();      // 点击更换按钮
-    void showGovSelectLayer();      // 显示选择弹窗
-    Node* createGovOptionUI(GovernmentType type); // 创建单个政体选项
-    std::vector<GovernmentType> getAllGovTypes(); // 获取所有政体列表
+    void onChangeGovClicked();
+    void showGovSelectLayer();
+    Node* createGovOptionUI(GovernmentType type);
+    std::vector<GovernmentType> getAllGovTypes();
 
-    // 辅助工具
+    void createDescriptionPanel();
+    void showPolicyDescription(const PolicyCard& card);
+    void hidePolicyDescription();
+    void onCardClicked(int cardId, const PolicyCard& card);
+
     Color3B getTypeColor(PolicyType type);
     std::string getTypeName(PolicyType type);
 };
