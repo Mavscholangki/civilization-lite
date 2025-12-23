@@ -15,6 +15,28 @@ Scene* GameScene::createScene() {
 bool GameScene::init() {
     if (!Scene::init()) return false;
 
+    CCLOG("GameScene::init() - 基本初始化开始");
+
+    // 只做最基本的场景初始化
+    _dataInitialized = false;
+    _graphicsInitialized = false;
+
+    // 设置背景颜色（立即可见，避免黑屏）
+    auto bg = LayerColor::create(Color4B(50, 50, 70, 255));
+    this->addChild(bg, -100);
+
+    CCLOG("GameScene::init() - 基本初始化完成");
+    return true;
+}
+
+
+bool GameScene::initGameData() {
+    if (_dataInitialized) {
+        return true;
+    }
+
+    CCLOG("GameScene::initGameData() - start");
+
     // 1. 初始化游戏管理器
     m_gameManager = GameManager::getInstance();
 
@@ -29,7 +51,11 @@ bool GameScene::init() {
     }
 
     // 2. 创建人类玩家
-    CivilizationType playerCiv = CivilizationSelectionScene::getSelectedCivilization();
+    CivilizationType playerCiv = CivilizationType::CHINA;
+    if (CivilizationSelectionScene::getSelectedCivilization() != CivilizationType::BASIC) {
+        playerCiv = CivilizationSelectionScene::getSelectedCivilization();
+    }
+
     m_humanPlayer = Player::create(0, playerCiv);
     if (m_humanPlayer) {
         m_humanPlayer->setIsHuman(true);
@@ -82,57 +108,98 @@ bool GameScene::init() {
         }
     }
 
-    // 4. 创建地图层
+    CCLOG("GameScene::initGameData() - end");
+    _dataInitialized = true;
+    return true;
+}
+
+bool GameScene::initGraphics() {
+    if (_graphicsInitialized) {
+        return true;
+    }
+
+    CCLOG("GameScene::initGraphics() - start");
+
+    // 这些必须在场景进入导演后才能正确初始化
+
+    // 1. 创建地图层
     _mapLayer = GameMapLayer::create();
     if (!_mapLayer) return false;
     this->addChild(_mapLayer, 0);
+    CCLOG("地图层创建完成");
 
-    // 5. 创建HUD层
+    // 2. 创建HUD层
     _hudLayer = HUDLayer::create();
     if (!_hudLayer) return false;
     this->addChild(_hudLayer, 100);
+    CCLOG("HUD层创建完成");
 
-    // 6. 创建生产面板层
+    // 3. 创建生产面板层
     _productionPanelLayer = CityProductionPanel::create();
     _productionPanelLayer->setVisible(false);
     this->addChild(_productionPanelLayer, 120);
+    CCLOG("生产面板层创建完成");
 
-    // 7. 设置HUD层使用人类玩家的系统实例
+    // 4. 设置HUD层使用人类玩家的系统实例
     if (m_humanPlayer) {
         _hudLayer->setTechTree(m_humanPlayer->getTechTree());
         _hudLayer->setCultureTree(m_humanPlayer->getCultureTree());
         _hudLayer->setPolicyManager(m_humanPlayer->getPolicyManager());
-        CCLOG("HUDLayer set to use human player's system instances");
+        CCLOG("HUDLayer设置完成");
     }
 
-    // 现在初始化这些系统只需调用Player的初始化方法
-    initTechTree();
-    initCultureTree();
-    initPolicySystem();
-
-    // 8. 设置回调
+    // 5. 设置回调
     setupCallbacks();
+    CCLOG("回调设置完成");
 
-    // 9. 设置游戏管理器回调
+    // 6. 设置游戏管理器回调
     m_gameManager->setOnTurnStartCallback([this](int playerId) {
         Player* currentPlayer = m_gameManager->getCurrentPlayer();
         if (currentPlayer && currentPlayer->getIsHuman()) {
             CCLOG("Human player turn started");
-            // 如果是人类玩家回合，确保HUD绑定的是当前玩家
             _hudLayer->setTechTree(currentPlayer->getTechTree());
             _hudLayer->setCultureTree(currentPlayer->getCultureTree());
             _hudLayer->setPolicyManager(currentPlayer->getPolicyManager());
         }
         });
 
-    m_gameManager->setOnVictoryCallback([this](VictoryType victoryType, int winnerPlayerId) {
-        // 胜利处理...
-        });
-
-    CCLOG("GameScene initialized successfully with %d total players",
-        m_gameManager->getAllPlayers().size());
-
+    CCLOG("GameScene::initGraphics() - 图形初始化完成");
+    _graphicsInitialized = true;
     return true;
+}
+
+void GameScene::onEnter() {
+    CCLOG("========== GameScene::onEnter() 被调用 ==========");
+
+    Scene::onEnter();  // 必须调用父类
+
+    // 确保数据已经初始化（可能在LoadingScene中已初始化）
+    if (!_dataInitialized) {
+        initGameData();
+    }
+
+    // 现在初始化图形部分
+    if (!_graphicsInitialized) {
+        initGraphics();
+    }
+
+    // 开始游戏循环
+    this->scheduleUpdate();
+    CCLOG("游戏循环已启动");
+}
+
+void GameScene::onExit() {
+    CCLOG("GameScene onExit called");
+
+    // 停止游戏循环
+    this->unscheduleUpdate();
+
+    // 清理游戏管理器
+    if (m_gameManager) {
+        m_gameManager->cleanup();
+    }
+
+    Scene::onExit();
 }
 
 // 这些函数现在只需要初始化玩家的系统
@@ -222,16 +289,6 @@ void GameScene::setupCallbacks() {
 
 Player* GameScene::getCurrentPlayer() const {
     return m_gameManager ? m_gameManager->getCurrentPlayer() : nullptr;
-}
-
-void GameScene::onExit() {
-    // 清理游戏管理器
-    if (m_gameManager) {
-        m_gameManager->cleanup();
-    }
-
-    // 注意：现在不需要删除_techTree等，因为它们在Player内部
-    Scene::onExit();
 }
 
 TileData GameScene::getTileData(Hex h) { return _mapLayer->getTileData(h); }
