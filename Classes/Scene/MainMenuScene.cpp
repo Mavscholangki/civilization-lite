@@ -50,9 +50,17 @@ bool MainMenuScene::init() {
 
 void MainMenuScene::onNewGameClicked(Ref* sender) {
     CCLOG("Start New Game...");
-    // 切换场景：带有淡入淡出特效 (1.0秒)
+
+    // 先跳转到Loading场景，然后从Loading场景跳转到GameScene
+    auto loadingScene = LoadingScene::createScene();
+    auto loadingNode = static_cast<LoadingScene*>(loadingScene);
+
+    // 设置要跳转的下一个场景（GameScene）
     auto gameScene = GameScene::createScene();
-    Director::getInstance()->replaceScene(TransitionFade::create(1.0f, gameScene));
+    loadingNode->setNextScene(gameScene);
+
+    // 切换到Loading场景
+    Director::getInstance()->replaceScene(TransitionFade::create(0.5f, loadingScene));
 }
 
 void MainMenuScene::onExitClicked(Ref* sender) {

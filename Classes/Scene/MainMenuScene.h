@@ -3,6 +3,8 @@
 
 #include "cocos2d.h"
 #include "ui/CocosGUI.h" // 引入 GUI 库
+#include "LoadingScene.h" // 添加这行
+#include "GameScene.h"    // 添加这行
 
 class MainMenuScene : public cocos2d::Scene {
 public:
