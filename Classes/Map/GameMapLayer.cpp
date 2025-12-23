@@ -78,110 +78,216 @@ bool GameMapLayer::init() {
     return true;
 }
 
+// 替换原有的 initGameManagerAndPlayers 函数
 void GameMapLayer::initGameManagerAndPlayers() {
-    // 获取游戏管理器
     auto gameManager = GameManager::getInstance();
-    if (!gameManager) {
-        CCLOG("GameManager not initialized");
-        return;
-    }
+    if (!gameManager) return;
 
-    // 如果游戏管理器没有玩家，创建默认玩家
+    // 1. 初始化游戏配置和默认玩家（如果没有的话）
     if (gameManager->getAllPlayers().empty()) {
-        CCLOG("Creating default player...");
-
-        // 创建游戏配置
         GameConfig config;
         config.maxTurns = 500;
         config.enableScienceVictory = true;
         config.enableDominationVictory = true;
-
-        // 初始化游戏管理器
         gameManager->initialize(config);
 
-        // 创建玩家
+        // 创建玩家 0 (人类)
         auto player = Player::create(0, CivilizationType::BASIC);
-        if (player) {
-            gameManager->addPlayer(player);
-            CCLOG("Default player created with ID 0");
+        if (player) gameManager->addPlayer(player);
+
+        // 【新增】：自动创建几个 AI 玩家 (例如 3 个 AI) 用于测试
+        // 如果你的 GameManager 外部已经创建了 AI，这部分可以去掉
+        for (int i = 1; i <= 3; i++) {
+            auto aiPlayer = Player::create(i, CivilizationType::BASIC);
+            gameManager->addPlayer(aiPlayer);
         }
     }
 
-    // 初始化玩家起始单位后，设置游戏状态为PLAYING
     gameManager->setGameState(GameState::PLAYING);
+    gameManager->setCurrentPlayer(0);
 
-    // 确保当前玩家索引正确
-    gameManager->setCurrentPlayer(0);  // 或者通过其他方式设置
+    // ===========================================================================
+    // 准备工作：记录已占用的出生点，防止撞车
+    // ===========================================================================
+    // 使用 shared_ptr 包装 vector，确保在 lambda 中能持续访问和修改同一个列表
+    auto occupiedSpawns = std::make_shared<std::vector<Hex>>();
 
-    // 创建玩家起始位置的函数
-    auto getStartHexForPlayer = [this](int playerId) -> Hex {
-        // 为不同玩家选择不同的起始位置
-        // 这里简化处理：玩家0在地图中心，其他玩家在随机位置
-        if (playerId == 0) {
-            return Hex(55, 15); // 玩家0在地图中心
-        }
-        else {
-            // 为AI玩家选择随机位置（确保是陆地）
-            int maxQ = 120; // 地图宽度
-            int maxR = 50;  // 地图高度
-
-            for (int attempt = 0; attempt < 100; attempt++) {
-                int q = cocos2d::random(10, maxQ - 10);
-                int r = cocos2d::random(10, maxR - 10);
-                Hex testHex(q, r);
-
-                if (getTerrainCost(testHex) > 0) {
-                    return testHex;
-                }
-            }
-
-            // 如果找不到合适位置，返回默认位置
-            return Hex(55 + playerId * 10, 15 + playerId * 5);
-        }
+    // 辅助 lambda：计算两个六边形的距离
+    auto getHexDistance = [](Hex a, Hex b) -> int {
+        return (std::abs(a.q - b.q) + std::abs(a.q + a.r - b.q - b.r) + std::abs(a.r - b.r)) / 2;
         };
 
-    // 添加单位到地图的函数
+    // 核心判断：是否是完美出生点（周围2格无山无水）
+    auto isPerfectSpawn = [this](Hex center) -> bool {
+        // 1. 检查中心点
+        TileData centerData = getTileData(center);
+        if (centerData.type == TerrainType::OCEAN ||
+            centerData.type == TerrainType::COAST ||
+            centerData.type == TerrainType::MOUNTAIN) return false;
+
+        // 2. 检查周围 2 格
+        int radius = 2;
+        for (int q = -radius; q <= radius; q++) {
+            int r1 = std::max(-radius, -q - radius);
+            int r2 = std::min(radius, -q + radius);
+            for (int r = r1; r <= r2; r++) {
+                Hex neighbor = center + Hex(q, r);
+                TileData data = getTileData(neighbor);
+
+                // 严格拒绝山脉和水域
+                if (data.type == TerrainType::MOUNTAIN ||
+                    data.type == TerrainType::OCEAN ||
+                    data.type == TerrainType::COAST) {
+                    return false;
+                }
+            }
+        }
+        return true;
+        };
+
+    // ===========================================================================
+    // 出生点选择逻辑 (玩家 + AI 通用)
+    // ===========================================================================
+    auto getStartHexForPlayer = [this, occupiedSpawns, isPerfectSpawn, getHexDistance](int playerId) -> Hex {
+        Hex finalHex(0, 0);
+        bool found = false;
+
+        // ---------------------------------------------------
+        // 策略 A: 玩家 0 (人类) -> 优先螺旋搜索地图中心
+        // ---------------------------------------------------
+        if (playerId == 0) {
+            CCLOG("Finding perfect start for Human Player 0...");
+            Hex center(55, 15); // 地图大致中心
+            int maxRadius = 50;
+
+            // 检查中心点
+            if (isPerfectSpawn(center)) {
+                finalHex = center;
+                found = true;
+            }
+            else {
+                // 螺旋搜索
+                for (int radius = 1; radius <= maxRadius && !found; radius++) {
+                    Hex current = center + Hex(-radius, 0);
+                    std::vector<Hex> directions = {
+                        Hex(1, -1), Hex(1, 0), Hex(0, 1),
+                        Hex(-1, 1), Hex(-1, 0), Hex(0, -1)
+                    };
+                    for (int i = 0; i < 6; i++) {
+                        for (int j = 0; j < radius; j++) {
+                            if (isPerfectSpawn(current)) {
+                                finalHex = current;
+                                found = true;
+                                break;
+                            }
+                            current = current + directions[i];
+                        }
+                        if (found) break;
+                    }
+                }
+            }
+        }
+        // ---------------------------------------------------
+        // 策略 B: AI 玩家 -> 随机寻找满足条件的点
+        // ---------------------------------------------------
+        else {
+            CCLOG("Finding perfect start for AI Player %d...", playerId);
+            int maxAttempts = 500; // 尝试 500 次
+            int mapW = 120;
+            int mapH = 50;
+
+            for (int i = 0; i < maxAttempts; i++) {
+                // 随机坐标 (稍微避开地图最边缘)
+                int q = cocos2d::random(5, mapW - 5);
+                int r = cocos2d::random(5, mapH - 5);
+                Hex randHex(q, r);
+
+                // 1. 地形检查 (和玩家一样严格)
+                if (!isPerfectSpawn(randHex)) continue;
+
+                // 2. 距离检查 (必须离所有已存在的出生点至少 12 格远)
+                bool isTooClose = false;
+                for (const auto& occupied : *occupiedSpawns) {
+                    if (getHexDistance(randHex, occupied) < 12) {
+                        isTooClose = true;
+                        break;
+                    }
+                }
+                if (isTooClose) continue;
+
+                // 找到合适位置
+                finalHex = randHex;
+                found = true;
+                break;
+            }
+        }
+
+        // ---------------------------------------------------
+        // 兜底逻辑：如果实在找不到完美点 (地图太挤或太烂)
+        // ---------------------------------------------------
+        if (!found) {
+            CCLOG("Warning: Perfect spawn not found for Player %d. Relaxing criteria.", playerId);
+            // 降级策略：只找是个陆地的地方，且尽量远一点
+            int safeGuard = 0;
+            while (safeGuard < 200) {
+                int q = cocos2d::random(5, 115);
+                int r = cocos2d::random(5, 45);
+                Hex h(q, r);
+
+                // 只要不是水和山就行 (忽略周围环境)
+                if (getTerrainCost(h) > 0) {
+                    // 距离稍微放宽到 5
+                    bool close = false;
+                    for (const auto& occ : *occupiedSpawns) {
+                        if (getHexDistance(h, occ) < 5) close = true;
+                    }
+                    if (!close) {
+                        finalHex = h;
+                        found = true;
+                        break;
+                    }
+                }
+                safeGuard++;
+            }
+            // 绝望的保底
+            if (!found) finalHex = Hex(10 + playerId * 5, 10);
+        }
+
+        // 记录并返回
+        CCLOG("Player %d spawn at (%d, %d)", playerId, finalHex.q, finalHex.r);
+        occupiedSpawns->push_back(finalHex);
+        return finalHex;
+        };
+
+    // ===========================================================================
+    // 下面的代码保持原样
+    // ===========================================================================
     auto addUnitToMap = [this](AbstractUnit* unit) {
         if (unit) {
             this->addChild(unit, 10);
             _allUnits.push_back(unit);
-
-            // 设置单位位置
             Hex pos = unit->getGridPos();
             unit->setPosition(_layout->hexToPixel(pos));
 
-            // 如果是玩家0的单位，设置镜头跟随
             if (unit->getOwnerId() == 0) {
                 _myUnit = unit;
-
-                // 镜头跟随出生点
                 auto visibleSize = Director::getInstance()->getVisibleSize();
                 Vec2 unitPos = _layout->hexToPixel(pos);
                 Vec2 centerOffset = Vec2(visibleSize.width / 2, visibleSize.height / 2) - unitPos;
                 this->setPosition(centerOffset);
-
-                CCLOG("Player 0 unit created, camera focused at (%d, %d)", pos.q, pos.r);
             }
         }
         };
 
-    // 检查城市存在的函数
-    auto checkCityAt = [this](Hex hex) -> bool {
-        return getCityAt(hex) != nullptr;
-        };
+    auto checkCityAt = [this](Hex hex) -> bool { return getCityAt(hex) != nullptr; };
+    auto getTerrainCostFunc = [this](Hex hex) -> int { return this->getTerrainCost(hex); };
 
-    // 获取地形消耗的函数
-    auto getTerrainCost = [this](Hex hex) -> int {
-        return this->getTerrainCost(hex);
-        };
-
-    // 初始化玩家起始单位
     gameManager->initializePlayerStartingUnits(
-        this,               // 父节点
-        getStartHexForPlayer, // 获取起始位置的函数
-        addUnitToMap,       // 添加单位到地图的函数
-        checkCityAt,        // 检查城市存在的函数
-        getTerrainCost      // 获取地形消耗的函数
+        this,
+        getStartHexForPlayer,
+        addUnitToMap,
+        checkCityAt,
+        getTerrainCostFunc
     );
 }
 
@@ -535,3 +641,56 @@ AbstractUnit* GameMapLayer::getUnitAt(Hex hex) {
     }
     return nullptr;
 }
+
+// 【新增】检查指定位置周围2格范围内是否所有六边形都可达
+bool GameMapLayer::isValidStartingPosition(Hex centerHex) {
+    // 获取中心点及周围2格范围内的所有六边形
+    std::vector<Hex> nearbyHexes;
+    nearbyHexes.push_back(centerHex);  // 中心点本身
+    
+    // 6个方向
+    std::vector<Hex> directions = {
+        Hex(1, 0),   Hex(1, -1),
+        Hex(0, -1),  Hex(-1, 0),
+        Hex(-1, 1),  Hex(0, 1)
+    };
+    
+    // 收集距离中心点1格内的所有六边形
+    std::set<Hex> visited;
+    std::queue<std::pair<Hex, int>> bfs;  // (hex, distance)
+    bfs.push({centerHex, 0});
+    visited.insert(centerHex);
+    
+    while (!bfs.empty()) {
+        auto p= bfs.front();
+        auto current = p.first;
+        auto dist = p.second;
+        bfs.pop();
+        
+        if (dist < 2) {  // 收集距离小于2的六边形
+            for (const Hex& dir : directions) {
+                Hex neighbor = current + dir;
+                
+                if (visited.find(neighbor) == visited.end()) {
+                    visited.insert(neighbor);
+                    nearbyHexes.push_back(neighbor);
+                    bfs.push({neighbor, dist + 1});
+                }
+            }
+        }
+    }
+    
+    // 检查所有周围六边形是否都可达（地形消耗 > 0）
+    for (const Hex& hex : nearbyHexes) {
+        int cost = getTerrainCost(hex);
+        if (cost <= 0) {  // 如果有海洋、山脉或其他不可通过的地形
+            CCLOG("Hex(%d, %d) is not passable (cost=%d)", hex.q, hex.r, cost);
+            return false;
+        }
+    }
+    
+    CCLOG("Position Hex(%d, %d) is valid - all nearby hexes are passable", 
+          centerHex.q, centerHex.r);
+    return true;
+}
+

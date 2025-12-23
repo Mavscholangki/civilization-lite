@@ -180,6 +180,8 @@ private:
     std::function<void(int)> m_onTurnStartCallback;
     std::function<void(int)> m_onTurnEndCallback;
     std::function<void(VictoryType, int)> m_onVictoryCallback;
+
+
 };
 
 #endif // __GAME_MANAGER_H__

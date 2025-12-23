@@ -206,6 +206,8 @@ private:
 
     std::chrono::steady_clock::time_point _lastClickTime;
     Hex _lastClickHex;
+
+    bool isValidStartingPosition(Hex centerHex);
 };
 
 #endif // __GAME_MAP_LAYER_H__
