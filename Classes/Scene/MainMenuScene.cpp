@@ -1,5 +1,5 @@
 #include "MainMenuScene.h"
-#include "GameScene.h" // 点击开始后要跳转到 GameScene
+#include "SelectionScene.h" // 点击开始后要跳转到 SelectionScene
 
 USING_NS_CC;
 using namespace cocos2d::ui; // 使用 UI 命名空间
@@ -59,8 +59,8 @@ void MainMenuScene::onNewGameClicked(Ref* sender) {
     auto gameScene = GameScene::createScene();
     loadingNode->setNextScene(gameScene);
 
-    // 切换到Loading场景
-    Director::getInstance()->replaceScene(TransitionFade::create(0.5f, loadingScene));
+    auto civSelectionScene = CivilizationSelectionScene::createScene();
+    Director::getInstance()->replaceScene(TransitionFade::create(0.8f, civSelectionScene));
 }
 
 void MainMenuScene::onExitClicked(Ref* sender) {

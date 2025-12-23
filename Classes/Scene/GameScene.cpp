@@ -4,6 +4,7 @@
 #include "../UI/CityProductionPanel.h"
 #include "../Core/GameManager.h"
 #include "../Core/Player.h"
+#include "SelectionScene.h"
 
 USING_NS_CC;
 
@@ -27,62 +28,92 @@ bool GameScene::init() {
         return false;
     }
 
-    // 2. 创建玩家
-    m_humanPlayer = Player::create(0, CivilizationType::CHINA);
+    // 2. 创建人类玩家
+    CivilizationType playerCiv = CivilizationSelectionScene::getSelectedCivilization();
+    m_humanPlayer = Player::create(0, playerCiv);
     if (m_humanPlayer) {
         m_humanPlayer->setIsHuman(true);
         m_humanPlayer->setPlayerName("Human Player");
         m_gameManager->addPlayer(m_humanPlayer);
-        CCLOG("Human player created");
+        CCLOG("Human player created with civilization: %d", static_cast<int>(playerCiv));
+    }
+
+    // 3. 创建AI玩家 - 使用选择界面中的设置
+    std::vector<AIPlayerSetting> aiSettings = CivilizationSelectionScene::getAIPlayerSettings();
+    int aiPlayerCount = CivilizationSelectionScene::getAIPlayerCount();
+
+    CCLOG("Creating %d AI players", aiPlayerCount);
+
+    // 如果设置数量不等于显示数量，重新生成
+    if (aiSettings.size() != aiPlayerCount) {
+        aiSettings.clear();
+        std::vector<CivilizationType> availableCivs;
+
+        // 获取可用文明（排除玩家文明）
+        if (playerCiv != CivilizationType::GERMANY) availableCivs.push_back(CivilizationType::GERMANY);
+        if (playerCiv != CivilizationType::RUSSIA) availableCivs.push_back(CivilizationType::RUSSIA);
+        if (playerCiv != CivilizationType::CHINA) availableCivs.push_back(CivilizationType::CHINA);
+
+        // 如果可用文明不够，允许重复
+        for (int i = 0; i < aiPlayerCount; i++) {
+            CivilizationType civ;
+            if (i < availableCivs.size()) {
+                civ = availableCivs[i];
+            }
+            else {
+                // 使用默认文明
+                civ = CivilizationType::GERMANY;
+            }
+
+            std::string aiName = "AI Player " + std::to_string(i + 1);
+            aiSettings.push_back(AIPlayerSetting(i + 1, civ, aiName));
+        }
     }
 
     // 创建AI玩家
-    Player* aiPlayerGermany = Player::create(1, CivilizationType::GERMANY);
-    if (aiPlayerGermany) {
-        aiPlayerGermany->setIsHuman(false);
-        aiPlayerGermany->setPlayerName("AI Germany");
-        m_gameManager->addPlayer(aiPlayerGermany);
+    for (int i = 0; i < aiPlayerCount; i++) {
+        Player* aiPlayer = Player::create(i + 1, aiSettings[i].civilization);
+        if (aiPlayer) {
+            aiPlayer->setIsHuman(false);
+            aiPlayer->setPlayerName(aiSettings[i].name);
+            m_gameManager->addPlayer(aiPlayer);
+            CCLOG("AI player %d created with civilization: %d",
+                i + 1, static_cast<int>(aiSettings[i].civilization));
+        }
     }
 
-    Player* aiPlayerRussia = Player::create(2, CivilizationType::RUSSIA);
-    if (aiPlayerRussia) {
-        aiPlayerRussia->setIsHuman(false);
-        aiPlayerRussia->setPlayerName("AI Russia");
-        m_gameManager->addPlayer(aiPlayerRussia);
-    }
-
-    // 3. 创建地图层
+    // 4. 创建地图层
     _mapLayer = GameMapLayer::create();
     if (!_mapLayer) return false;
     this->addChild(_mapLayer, 0);
 
-    // 4. 创建HUD层
+    // 5. 创建HUD层
     _hudLayer = HUDLayer::create();
     if (!_hudLayer) return false;
     this->addChild(_hudLayer, 100);
 
-    // 5. 创建生产面板层
+    // 6. 创建生产面板层
     _productionPanelLayer = CityProductionPanel::create();
     _productionPanelLayer->setVisible(false);
     this->addChild(_productionPanelLayer, 120);
 
-    // 6. 设置HUD层使用人类玩家的系统实例
+    // 7. 设置HUD层使用人类玩家的系统实例
     if (m_humanPlayer) {
-        // 关键：这里设置的是Player内部的TechTree、CultureTree
         _hudLayer->setTechTree(m_humanPlayer->getTechTree());
         _hudLayer->setCultureTree(m_humanPlayer->getCultureTree());
         _hudLayer->setPolicyManager(m_humanPlayer->getPolicyManager());
         CCLOG("HUDLayer set to use human player's system instances");
     }
-	// 现在初始化这些系统只需调用Player的初始化方法
+
+    // 现在初始化这些系统只需调用Player的初始化方法
     initTechTree();
     initCultureTree();
     initPolicySystem();
 
-    // 7. 设置回调
+    // 8. 设置回调
     setupCallbacks();
 
-    // 8. 设置游戏管理器回调
+    // 9. 设置游戏管理器回调
     m_gameManager->setOnTurnStartCallback([this](int playerId) {
         Player* currentPlayer = m_gameManager->getCurrentPlayer();
         if (currentPlayer && currentPlayer->getIsHuman()) {
@@ -98,7 +129,8 @@ bool GameScene::init() {
         // 胜利处理...
         });
 
-    CCLOG("GameScene initialized successfully");
+    CCLOG("GameScene initialized successfully with %d total players",
+        m_gameManager->getAllPlayers().size());
 
     return true;
 }
