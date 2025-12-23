@@ -51,16 +51,15 @@ bool MainMenuScene::init() {
 void MainMenuScene::onNewGameClicked(Ref* sender) {
     CCLOG("Start New Game...");
 
-    // 先跳转到Loading场景，然后从Loading场景跳转到GameScene
-    auto loadingScene = LoadingScene::createScene();
-    auto loadingNode = static_cast<LoadingScene*>(loadingScene);
+    // 创建加载场景，传入创建文明选择场景的函数
+    auto sceneCreator = []() -> cocos2d::Scene* {
+        return CivilizationSelectionScene::createScene();
+        };
 
-    // 设置要跳转的下一个场景（GameScene）
-    auto gameScene = GameScene::createScene();
-    loadingNode->setNextScene(gameScene);
+    auto selectionScene = CivilizationSelectionScene::createScene();
 
-    auto civSelectionScene = CivilizationSelectionScene::createScene();
-    Director::getInstance()->replaceScene(TransitionFade::create(0.8f, civSelectionScene));
+    // 切换到Loading场景
+    Director::getInstance()->replaceScene(TransitionFade::create(0.5f, selectionScene));
 }
 
 void MainMenuScene::onExitClicked(Ref* sender) {

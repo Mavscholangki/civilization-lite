@@ -572,12 +572,14 @@ void CivilizationSelectionScene::onStartGameClicked(cocos2d::Ref* sender) {
     s_aiPlayerSettings = _aiSettings;
     s_aiPlayerCount = _aiPlayerCount;
 
-    // 跳转到加载界面
+    // 创建加载场景，传入创建游戏场景的函数
     auto sceneCreator = []() -> cocos2d::Scene* {
-        return LoadingScene::createScene();
+        return GameScene::createScene();
         };
 
-    auto loadingScene = LoadingScene::createScene();
+    auto loadingScene = LoadingScene::createScene(sceneCreator);
+
+    // 切换到Loading场景
     Director::getInstance()->replaceScene(TransitionFade::create(0.5f, loadingScene));
 }
 

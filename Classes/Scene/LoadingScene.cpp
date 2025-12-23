@@ -1,10 +1,18 @@
+// LoadingScene.cpp - 修复版本
 #include "LoadingScene.h"
 #include "GameScene.h"
+#include "Map/GameMapLayer.h"
+#include "UI/HUDLayer.h"
+#include "Core/GameManager.h"
 
 USING_NS_CC;
 
-Scene* LoadingScene::createScene() {
-    return LoadingScene::create();
+Scene* LoadingScene::createScene(std::function<cocos2d::Scene* ()> sceneCreator) {
+    auto scene = LoadingScene::create();
+    auto loadingNode = static_cast<LoadingScene*>(scene);
+    loadingNode->setSceneCreator(sceneCreator);
+    loadingNode->startRealLoading();
+    return scene;
 }
 
 bool LoadingScene::init() {
@@ -76,82 +84,269 @@ bool LoadingScene::init() {
     versionLabel->setColor(Color3B(120, 120, 140));
     this->addChild(versionLabel);
 
-    // 初始化进度
-    _nextScene = nullptr;
+    // 初始化状态
+    _currentState = LoadingState::INITIALIZING;
+    _currentResourceIndex = 0;
+    _totalResources = 0;
+    _successfullyLoaded = 0;
+    _failedToLoad = 0;
+    _elapsedTime = 0.0f;
+    _minDisplayTime = 2.0f; // 最小显示2秒
+    _preCreatedScene = nullptr;
 
-    // 开始模拟加载
-    this->schedule(CC_SCHEDULE_SELECTOR(LoadingScene::onLoadingComplete), 0.05f);
+    // 定义需要加载的资源列表
+    _resourcesToLoad.clear();
+
+    // 添加基本的UI纹理
+    addResourcesToLoad({
+        "Images/UI/button_normal.png",
+        "Images/UI/button_pressed.png",
+        "Images/UI/panel_bg.png",
+        "Images/UI/progress_bar.png"
+        });
+
+    // 添加地形纹理
+    addResourcesToLoad({
+        "Images/Terrain/grass.png",
+        "Images/Terrain/forest.png",
+        "Images/Terrain/mountain.png",
+        "Images/Terrain/water.png",
+        "Images/Terrain/desert.png",
+        "Images/Terrain/tundra.png"
+        });
+
+    // 添加单位纹理
+    addResourcesToLoad({
+        "Images/Units/settler.png",
+        "Images/Units/warrior.png",
+        "Images/Units/builder.png",
+        "Images/Units/scout.png"
+        });
+
+    // 添加领袖图片
+    addResourcesToLoad({
+        "Images/Leaders/CivChina.png",
+        "Images/Leaders/CivGermany.png",
+        "Images/Leaders/CivRussia.png"
+        });
+
+    _totalResources = _resourcesToLoad.size();
 
     return true;
 }
 
-void LoadingScene::setNextScene(cocos2d::Scene* scene) {
-    // 修复：保持引用计数
-    if (_nextScene) {
-        _nextScene->release();
-    }
-    _nextScene = scene;
-    if (_nextScene) {
-        _nextScene->retain();  // 保留引用
-    }
+void LoadingScene::setSceneCreator(std::function<cocos2d::Scene* ()> creator) {
+    _sceneCreator = creator;
 }
 
-LoadingScene::~LoadingScene() {
-    // 清理时释放引用
-    if (_nextScene) {
-        _nextScene->release();
-        _nextScene = nullptr;
-    }
+void LoadingScene::addResourceToLoad(const std::string& resourcePath) {
+    _resourcesToLoad.push_back(resourcePath);
+    _totalResources = _resourcesToLoad.size();
 }
 
-void LoadingScene::onLoadingComplete(float dt) {
-    static float progress = 0.0f;
-    static int step = 0;
-    static const char* steps[] = {
-        "Initializing game systems...",
-        "Generating world map...",
-        "Creating civilizations...",
-        "Setting up AI opponents...",
-        "Loading textures and assets...",
-        "Finalizing game state...",
-        "Starting game..."
-    };
+void LoadingScene::addResourcesToLoad(const std::vector<std::string>& resources) {
+    for (const auto& resource : resources) {
+        _resourcesToLoad.push_back(resource);
+    }
+    _totalResources = _resourcesToLoad.size();
+}
 
-    // 更新进度
-    progress += 1.5f; // 控制加载速度
-    if (progress > 100.0f) {
-        progress = 100.0f;
+void LoadingScene::startRealLoading() {
+    CCLOG("Starting real loading with %d resources", _totalResources);
+
+    // 开始加载计时器
+    _elapsedTime = 0.0f;
+    _currentState = LoadingState::INITIALIZING;
+
+    // 每帧更新加载状态
+    this->schedule(CC_SCHEDULE_SELECTOR(LoadingScene::onLoadingUpdate), 0.016f);
+}
+
+void LoadingScene::onLoadingUpdate(float dt) {
+    _elapsedTime += dt;
+
+    // 更新进度条（混合真实进度和虚假进度）
+    float fakeProgress = (_elapsedTime / _minDisplayTime) * 100.0f;
+    float realProgress = 0.0f;
+
+    switch (_currentState) {
+        case LoadingState::INITIALIZING:
+            _loadingLabel->setString("Initializing game systems...");
+            fakeProgress = 0.0f;
+
+            // 短暂初始化后进入资源加载阶段
+            if (_elapsedTime > 0.3f) {
+                _currentState = LoadingState::LOADING_TEXTURES;
+                _currentResourceIndex = 0;
+                _successfullyLoaded = 0;
+                _failedToLoad = 0;
+            }
+            break;
+
+        case LoadingState::LOADING_TEXTURES:
+            _loadingLabel->setString("Loading basic assets...");
+
+            // 计算真实进度
+            if (_totalResources > 0) {
+                realProgress = (float)_currentResourceIndex / (float)_totalResources * 100.0f;
+            }
+
+            // 异步加载资源
+            if (_currentResourceIndex < _totalResources) {
+                std::string resourcePath = _resourcesToLoad[_currentResourceIndex];
+
+                // 异步加载纹理
+                Director::getInstance()->getTextureCache()->addImageAsync(
+                    resourcePath,
+                    CC_CALLBACK_1(LoadingScene::onSingleResourceLoaded, this)
+                );
+
+                _currentResourceIndex++;
+            }
+            else {
+                // 所有资源都已开始加载，等待回调完成
+                if (_successfullyLoaded + _failedToLoad >= _totalResources) {
+                    CCLOG("All resources loaded: %d success, %d failed",
+                        _successfullyLoaded, _failedToLoad);
+
+                    // 进入预创建场景阶段
+                    _currentState = LoadingState::PRE_CREATING_SCENE;
+                    _elapsedTime = 0.0f;
+                }
+            }
+            break;
+
+        case LoadingState::PRE_CREATING_SCENE:
+            _loadingLabel->setString("Initializing game instances...");
+
+            // 计算进度
+            if (_elapsedTime < 0.5f) {
+                // 模拟进度：75%到90%
+                realProgress = 75.0f + (_elapsedTime / 0.5f) * 15.0f;
+            }
+            else {
+                // 同步预创建游戏场景
+                preCreateGameObjectsSync();
+                _currentState = LoadingState::FINALIZING;
+                _elapsedTime = 0.0f;
+            }
+            break;
+
+        case LoadingState::FINALIZING:
+            _loadingLabel->setString("Shifting the layer...");
+
+            // 模拟最终阶段
+            if (_elapsedTime < 0.5f) {
+                realProgress = 90.0f + (_elapsedTime / 0.5f) * 10.0f;
+            }
+            else {
+                _currentState = LoadingState::COMPLETE;
+                realProgress = 100.0f;
+            }
+            break;
+
+        case LoadingState::COMPLETE:
+            _loadingLabel->setString("Updating global state...");
+            realProgress = 100.0f;
+
+            // 确保最小显示时间
+            if (_elapsedTime >= _minDisplayTime) {
+                this->unschedule(CC_SCHEDULE_SELECTOR(LoadingScene::onLoadingUpdate));
+
+                // 立即跳转，不使用延迟
+                goToNextScene();
+            }
+            break;
     }
 
-    _progressBar->setPercentage(progress);
+    // 混合真实进度和虚假进度
+    float displayProgress;
+    if (_currentState == LoadingState::INITIALIZING) {
+        displayProgress = fakeProgress;
+    }
+    else {
+        // 使用真实进度为主，但确保不会倒退
+        displayProgress = std::max(realProgress, _progressBar->getPercentage());
 
-    // 每15%更新一次状态文本
-    if (progress >= 15.0f * (step + 1) && step < 6) {
-        step++;
-        if (step < 7) {
-            _loadingLabel->setString(steps[step]);
+        // 如果真实进度太慢，稍微加点速
+        if (displayProgress < fakeProgress && fakeProgress < 90.0f) {
+            displayProgress += 0.5f;
         }
     }
 
-    // 加载完成后跳转
-    if (progress >= 100.0f) {
-        this->unschedule(CC_SCHEDULE_SELECTOR(LoadingScene::onLoadingComplete));
+    // 更新进度条
+    _progressBar->setPercentage(displayProgress);
 
-        // 延迟0.5秒后跳转
-        this->scheduleOnce([this](float dt) {
-            Scene* targetScene = nullptr;
-
-            if (_nextScene) {
-                targetScene = _nextScene;
-            }
-            else {
-                // 默认跳转到游戏场景
-                targetScene = GameScene::createScene();
-            }
-
-            if (targetScene) {
-                Director::getInstance()->replaceScene(TransitionFade::create(0.8f, targetScene));
-            }
-            }, 0.5f, "jump_to_game");
+    // 更新加载标签
+    if (_currentState == LoadingState::LOADING_TEXTURES && _totalResources > 0) {
+        std::string progressText = StringUtils::format(
+            "Loading assets... (%d/%d)",
+            _currentResourceIndex, _totalResources
+        );
+        _loadingLabel->setString(progressText);
     }
+}
+
+void LoadingScene::onSingleResourceLoaded(cocos2d::Texture2D* texture) {
+    if (texture) {
+        _successfullyLoaded++;
+    }
+    else {
+        _failedToLoad++;
+    }
+}
+
+void LoadingScene::preCreateGameObjectsSync() {
+    CCLOG("Synchronously pre-creating game scene...");
+
+    // 直接创建游戏场景并完成所有初始化
+    if (_sceneCreator) {
+        _preCreatedScene = _sceneCreator();
+    }
+    else {
+        _preCreatedScene = GameScene::createScene();
+    }
+
+    if (_preCreatedScene) {
+        // 重要：保留引用，防止被自动释放池释放
+        _preCreatedScene->retain();
+        CCLOG("GameScene created and retained in LoadingScene");
+
+        // 强制GameScene完成所有初始化
+        auto gameScene = dynamic_cast<GameScene*>(_preCreatedScene);
+        if (gameScene) {
+            // GameScene的init已经在createScene中调用过
+            CCLOG("GameScene already initialized in createScene");
+        }
+    }
+}
+
+void LoadingScene::goToNextScene() {
+    CCLOG("Transitioning to game scene...");
+
+    Scene* targetScene = nullptr;
+
+    if (_sceneCreator) {
+        // 使用场景创建函数
+        targetScene = _sceneCreator();
+    }
+    else {
+        // 默认创建游戏场景
+        targetScene = GameScene::createScene();
+    }
+
+    if (targetScene) {
+        // 直接切换到GameScene
+    // GameScene会自己显示覆盖层并完成初始化
+        auto gameScene = GameScene::createScene();
+        Director::getInstance()->replaceScene(gameScene);
+    }
+    else {
+        CCLOGERROR("Failed to create target scene!");
+    }
+}
+
+void LoadingScene::onExit() {
+    CCLOG("LoadingScene onExit called");
+    Scene::onExit();
 }
