@@ -128,6 +128,11 @@ Player* GameManager::getCurrentPlayer() const {
     return getPlayer(currentPlayerId);
 }
 
+void GameManager::setCurrentPlayer(int index)
+{
+    m_currentPlayerIndex = 0;
+}
+
 Player* GameManager::getNextPlayer() const {
     if (m_playerOrder.empty()) {
         return nullptr;
@@ -208,6 +213,48 @@ void GameManager::endTurn() {
         if (winnerId != -1) {
             notifyVictory(victoryType, winnerId);
             m_gameState = GameState::GAME_OVER;
+        }
+    }
+}
+
+void GameManager::initializePlayerStartingUnits(cocos2d::Node* parentNode,
+    std::function<Hex(int)> getStartHexForPlayerFunc,
+    std::function<void(AbstractUnit*)> addToMapFunc,
+    std::function<bool(Hex)> checkCityFunc,
+    std::function<int(Hex)> getTerrainCostFunc) {
+
+    if (m_players.empty()) {
+        CCLOG("No players to initialize starting units for");
+        return;
+    }
+
+    CCLOG("Initializing starting units for %d players", m_players.size());
+
+    for (auto player : m_players) {
+        if (!player || player->getState() != Player::PlayerState::ACTIVE) {
+            continue;
+        }
+
+        // 为每个玩家创建起始六边形函数
+        auto getStartHexFunc = [getStartHexForPlayerFunc, player]() -> Hex {
+            if (getStartHexForPlayerFunc) {
+                return getStartHexForPlayerFunc(player->getPlayerId());
+            }
+            // 默认返回地图中心
+            return Hex(55, 15);
+            };
+
+        // 设置玩家回调函数
+        player->setMapCallbacks(getStartHexFunc, addToMapFunc, checkCityFunc, getTerrainCostFunc);
+
+        // 创建起始开拓者
+        auto settler = player->createStartingSettler(parentNode, getStartHexFunc, addToMapFunc, checkCityFunc);
+
+        if (settler) {
+            CCLOG("Successfully created starting settler for player %d", player->getPlayerId());
+        }
+        else {
+            CCLOG("Failed to create starting settler for player %d", player->getPlayerId());
         }
     }
 }
@@ -309,9 +356,12 @@ VictoryType GameManager::checkVictoryConditions() {
 }
 
 bool GameManager::checkScienceVictory() const {
+    if (m_gameState != GameState::PLAYING) {  // 添加状态检查
+        return false;
+    }
+
     for (auto player : m_players) {
         if (player && player->checkScienceVictory()) {
-            CCLOG("Player %d achieves science victory!", player->getPlayerId());
             return true;
         }
     }

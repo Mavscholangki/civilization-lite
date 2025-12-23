@@ -128,6 +128,18 @@ public:
     const std::vector<AbstractUnit*>& getUnits() const { return m_units; }
     int getUnitCount() const { return m_units.size(); }
 
+    // ==================== 起始单位管理 ====================
+    AbstractUnit* createStartingSettler(cocos2d::Node* parentNode,
+        std::function<Hex()> getStartHexFunc,
+        std::function<void(AbstractUnit*)> addToMapFunc,
+        std::function<bool(Hex)> checkCityFunc);
+
+    // 设置布局和地图函数回调
+    void setMapCallbacks(std::function<Hex()> getStartHexFunc,
+        std::function<void(AbstractUnit*)> addToMapFunc,
+        std::function<bool(Hex)> checkCityFunc,
+        std::function<int(Hex)> getTerrainCostFunc);
+
     // ==================== 科技系统接口 ====================
     // TechEventListener 实现
     virtual void onTechActivated(int techId, const std::string& techName,
@@ -195,6 +207,15 @@ private:
     // ==================== 游戏实体 ====================
     std::vector<BaseCity*> m_cities;        // 城市列表
     std::vector<AbstractUnit*> m_units;     // 单位列表
+
+    // 起始单位回调函数
+    std::function<Hex()> m_getStartHexFunc;
+    std::function<void(AbstractUnit*)> m_addToMapFunc;
+    std::function<bool(Hex)> m_checkCityFunc;
+    std::function<int(Hex)> m_getTerrainCostFunc;
+
+    // 起始单位
+    AbstractUnit* m_startingSettler = nullptr;
 
     // ==================== 回合统计 ====================
     TurnStats m_turnStats;

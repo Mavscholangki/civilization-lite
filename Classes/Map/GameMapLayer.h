@@ -48,6 +48,16 @@ public:
      * 4. 注册触摸事件监听器
      */
     virtual bool init();
+
+    /**
+     * @brief 初始化GameManager和玩家类
+     * @return true 初始化成功，false 失败
+     *
+     * 此方法会：
+     * 1. 创建玩家初始开拓者
+     * 2. 绑定到当前玩家
+     */
+    void initGameManagerAndPlayers();
     
     /**
      * @brief 创建函数

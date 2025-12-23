@@ -61,20 +61,6 @@ bool GameMapLayer::init() {
     }
     // ============================================================
 
-    auto unit = Settler::create();
-    unit->initUnit(0, startHex);
-    this->addChild(unit, 10);
-
-    unit->onCheckCity = [this](Hex h) {
-        return this->getCityAt(h) != nullptr;
-        };
-    _myUnit = unit;
-    _allUnits.push_back(unit);
-
-    if (_myUnit) {
-        _myUnit->setPosition(_layout->hexToPixel(startHex));
-    }
-
     // ============================================================
     // 【修改点】：镜头跟随出生点
     // ============================================================
@@ -87,9 +73,117 @@ bool GameMapLayer::init() {
     Vec2 centerOffset = Vec2(visibleSize.width / 2, visibleSize.height / 2) - unitPos;
     this->setPosition(centerOffset);
 
+    initGameManagerAndPlayers();
+
     return true;
 }
 
+void GameMapLayer::initGameManagerAndPlayers() {
+    // 获取游戏管理器
+    auto gameManager = GameManager::getInstance();
+    if (!gameManager) {
+        CCLOG("GameManager not initialized");
+        return;
+    }
+
+    // 如果游戏管理器没有玩家，创建默认玩家
+    if (gameManager->getAllPlayers().empty()) {
+        CCLOG("Creating default player...");
+
+        // 创建游戏配置
+        GameConfig config;
+        config.maxTurns = 500;
+        config.enableScienceVictory = true;
+        config.enableDominationVictory = true;
+
+        // 初始化游戏管理器
+        gameManager->initialize(config);
+
+        // 创建玩家
+        auto player = Player::create(0, CivilizationType::BASIC);
+        if (player) {
+            gameManager->addPlayer(player);
+            CCLOG("Default player created with ID 0");
+        }
+    }
+
+    // 初始化玩家起始单位后，设置游戏状态为PLAYING
+    gameManager->setGameState(GameState::PLAYING);
+
+    // 确保当前玩家索引正确
+    gameManager->setCurrentPlayer(0);  // 或者通过其他方式设置
+
+    // 创建玩家起始位置的函数
+    auto getStartHexForPlayer = [this](int playerId) -> Hex {
+        // 为不同玩家选择不同的起始位置
+        // 这里简化处理：玩家0在地图中心，其他玩家在随机位置
+        if (playerId == 0) {
+            return Hex(55, 15); // 玩家0在地图中心
+        }
+        else {
+            // 为AI玩家选择随机位置（确保是陆地）
+            int maxQ = 120; // 地图宽度
+            int maxR = 50;  // 地图高度
+
+            for (int attempt = 0; attempt < 100; attempt++) {
+                int q = cocos2d::random(10, maxQ - 10);
+                int r = cocos2d::random(10, maxR - 10);
+                Hex testHex(q, r);
+
+                if (getTerrainCost(testHex) > 0) {
+                    return testHex;
+                }
+            }
+
+            // 如果找不到合适位置，返回默认位置
+            return Hex(55 + playerId * 10, 15 + playerId * 5);
+        }
+        };
+
+    // 添加单位到地图的函数
+    auto addUnitToMap = [this](AbstractUnit* unit) {
+        if (unit) {
+            this->addChild(unit, 10);
+            _allUnits.push_back(unit);
+
+            // 设置单位位置
+            Hex pos = unit->getGridPos();
+            unit->setPosition(_layout->hexToPixel(pos));
+
+            // 如果是玩家0的单位，设置镜头跟随
+            if (unit->getOwnerId() == 0) {
+                _myUnit = unit;
+
+                // 镜头跟随出生点
+                auto visibleSize = Director::getInstance()->getVisibleSize();
+                Vec2 unitPos = _layout->hexToPixel(pos);
+                Vec2 centerOffset = Vec2(visibleSize.width / 2, visibleSize.height / 2) - unitPos;
+                this->setPosition(centerOffset);
+
+                CCLOG("Player 0 unit created, camera focused at (%d, %d)", pos.q, pos.r);
+            }
+        }
+        };
+
+    // 检查城市存在的函数
+    auto checkCityAt = [this](Hex hex) -> bool {
+        return getCityAt(hex) != nullptr;
+        };
+
+    // 获取地形消耗的函数
+    auto getTerrainCost = [this](Hex hex) -> int {
+        return this->getTerrainCost(hex);
+        };
+
+    // 初始化玩家起始单位
+    gameManager->initializePlayerStartingUnits(
+        this,               // 父节点
+        getStartHexForPlayer, // 获取起始位置的函数
+        addUnitToMap,       // 添加单位到地图的函数
+        checkCityAt,        // 检查城市存在的函数
+        getTerrainCost      // 获取地形消耗的函数
+    );
+}
 
 void GameMapLayer::generateMap() {
     int mapWidth = 120;
@@ -198,23 +292,28 @@ void GameMapLayer::onTouchMoved(Touch* touch, Event* event) {
 }
 
 void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
-    // 如果是拖拽操作结束，不处理点击逻辑
+    // 首先判断是否是拖拽，如果是就不处理单元逻辑
     if (_isDragging) return;
 
-    // 1. 坐标转换 (Touch -> NodeSpace -> Hex)
+    // 1. 将触摸转换 (Touch -> NodeSpace -> Hex)
     Vec2 clickPos = this->convertToNodeSpace(touch->getLocation());
     Hex clickHex = _layout->pixelToHex(clickPos);
 
     CCLOG("Touch Hex: %d, %d", clickHex.q, clickHex.r);
 
-    // ------------------------------------------------------------
-    // 双击检测逻辑
-    // ------------------------------------------------------------
+    // 【修复：添加调试日志】
+    CCLOG("SelectedUnit: %s, moves: %d", 
+          _selectedUnit ? _selectedUnit->getUnitName().c_str() : "NULL",
+          _selectedUnit ? _selectedUnit->getCurrentMoves() : -1);
+
+    // ============================================================
+    // 双击逻辑处理
+    // ============================================================
     auto now = std::chrono::steady_clock::now();
     long long diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastClickTime).count();
 
     bool isDoubleTap = false;
-    // 如果点击的是同一个格子，且间隔小于 300ms
+    // 检查是否同一个六边形，且间隔小于 300ms
     if (clickHex == _lastClickHex && diff < 300) {
         isDoubleTap = true;
     }
@@ -223,14 +322,14 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
     _lastClickTime = now;
     _lastClickHex = clickHex;
 
-    // ------------------------------------------------------------
-    // 分支 A: 双击事件 (执行移动/攻击)
-    // ------------------------------------------------------------
+    // ============================================================
+    // 分支 A: 双击事件（执行移动/攻击）
+    // ============================================================
     if (isDoubleTap) {
-        // 只有当前选中了己方单位才处理
+        // 只有当前选中的我方单位才能执行
         if (_selectedUnit && _selectedUnit->getOwnerId() == 0) {
 
-            // 排除点击自己脚下
+            // 排除攻击自己目标
             if (clickHex != _selectedUnit->getGridPos()) {
 
                 // 1. 检查攻击
@@ -239,52 +338,72 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
                     // handleAttack(enemy);
                     CCLOG("Double Tap -> Attack Enemy!");
 
-                    // 重置双击状态，防止三击
+                    // 重置双击状态以防止再次触发
                     _lastClickHex = Hex(-999, -999);
                     return;
                 }
 
-                // 2. 检查移动
+                // 2. 执行移动 【核心修复】
                 auto costFunc = [this](Hex h) { return this->getTerrainCost(h); };
                 std::vector<Hex> path = PathFinder::findPath(_selectedUnit->getGridPos(), clickHex, costFunc);
 
-                if (!path.empty() && (int)path.size() - 1 <= _selectedUnit->getCurrentMoves()) {
-                    // 执行移动
-                    _selectedUnit->moveTo(clickHex, _layout);
+                if (!path.empty()) {
+                    // 【修复：计算实际需要的移动力消耗】
+                    int pathCost = 0;
+                    for (size_t i = 1; i < path.size(); i++) {
+                        int tileCost = getTerrainCost(path[i]);
+                        if (tileCost < 0) {
+                            // 路径无法通过
+                            pathCost = INT_MAX;
+                            break;
+                        }
+                        pathCost += tileCost;
+                    }
 
-                    // 移动后更新视觉状态
-                    updateSelection(clickHex);
-                    _selectedUnit->hideMoveRange();
+                    // 【修复：检查移动力是否足够】
+                    if (pathCost <= _selectedUnit->getCurrentMoves()) {
+                        // 执行移动
+                        _selectedUnit->moveTo(clickHex, _layout);
 
-                    // 重置双击状态
-                    _lastClickHex = Hex(-999, -999);
+                        // 移动成功更新视觉状态
+                        updateSelection(clickHex);
+                        _selectedUnit->hideMoveRange();
+
+                        // 重置双击状态
+                        _lastClickHex = Hex(-999, -999);
+                        CCLOG("Double Tap Move -> Cost: %d, Remaining: %d", 
+                              pathCost, _selectedUnit->getCurrentMoves());
+                    }
+                    else {
+                        CCLOG("移动力不足！需要：%d，当前：%d", pathCost, _selectedUnit->getCurrentMoves());
+                    }
                 }
                 else {
-                    CCLOG("无法移动：不可达或太远");
+                    CCLOG("无法找到路径到目标");
                 }
             }
         }
-        return; // 双击处理完毕，直接返回
+        return; // 双击事件处理完毕，直接返回
     }
 
-    // ------------------------------------------------------------
-    // 分支 B: 单击事件 (执行选中/切换)
-    // ------------------------------------------------------------
+    // ============================================================
+    // 分支 B: 单击事件（执行选择/切换）
+    // ============================================================
 
-    // 无论点哪里，先更新黄色选中框，提供视觉反馈
+    // 更新浅蓝色背景选中框框提示用户
     updateSelection(clickHex);
 
     AbstractUnit* clickedUnit = getUnitAt(clickHex);
     BaseCity* clickedCity = getCityAt(clickHex);
 
     if (clickedUnit) {
-        // --- 情况1: 点中单位 ---
+        // --- 情况1: 点击单位 ---
         if (_selectedUnit == clickedUnit) {
             _selectedUnit->hideMoveRange();
             _selectedUnit = nullptr;
-            _selectionNode->clear(); // 清除黄框
+            _selectionNode->clear(); // 清除框
             if (_onUnitSelected) _onUnitSelected(nullptr);
-            return; // 结束
+            return; // 退出
         }
 
         if (_selectedUnit != clickedUnit) {
@@ -299,11 +418,11 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
             auto costFunc = [this](Hex h) { return this->getTerrainCost(h); };
             _selectedUnit->showMoveRange(_layout, costFunc);
         }
-        // 点单位时关闭城市面板
+        // 单击单位时关闭城市面板
         if (_onCitySelected) _onCitySelected(nullptr);
     }
     else if (clickedCity) {
-        // --- 情况2: 点中城市 ---
+        // --- 情况2: 点击城市 ---
         if (_selectedUnit) {
             _selectedUnit->hideMoveRange();
             _selectedUnit = nullptr;
@@ -313,8 +432,8 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
         if (_onCitySelected) _onCitySelected(clickedCity);
     }
     else {
-        // --- 情况3: 点中空地 ---
-        // 【关键】点空地不取消单位选中！这样才能允许你再次点击(双击)来移动。
+        // --- 情况3: 点击空地 ---
+        // 空地位置可以通过点击移动，或需要再次点击(双击)来移动。
         // 只关闭城市面板
         if (_onCitySelected) _onCitySelected(nullptr);
     }
@@ -339,6 +458,12 @@ void GameMapLayer::setOnUnitSelectedCallback(const std::function<void(AbstractUn
 void GameMapLayer::onBuildCityAction() {
     if (!_selectedUnit) return;
 
+    // 【核心修复】：检查单位是否属于人类玩家
+    if (_selectedUnit->getOwnerId() != 0) {
+        CCLOG("只有玩家 0 的单位可以建城！当前单位属于玩家 %d", _selectedUnit->getOwnerId());
+        return;
+    }
+
     Hex pos = _selectedUnit->getGridPos();
 
     auto city = BaseCity::create(0, pos, "Rome");
@@ -353,7 +478,7 @@ void GameMapLayer::onBuildCityAction() {
             // 添加到玩家的城市列表
             currentPlayer->addCity(city);
 
-            CCLOG("City added to Player %d, total cities: %d",
+            CCLOG("城市已添加到玩家 %d，城市总数: %d",
                 currentPlayer->getPlayerId(), currentPlayer->getCityCount());
         }
         else {

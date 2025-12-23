@@ -5,6 +5,7 @@
 #include "../Civilizations/CivChina.h"
 #include "../Civilizations/CivGermany.h"
 #include "../Civilizations/CivRussia.h"
+#include "../Units/Civilian/Settler.h"
 
 USING_NS_CC;
 
@@ -14,6 +15,7 @@ USING_NS_CC;
 Player::Player()
     : m_policyManager(&m_cultureTree)
     , m_civilization(nullptr)
+    , m_startingSettler(nullptr)
 {
 }
 
@@ -74,6 +76,11 @@ bool Player::init(int playerId, CivilizationType civType) {
     CCLOG("Player %d (%s) initialized with civilization %s",
         m_playerId, m_playerName.c_str(),
         m_civilization ? typeid(*m_civilization).name() : "Unknown");
+
+    m_getStartHexFunc = nullptr;
+    m_addToMapFunc = nullptr;
+    m_checkCityFunc = nullptr;
+    m_getTerrainCostFunc = nullptr;
 
     return true;
 }
@@ -139,6 +146,11 @@ void Player::cleanupResources() {
 void Player::onTurnBegin() {
     m_turnStats = TurnStats();
 
+    // 更新单位状态
+    for (auto unit : m_units) {
+        unit->onTurnStart();
+    }
+
     if (m_cities.empty()) {
         CCLOG("Player %d has no cities!", m_playerId);
         int maintenance = calculateMaintenanceCost();
@@ -185,10 +197,7 @@ void Player::onTurnBegin() {
     // 5. 更新研究进度
     updateResearchProgress();
 
-    // 6. 更新单位状态
-    for (auto unit : m_units) {
-        unit->onTurnStart();
-    }
+    
 
     // 7. 计算维护费
     int maintenance = calculateMaintenanceCost();
@@ -371,6 +380,84 @@ void Player::removeUnit(AbstractUnit* unit) {
         (*it)->release();
         m_units.erase(it);
     }
+}
+
+void Player::setMapCallbacks(std::function<Hex()> getStartHexFunc,
+    std::function<void(AbstractUnit*)> addToMapFunc,
+    std::function<bool(Hex)> checkCityFunc,
+    std::function<int(Hex)> getTerrainCostFunc) {
+    m_getStartHexFunc = getStartHexFunc;
+    m_addToMapFunc = addToMapFunc;
+    m_checkCityFunc = checkCityFunc;
+    m_getTerrainCostFunc = getTerrainCostFunc;
+
+    CCLOG("Player %d map callbacks set", m_playerId);
+}
+
+AbstractUnit* Player::createStartingSettler(cocos2d::Node* parentNode,
+    std::function<Hex()> getStartHexFunc,
+    std::function<void(AbstractUnit*)> addToMapFunc,
+    std::function<bool(Hex)> checkCityFunc) {
+
+    // 如果提供了参数，更新回调函数
+    if (getStartHexFunc) m_getStartHexFunc = getStartHexFunc;
+    if (addToMapFunc) m_addToMapFunc = addToMapFunc;
+    if (checkCityFunc) m_checkCityFunc = checkCityFunc;
+
+    // 检查必要的回调函数
+    if (!m_getStartHexFunc) {
+        CCLOG("Error: Player %d cannot create settler - no start hex function", m_playerId);
+        return nullptr;
+    }
+
+    if (!m_addToMapFunc) {
+        CCLOG("Error: Player %d cannot create settler - no add to map function", m_playerId);
+        return nullptr;
+    }
+
+    // 获取起始位置
+    Hex startHex = m_getStartHexFunc();
+
+    // 寻找最近的陆地
+    int safeGuard = 0;
+    while (m_getTerrainCostFunc && m_getTerrainCostFunc(startHex) < 0 && safeGuard < 500) {
+        startHex.q++; // 向右移动
+
+        if (safeGuard % 20 == 0) {
+            startHex.q -= 20;
+            startHex.r++;
+        }
+        safeGuard++;
+    }
+
+    CCLOG("Player %d starting position: Hex(%d, %d)", m_playerId, startHex.q, startHex.r);
+
+    // 创建开拓者单位
+    auto unit = Settler::create();
+    if (unit && unit->initUnit(m_playerId, startHex)) {
+        unit->autorelease();
+
+        // 设置城市检查回调
+        if (m_checkCityFunc) {
+            unit->onCheckCity = m_checkCityFunc;
+        }
+
+        m_startingSettler = unit;
+
+        // 添加到玩家单位列表
+        addUnit(unit);
+
+        // 通过回调函数添加到地图
+        m_addToMapFunc(unit);
+
+        CCLOG("Player %d created starting settler at (%d, %d)",
+            m_playerId, startHex.q, startHex.r);
+
+        return unit;
+    }
+
+    CCLOG("Error: Player %d failed to create starting settler", m_playerId);
+    return nullptr;
 }
 
 // ==================== 科技系统接口 ====================

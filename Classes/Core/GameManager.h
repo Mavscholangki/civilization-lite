@@ -83,11 +83,21 @@ public:
     // 获取当前玩家
     Player* getCurrentPlayer() const;
 
+    // 设置当前玩家
+    void setCurrentPlayer(int index);
+
     // 获取下一个玩家
     Player* getNextPlayer() const;
 
     // 结束当前玩家回合
     void endTurn();
+
+    // 初始化玩家起始单位
+    void initializePlayerStartingUnits(cocos2d::Node* parentNode,
+        std::function<Hex(int)> getStartHexForPlayerFunc,
+        std::function<void(AbstractUnit*)> addToMapFunc,
+        std::function<bool(Hex)> checkCityFunc,
+        std::function<int(Hex)> getTerrainCostFunc);
 
     // 检查胜利条件
     VictoryType checkVictoryConditions();
