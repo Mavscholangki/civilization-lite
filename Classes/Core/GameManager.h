@@ -7,6 +7,9 @@
 #include <vector>
 #include <map>
 
+const int MAX_AI_PLAYERS = 6;  // 最大AI玩家数量，方便调试
+const int MIN_AI_PLAYERS = 1;  // 最少AI玩家数量
+
 // 游戏状态
 enum class GameState {
     INITIALIZING,      // 初始化中

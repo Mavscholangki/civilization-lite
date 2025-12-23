@@ -1,5 +1,5 @@
 #include "MainMenuScene.h"
-#include "GameScene.h" // 点击开始后要跳转到 GameScene
+#include "SelectionScene.h" // 点击开始后要跳转到 SelectionScene
 
 USING_NS_CC;
 using namespace cocos2d::ui; // 使用 UI 命名空间
@@ -50,9 +50,17 @@ bool MainMenuScene::init() {
 
 void MainMenuScene::onNewGameClicked(Ref* sender) {
     CCLOG("Start New Game...");
-    // 切换场景：带有淡入淡出特效 (1.0秒)
+
+    // 先跳转到Loading场景，然后从Loading场景跳转到GameScene
+    auto loadingScene = LoadingScene::createScene();
+    auto loadingNode = static_cast<LoadingScene*>(loadingScene);
+
+    // 设置要跳转的下一个场景（GameScene）
     auto gameScene = GameScene::createScene();
-    Director::getInstance()->replaceScene(TransitionFade::create(1.0f, gameScene));
+    loadingNode->setNextScene(gameScene);
+
+    auto civSelectionScene = CivilizationSelectionScene::createScene();
+    Director::getInstance()->replaceScene(TransitionFade::create(0.8f, civSelectionScene));
 }
 
 void MainMenuScene::onExitClicked(Ref* sender) {

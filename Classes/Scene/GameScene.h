@@ -4,6 +4,7 @@
 #include "cocos2d.h"
 #include "Map/TileData.h"
 #include "Utils/HexUtils.h"
+#include "SelectionScene.h"
 
 // Ç°ÏòÉùÃ÷
 class TechTree;
