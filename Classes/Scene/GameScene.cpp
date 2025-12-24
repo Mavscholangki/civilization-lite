@@ -495,9 +495,24 @@ void GameScene::setupCallbacks() {
         }
         });
 
-    // HUD建城按钮 -> 地图层建城动画
+    // HUD建城按钮 -> 执行建城、隐藏按钮、显示生产面板
     _hudLayer->setBuildCityCallback([this]() {
+        CCLOG("GameScene: Received Build City Request");
+
+        // 1. 执行地图层的建城逻辑（创建城市模型、消耗开拓者）
         _mapLayer->onBuildCityAction();
+
+        // 2. 立即通知 HUD 隐藏单位信息（包含 Found City 按钮）
+        // 这解决了你提到的“可以无限点击”的问题
+        _hudLayer->hideUnitInfo();
+
+        // 3. 激活并显示生产面板（文明6风格：建城后右侧面板呼出按钮应该可见）
+        if (_productionPanelLayer) {
+            _productionPanelLayer->setVisible(true);
+            // 如果你的 CityProductionPanel 有拉出的动画接口，可以在这里调用
+            // _productionPanelLayer->slideIn(); 
+            CCLOG("GameScene: City Production Panel is now visible");
+        }
         });
 
     // 下一回合按钮回调 - 直接调用GameManager
