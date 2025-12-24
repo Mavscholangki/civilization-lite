@@ -240,6 +240,8 @@ std::vector<int> TechTree::getResearchableTechList() const {
 	return currentResearchable;
 }
 
+
+
 // 获取已激活的科技列表
 std::vector<int> TechTree::getActivatedTechList() const {
 	return activatedTechList;

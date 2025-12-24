@@ -51,7 +51,7 @@ bool MainMenuScene::init() {
 void MainMenuScene::onNewGameClicked(Ref* sender) {
     CCLOG("Start New Game...");
     // 切换场景：带有淡入淡出特效 (1.0秒)
-    auto gameScene = GameScene::createScene();
+    auto gameScene = GameScene::getInstance();
     Director::getInstance()->replaceScene(TransitionFade::create(1.0f, gameScene));
 }
 

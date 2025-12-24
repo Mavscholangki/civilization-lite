@@ -2,8 +2,32 @@
 * 城市基类
 */
 #include "BaseCity.h"
-#define RADIUS 50.0f
+#include "District/Building/Building.h"
+#include "Core/GameManager.h"
+#include "Scene/GameScene.h"
+#include <cmath>
+#define RADIUS 50.0f // 六边形半径
+
 USING_NS_CC;
+
+void warningFlash(std::string)
+{
+	auto visibleSize = Director::getInstance()->getVisibleSize();
+	// 创建Label
+	auto label = Label::createWithTTF("提示文字", "fonts/Marker Felt.ttf", 24);
+	label->setPosition(Vec2(visibleSize.width / 2, visibleSize.height / 2));
+	Director::getInstance()->getRunningScene()->addChild(label, 500);
+
+	// 设置初始透明度为0（完全透明）
+	label->setOpacity(0);
+
+	// 创建闪烁动作：淡入淡出重复
+	auto fadeIn = FadeIn::create(0.2f);
+	auto fadeOut = FadeOut::create(1.0f);
+	auto sequence = Sequence::create(fadeIn, fadeOut, nullptr);
+	auto repeatForever = RepeatForever::create(sequence);
+	label->runAction(repeatForever);
+}
 
 BaseCity* BaseCity::create(int player, Hex pos, std::string name) {
     BaseCity* pRet = new BaseCity();
@@ -33,17 +57,14 @@ bool BaseCity::initCity(int player, Hex pos, std::string name) {
 	this->addToTerritory(Hex(pos.q, pos.r - 1));
 	this->addToTerritory(Hex(pos.q + 1, pos.r - 1));
 	this->addToTerritory(Hex(pos.q - 1, pos.r + 1));
+	
 	// 创建并添加市中心区
-	Downtown* downtownDistrict = new Downtown(pos, name + " Downtown");
+	Downtown* downtownDistrict = new Downtown(this->ownerPlayer, pos, name + " Downtown");
 	this->addDistrict(static_cast<District*>(downtownDistrict)); // 添加市中心区
 
 	_visual = Node::create();
     _visual->addChild(downtownDistrict->_downtownVisual);
     this->addChild(_visual);
-
-	// 创建生产面板 
-	this->productionPanelLayer = CityProductionPanel::create();
-	this->productionPanelLayer->setVisible(false); // 初始隐藏
 
     // 城市名字
     _nameLabel = ui::Button::create();
@@ -53,21 +74,14 @@ bool BaseCity::initCity(int player, Hex pos, std::string name) {
     _nameLabel->setPosition(Vec2(0, 25));
 	_nameLabel->addClickEventListener([=](Ref* sender) {
 		// 点击城市名称时显示生产面板
-		if (productionPanelLayer->isVisible()) {
-			productionPanelLayer->setVisible(false);
-		}
-		else {
-			productionPanelLayer->setVisible(true);
-		}
+		GameScene::getInstance()->updateProductionPanel(this->ownerPlayer, this);
 		});
     
     this->addChild(_nameLabel, 100);
 	updateDistribution(); // 更新分配信息
 	updateYield(); // 更新城市总产出
 	drawTerritory(); // 绘制城市边界
-	updatePanel();
 
-	Director::getInstance()->getRunningScene()->addChild(productionPanelLayer, 100);
     return true;
 }
 
@@ -76,7 +90,7 @@ void BaseCity::drawTerritory() // 绘制城市边界
 	auto draw = DrawNode::create();
 	for (auto tile : territory) {
 		// 计算每个格子的像素位置
-		HexLayout layout(RADIUS); // 假设六边形大小为40
+		HexLayout layout(RADIUS);
 		Vec2 center = layout.hexToPixel(tile) - layout.hexToPixel(this->gridPos); // 相对于城市中心的位置
 		// 画出边界
 		Vec2 vertices[6];
@@ -125,6 +139,109 @@ void BaseCity::updateYield() // 更新城市总产出
 	cityYield = totalYield;
 }
 
+void BaseCity::updatePopulation()
+{
+	neededFoodToMultiply = 15 + 8 * (population - 1) + (float)(pow(population - 1, 1.5) + 0.5f);
+	float accumulationIncrease = (cityYield.foodYield - population * 2.f) * 0.75f;
+	currentAccumulation += accumulationIncrease;
+	if (currentAccumulation >= neededFoodToMultiply)
+	{
+		population++;
+		neededFoodToMultiply = 15 + 8 * (population - 1) + (float)(pow(population - 1, 1.5) + 0.5f);
+		currentAccumulation = 0;
+	}
+	else if (currentAccumulation < 0)
+	{
+		population--;
+		neededFoodToMultiply = 15 + 8 * (population - 1) + (float)(pow(population - 1, 1.5) + 0.5f);
+		currentAccumulation += neededFoodToMultiply;
+	}
+	updateDistribution();
+}
+
+void BaseCity::addNewProduction(ProductionProgram* newProgram)
+{
+	if (this->currentProduction != nullptr)
+		this->suspendedProductions.push_back(new ProductionProgram(*currentProduction));
+	currentProduction = newProgram;
+}
+
+void BaseCity::updateProduction()
+{
+	if (!currentProduction)
+	{
+		if (suspendedProductions.empty())
+			return;
+		currentProduction = suspendedProductions.back();
+		suspendedProductions.pop_back();
+	}
+
+	currentProduction->addProgress(this->cityYield.productionYield);
+	if (currentProduction->isCompleted())
+	{
+		if (currentProduction->getType() == ProductionProgram::ProductionType::DISTRICT)
+		{
+			districts.push_back(static_cast<District*>(currentProduction));
+		}
+		else if(currentProduction->getType() == ProductionProgram::ProductionType::BUILDING)
+		{
+			auto newBuilding = dynamic_cast<Building*>(currentProduction);
+			for (auto district : districts)
+			{
+				district->addBuilding(newBuilding->getType());
+			}
+			delete newBuilding;
+		}
+		else if(currentProduction->getType() == ProductionProgram::ProductionType::UNIT)
+		{
+			GameManager::getInstance()->getPlayer(ownerPlayer)->addUnit(dynamic_cast<AbstractUnit*>(currentProduction));
+		}
+		if (suspendedProductions.empty())
+		{
+			currentProduction = nullptr;
+		}
+		else
+		{
+			currentProduction = suspendedProductions.back();
+			suspendedProductions.pop_back();
+		}
+	}
+}
+
+void BaseCity::purchaseDirectly(ProductionProgram* newProgram)
+{
+	if (!newProgram->getCanPurchase())
+		return;
+	newProgram->purchaseCompletion();
+	int cost = newProgram->getPurchaseCost();
+	Player* player = GameManager::getInstance()->getPlayer(this->ownerPlayer);
+	if(cost <= player->getGold())
+	{
+		player->setGold(player->getGold() - newProgram->getPurchaseCost());
+		if (newProgram->getType() == ProductionProgram::ProductionType::DISTRICT)
+		{
+			districts.push_back(static_cast<District*>(newProgram));
+		}
+		else if (newProgram->getType() == ProductionProgram::ProductionType::BUILDING)
+		{
+			auto newBuilding = static_cast<Building*>(newProgram);
+			for (auto district : districts)
+			{
+				district->addBuilding(newBuilding->getType());
+			}
+			delete newBuilding;
+		}
+		else if (newProgram->getType() == ProductionProgram::ProductionType::UNIT)
+		{
+			GameManager::getInstance()->getPlayer(ownerPlayer)->addUnit(dynamic_cast<AbstractUnit*>(newProgram));
+		}
+	}
+	else
+	{
+		warningFlash("CANNOT PURCHASE: GOLD SHORTAGE");
+	}
+}
+
 void BaseCity::updateDistribution() // 更新分配信息
 {
 	int i = 0;
@@ -142,11 +259,12 @@ void BaseCity::updateDistribution() // 更新分配信息
 
 void BaseCity::updatePanel() // 更新生产面板信息
 {
-	// if (!this->productionPanelLayer) return; // 没有面板则不更新
-	this->productionPanelLayer->populationPanel->updatePanel(this->populationDistribution, this->population);
+	GameScene::getInstance()->updateProductionPanel(ownerPlayer, this);
 }
 
 void BaseCity::onTurnEnd() {
-    // 这里可以处理人口增长逻辑
-    CCLOG("City [%s] produced %d Gold, %d Science", cityName.c_str(), cityYield.goldYield, cityYield.scienceYield);
+	// 处理生产
+	updateProduction();
+    // 人口增长
+	updatePopulation();
 }

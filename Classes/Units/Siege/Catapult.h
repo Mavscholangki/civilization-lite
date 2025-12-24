@@ -17,6 +17,8 @@
 class Catapult : public AbstractUnit {
 public:
 
+    Catapult() : AbstractUnit() { cost = 30; purchaseCost = 200; prereqTechID = 8; } // 前置科技：工程学(ID 8)
+
     /**
      * @brief 获取单位名称
      * @return 弩车名称
@@ -40,16 +42,9 @@ public:
     std::string getSpritePath() const override { 
         return "units/catapult.png"; 
     }
-    int getCost() const override {
-        return 200;
-    }
-
+    
     int getMaintenanceCost() const override {
         return 2;
-    }
-
-    int getProductionCost() const override {
-        return 30;
     }
 
     bool ismilitary() const override {

@@ -6,12 +6,15 @@
 #define __DISTRICT_H__
 
 #include "Utils/HexUtils.h"
-#include "District/Building/Building.h"
 #include "Map/TileData.h"
 #include "City/Yield.h"
+#include "Development/ProductionProgram.h"
 #include <vector> 
 
-class District {
+class Building;
+
+
+class District : public ProductionProgram {
 public:
 	enum class DistrictType { // 区域类型枚举
 		DOWNTOWN, // 市中心(默认区域类型)
@@ -25,41 +28,77 @@ public:
 		TO_BE_DEFINED // 未定义
 	};
 
-	District(Hex pos, DistrictType type, std::string name);
-	~District() {
-		// 释放建筑对象
-		for (auto building : buildings) {
-			delete building;
-		}
-	}
-	virtual bool canErectDistrict(Hex where);
+	enum class BuildingCategory
+	{
+		PALACE, // 宫殿
+		MONUMENT, // 纪念碑
+		GRANARY, // 谷仓
+
+		LIBRARY, // 图书馆
+		UNIVERSITY, // 大学
+		LABORATORY, // 实验室
+
+		MARKET, // 市场
+		BANK, // 银行
+		STOCK_EXCHANGE, // 证券交易所
+
+		WORKSHOP, // 工坊
+		FACTORY, // 工厂
+		POWER_PLANT, // 发电厂
+		RHUR_VALLEY, // 鲁尔工业区(特殊建筑-德国， 原版是奇观，这里当作建筑处理)
+
+		AMPHITHEATER, // 露天剧场
+		MUSEUM, // 博物馆
+		BROADCAST_CENTER, // 广播中心
+
+		LIGHTHOUSE, // 灯塔
+		DOCKYARD, // 造船厂
+		DOCKS, // 码头
+
+		// 这里把航天中心的项目视为建筑
+		LAUNCH_SATELLITE, // 发射卫星
+
+		TO_BE_DEFINED
+	};
+
+	District(int playerID, Hex pos, DistrictType type, std::string name);
+	~District();
+	static bool isThereDistrictAt(Hex where);
+
+	// 基类函数重写
+	virtual void addProgress(int amount) override { updateProduction(amount); };
+
+
+	bool canErectDistrict(Hex where);
 	bool updateProduction(int productionYield);
 	virtual void calculateBonus();
 	void updateMaintenanceCost();
 	void updateGrossYield();
 	void updateCitizenBenefit();
 
-	virtual bool addBuilding(Building::BuildingType building) = 0;
-	inline int			getID() const { return _id; }
-	inline DistrictType getType() const { return _type; }
-	inline std::string	getName() { return _name; }
-	inline Hex			getPos() const { return _pos; }
-	inline bool			getIsConstructed() const { return isConstructed; }
-	inline int			getProductionCost() const { return productionCost; }
-	inline int			getConstructionProgress() const { return currentProgress; }
-	inline int			getTurnsRemaining() const { return turnsRemaining; }
-	inline std::string	getPrereqTech() const { return prereqTech; }
-	inline std::string	getPrereqCivic() const { return prereqCivic; }
-	inline int			getMaintenanceCost() const { return maintanenceCost; }
-	inline Yield		getCitizenBenefit() const { return citizenBenefit; }
-	inline Yield		getYield() const { return grossYield; }
+	
+	virtual bool addBuilding(BuildingCategory building);
+	
+	inline int						getPlayerID() const { return playerID; }
+	inline int						getID() const { return _id; }
+	inline DistrictType				getType() const { return _type; }
+	inline std::string				getName() { return _name; }
+	inline Hex						getPos() const { return _pos; }
+
+	inline int						getPrereqTech() const { return prereqTechID; }
+	inline int						getPrereqCivic() const { return prereqCivicID; }
+	inline std::vector<TerrainType> getPrereqTerrains() const { return prereqTerrains; }; // 建造前置地形
+	inline int						getMaintenanceCost() const { return maintanenceCost; }
+	inline Yield					getCitizenBenefit() const { return citizenBenefit; }
+	inline Yield					getYield() const { return grossYield; }
 
 protected:
 	std::vector<Hex> getHexNeighbors(Hex center);
 	// 计数所有的区域,便于编号
 	static int count;
-
+	static std::vector<Hex> districtPositions; // 已有区域的位置列表
 	// 基础信息
+	int playerID; // 区域所属玩家ID
 	int _id; // 区域的唯一标志符
 	DistrictType _type; // 区域类型
 	std::string _name; // 区域名称
@@ -68,14 +107,11 @@ protected:
 	Hex _pos; // 区域坐标
 	 
 	// 建造相关
-	bool isConstructed; // 区域是否建成
-	int productionCost; // 区域所耗生产力
-	int currentProgress; // 区域建造进度
-	int turnsRemaining; // 区域建成预计剩余回合数
 	
-	std::string prereqTech; // 建造前置科技
-	std::string prereqCivic; // 建造前置市政
-
+	int prereqTechID; // 建造前置科技
+	int prereqCivicID; // 建造前置市政
+	std::vector<TerrainType> prereqTerrains; // 建造前置地形
+	std::vector<BuildingCategory> possibleBuildings; // 包含在内的建筑
 	// 维护相关
 	int baseMaintenanceCost; // 区域维护费用
 	int buildingMaintenanceCost;// 建筑维护费用
@@ -95,10 +131,13 @@ protected:
 
 class Downtown : public District {
 public:
-	Downtown(Hex pos, std::string name);
+	Downtown(int player, Hex pos, std::string name);
+	void completeDirectly() { // 建立新城市时直接完成市中心区的建造，修复已有的市中心才需要正常建造流程
+		progress = cost;
+		status = ProductionStatus::COMPLETED;
+		updateGrossYield();
+	}
 	virtual void calculateBonus();
-	virtual bool canErectDistrict(Hex where);
-	virtual bool addBuilding(Building::BuildingType buildingType);
 	cocos2d::Node* _downtownVisual;
 };
 

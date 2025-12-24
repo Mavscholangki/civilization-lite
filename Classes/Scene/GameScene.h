@@ -4,6 +4,7 @@
 #include "cocos2d.h"
 #include "Map/TileData.h"
 #include "Utils/HexUtils.h"
+#include "City/BaseCity.h"
 
 // 前向声明
 class TechTree;
@@ -12,6 +13,7 @@ class PolicyManager;
 class GameManager;
 class Player;
 
+class BaseCity;
 class GameMapLayer;
 class HUDLayer;
 class AbstractUnit;
@@ -19,17 +21,21 @@ class CityProductionPanel;
 
 class GameScene : public cocos2d::Scene {
 public:
-    static cocos2d::Scene* createScene();
+    static GameScene* getInstance();
+
     virtual bool init();
     virtual void onExit() override;
     TileData getTileData(Hex h);
-
+    void updateProductionPanel(int playerID, BaseCity* currentCity);
     // 添加获取当前玩家的方法
     Player* getCurrentPlayer() const;
 
-    CREATE_FUNC(GameScene);
 
 private:
+    static GameScene* s_instance;
+    static cocos2d::Scene* createScene();
+    CREATE_FUNC(GameScene);
+
     // 私有实现方法 - 现在这些只是包装器，调用Player的方法
     void initTechTree();    // 已废弃，保持为空
     void initCultureTree(); // 已废弃，保持为空

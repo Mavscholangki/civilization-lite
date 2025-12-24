@@ -31,6 +31,7 @@
 class JetFighter : public AbstractUnit {
 public:
 
+    JetFighter() : AbstractUnit() { cost = 80; purchaseCost = 10600; prereqTechID = 20; } // 前置科技：高级飞行(ID 20)
     /**
      * @brief 获取单位名称
      * @return 喷气战斗机名称
@@ -55,17 +56,9 @@ public:
         return "units/jetFighter.png"; 
     }
 
-    int getCost() const override {
-        return 10600;
-    }
-
     int getMaintenanceCost() const override {
         return 8;
 	}
-
-    int getProductionCost() const override {
-        return 80;
-    }
 
     bool ismilitary() const override {
         return true;

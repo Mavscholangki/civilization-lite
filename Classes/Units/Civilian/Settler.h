@@ -16,6 +16,8 @@
 class Settler : public AbstractUnit {
 public:
 
+    Settler() { cost = 80; purchaseCost = 400; }
+
     /**
      * @brief 获取单位名称
      * @return 定居者名称
@@ -40,17 +42,9 @@ public:
         return "units/settler.png"; 
     }
 
-    int getCost() const override {
-        return 400;
-	}
-
     int getMaintenanceCost() const override {
         return 0;
     }
-
-    int getProductionCost() const override {
-        return 80;
-	}
 
     bool ismilitary() const override {
         return false;

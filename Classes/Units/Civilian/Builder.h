@@ -29,6 +29,8 @@
 class Builder : public AbstractUnit {
 public:
 
+    Builder() { cost = 50; purchaseCost = 200; }
+
     /**
      * @brief 获取单位名称
      * @return 建筑工人名称

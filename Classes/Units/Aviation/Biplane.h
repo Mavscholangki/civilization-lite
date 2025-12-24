@@ -29,6 +29,8 @@
 class Biplane : public AbstractUnit {
 public:
 
+    Biplane() : AbstractUnit() { cost = 60; purchaseCost = 1000;  prereqTechID = 18; } // 前置科技：飞行(ID 18)
+
     /**
      * @brief 获取单位名称
      * @return 双翼飞机名称
@@ -53,17 +55,10 @@ public:
         return "units/biplane.png"; 
     }
 
-    int getCost() const override {
-        return 1000; 
-	}
-
     int getMaintenanceCost() const override {
         return 5;
     }
 
-    int getProductionCost() const override {
-        return 60;
-	}
 
     bool ismilitary() const override {
         return true; 

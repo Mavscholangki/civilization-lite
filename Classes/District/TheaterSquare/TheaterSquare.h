@@ -5,10 +5,8 @@
 
 class TheaterSquare : public District {
 public:
-	TheaterSquare(Hex pos, std::string name);
+	TheaterSquare(int player, Hex pos, std::string name);
 	virtual void calculateBonus();
-	virtual bool canErectDistrict(Hex where);
-	virtual bool addBuilding(Building::BuildingType buildingType);
 	cocos2d::Node* _theaterSquareVisual;
 private:
 	static int theaterSquareCount; // 剧院广场计数器

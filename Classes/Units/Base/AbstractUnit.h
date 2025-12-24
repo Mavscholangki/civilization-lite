@@ -4,6 +4,7 @@
 #include "cocos2d.h"
 #include "../../Utils/HexUtils.h"
 #include "../../Utils/PathFinder.h"
+#include "Development/ProductionProgram.h"
 #include <functional>
 
 /**
@@ -37,7 +38,7 @@ enum class UnitState {
  * 2. 处理通用视觉表现（移动动画、血条更新、选中高亮）
  * 3. 定义子类必须实现的接口（攻击力、移动力等配置）
  */
-class AbstractUnit : public cocos2d::Node {
+class AbstractUnit : public cocos2d::Node, public ProductionProgram {
 public:
     AbstractUnit();
     virtual ~AbstractUnit();
@@ -92,9 +93,8 @@ public:
     virtual int getMaxMoves() const = 0;    // 最大移动力
     virtual int getAttackRange() const = 0; // 攻击距离 (1=近战)
     virtual int getVisionRange() const { return 2; } // 视野范围 (默认2)
-	virtual int getCost() const = 0;          // 购买/训练成本
 	virtual int getMaintenanceCost() const = 0; // 维护费用
-	virtual int getProductionCost() const = 0;   // 生产力所需
+    virtual int getPrereqTechID() const { return prereqTechID; }    // 前置科技
 
     // ==========================================
     // 3. 特殊能力开关 (虚函数，默认为 false)
@@ -183,18 +183,24 @@ public:
      */
     void hideMoveRange();
 
+    // ==========================================
+    // 7. 生产条件
+    // ==========================================
+    bool canErectUnit();
+
 protected:
     // --- 内部辅助 ---
-    void updateHpBar();      // 刷新血条UI
-    void onDeath();          // 死亡处理
+    void updateHpBar();     // 刷新血条UI
+    void onDeath();         // 死亡处理
 
     // --- 成员变量 ---
-    int _ownerId;            // 所属玩家
-    Hex _gridPos;            // 逻辑坐标
-    int _currentHp;          // 当前血量
-    int _currentMoves;       // 当前移动力
-    UnitState _state;        // 动作状态
+    int _ownerId;           // 所属玩家
+    Hex _gridPos;           // 逻辑坐标
+    int _currentHp;         // 当前血量
+    int _currentMoves;      // 当前移动力
+    UnitState _state;       // 动作状态
     bool _hasActed;
+    int prereqTechID;       // 前置科技
 
     // --- 视觉节点 ---
     cocos2d::Sprite* _unitSprite;    // 单位外观

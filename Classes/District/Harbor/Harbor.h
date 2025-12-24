@@ -6,10 +6,8 @@
 
 class Harbor : public District {
 public:
-	Harbor(Hex pos, std::string name);
+	Harbor(int player, Hex pos, std::string name);
 	virtual void calculateBonus();
-	virtual bool canErectDistrict(Hex where);
-	virtual bool addBuilding(Building::BuildingType buildingType);
 	cocos2d::Node* _harborVisual;
 private:
 	static int harborCount; // 港口计数器

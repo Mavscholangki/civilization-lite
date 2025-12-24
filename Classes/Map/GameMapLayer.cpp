@@ -351,6 +351,7 @@ void GameMapLayer::onBuildCityAction() {
         Player* currentPlayer = gameManager->getCurrentPlayer();
         if (currentPlayer) {
             // 添加到玩家的城市列表
+            city->ownerPlayer = currentPlayer->getPlayerId();
             currentPlayer->addCity(city);
 
             CCLOG("City added to Player %d, total cities: %d",

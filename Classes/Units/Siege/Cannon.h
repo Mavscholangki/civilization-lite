@@ -5,6 +5,9 @@
 
 class Cannon : public AbstractUnit {
 public:
+
+    Cannon() : AbstractUnit() { cost = 50; purchaseCost = 400; prereqTechID = 14; } // Ç°ÖÃ¿Æ¼¼£º»ðÒ©(ID 14)
+
     std::string getUnitName() const override { 
         return "Cannon"; 
     }
@@ -14,16 +17,9 @@ public:
     std::string getSpritePath() const override { 
         return "units/cannon.png"; 
     }
-    int getCost() const override {
-        return 400;
-    }
-
+    
     int getMaintenanceCost() const override {
         return 4;
-    }
-
-    int getProductionCost() const override {
-        return 50;
     }
 
     bool ismilitary() const override {

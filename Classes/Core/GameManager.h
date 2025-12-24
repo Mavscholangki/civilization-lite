@@ -134,7 +134,7 @@ private:
     void processAITurn(Player* aiPlayer);
 
     // 检查玩家是否被击败
-    void checkDefeatedPlayers();
+    void checkDefeatedPlayers() {};
 
     // 检查统治胜利
     bool checkDominationVictory() const;

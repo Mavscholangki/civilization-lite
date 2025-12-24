@@ -32,6 +32,8 @@
 class Musketeers : public AbstractUnit {
 public:
 
+    Musketeers() : AbstractUnit() { cost = 80; purchaseCost = 600; prereqTechID = 14; } // 前置科技：火药(ID 14)
+
     /**
      * @brief 获取单位名称
      * @return 火枪手名称
@@ -48,16 +50,8 @@ public:
         return UnitType::RANGED; 
     }
 
-    int getCost() const override {
-        return 600;
-    }
-
     int getMaintenanceCost() const override {
         return 5;
-    }
-
-    int getProductionCost() const override {
-        return 80;
     }
 
     bool ismilitary() const override {

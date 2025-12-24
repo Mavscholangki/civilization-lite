@@ -1,7 +1,10 @@
 #include "CityProductionPanel.h"
+#include "Core/GameManager.h"
+#include "Development/ProductionProgram.h"
+#include "District/Building/Building.h"
 USING_NS_CC;
 
-//// CityProductionPanel 类实现 ////
+//// =================== CityProductionPanel 类实现 =================== ////
 bool CityProductionPanel::init()
 {
 	if (!Layer::init())
@@ -9,8 +12,10 @@ bool CityProductionPanel::init()
 		return false;
 	}
 
+	this->currentPlayerID = 0;
+	this->visible = false;
 	auto visibleSize = Director::getInstance()->getVisibleSize();
-	auto panelSize = Size(visibleSize.width / 7, visibleSize.height);
+	auto panelSize = Size(visibleSize.width / 5, visibleSize.height);
 
 	// 背景面板
 	this->PanelBG = ui::Layout::create();
@@ -36,7 +41,7 @@ bool CityProductionPanel::init()
 	this->Pull->setTitleText(" <[ ");
 	this->Pull->setTitleColor(Color3B(204, 204, 0)); // 黄色文字
 	this->Pull->setTitleFontSize(36);
-	this->Pull->setPosition(Vec2(-100, 100));
+	this->Pull->setPosition(Vec2(-Pull->getContentSize().width, 100));
 	this->Pull->addClickEventListener([=](Ref* sender) {
 		if (visible)
 		{
@@ -58,16 +63,9 @@ bool CityProductionPanel::init()
 	this->showProductionPanel->setTitleText("[ Production ]");
 	this->showProductionPanel->setTitleColor(Color3B(204, 204, 0)); // 黄色文字
 	this->showProductionPanel->setTitleFontSize(24);
-	this->showProductionPanel->setPosition(Vec2(-80, 150)); // 初始位置在面板外
+	this->showProductionPanel->setPosition(Vec2(-showProductionPanel->getContentSize().width / 2, 150)); // 初始位置在面板外
 	this->showProductionPanel->addClickEventListener([=](Ref* sender) {
-		if (currentShownPanel == productionPanel)
-		{
-			// 切回人口分配面板
-			currentShownPanel = populationPanel;
-			this->populationPanel->setVisible(true);
-			this->productionPanel->setVisible(false);
-		}
-		else
+		if (currentShownPanel != productionPanel)
 		{
 			// 切到生产面板
 			currentShownPanel = productionPanel;
@@ -91,16 +89,9 @@ bool CityProductionPanel::init()
 	this->showPopulationPanel->setTitleText("[ Population Distribution ]");
 	this->showPopulationPanel->setTitleColor(Color3B(204, 204, 0)); // 黄色文字
 	this->showPopulationPanel->setTitleFontSize(24);
-	this->showPopulationPanel->setPosition(Vec2(-150, 200)); // 初始位置在面板外
+	this->showPopulationPanel->setPosition(Vec2(-showPopulationPanel->getContentSize().width / 2, 200)); // 初始位置在面板外
 	this->showPopulationPanel->addClickEventListener([=](Ref* sender) {
-		if (currentShownPanel == populationPanel)
-		{
-			// 切回生产面板
-			currentShownPanel = productionPanel;
-			this->populationPanel->setVisible(false);
-			this->productionPanel->setVisible(true);
-		}
-		else
+		if (currentShownPanel != populationPanel)
 		{
 			// 切到人口分配面板
 			currentShownPanel = populationPanel;
@@ -122,7 +113,70 @@ bool CityProductionPanel::init()
 	return true;
 }
 
-//// PopulationDistributionPanel 类实现 ////
+void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentCity, std::vector<ProductionProgram*> programs[3])
+{
+	this->productionPanel->clear();
+	currentPlayerID = playerID;
+
+	bool firstPurchase = false;
+	if (!programs[0].empty())
+	{
+		productionPanel->createNewLabelItem(playerID, currentCity, "       Districts      ", PanelItem::ItemType::PRODUCT);
+		for (auto district : programs[0])
+		{
+			productionPanel->createNewButtonItem(playerID, currentCity, PanelItem::ItemType::PRODUCT, district);
+			if(district->getCanPurchase())
+			{
+				if (!firstPurchase)
+				{
+					productionPanel->createNewLabelItem(playerID, currentCity, "       Districts      ", PanelItem::ItemType::PURCHASE);
+					firstPurchase = true;
+				}
+				productionPanel->createNewButtonItem(playerID, currentCity, PanelItem::ItemType::PURCHASE, district);
+			}
+		}
+	}
+	/*firstPurchase = false;
+	if (!programs[1].empty())
+	{
+		productionPanel->createNewLabelItem(playerID, currentCity, "       Buildings      ", PanelItem::ItemType::PRODUCT);
+		for (auto building : programs[1])
+		{
+			productionPanel->createNewButtonItem(playerID, currentCity, PanelItem::ItemType::PRODUCT, building);
+			if (building->getCanPurchase())
+			{
+				if (!firstPurchase)
+				{
+					productionPanel->createNewLabelItem(playerID, currentCity, "       Buildings      ", PanelItem::ItemType::PURCHASE);
+					firstPurchase = true;
+				}
+				productionPanel->createNewButtonItem(playerID, currentCity, PanelItem::ItemType::PURCHASE, building);
+			}
+		}
+	}*/
+	firstPurchase = false;
+	if (!programs[2].empty())
+	{
+		productionPanel->createNewLabelItem(playerID, currentCity, "         Units         ", PanelItem::ItemType::PRODUCT);
+		for (auto unit : programs[2])
+		{
+			productionPanel->createNewButtonItem(playerID, currentCity, PanelItem::ItemType::PRODUCT, unit);
+			if (unit->getCanPurchase())
+			{
+				if (!firstPurchase)
+				{
+					productionPanel->createNewLabelItem(playerID, currentCity, "         Units         ", PanelItem::ItemType::PURCHASE);
+					firstPurchase = true;
+				}
+				productionPanel->createNewButtonItem(playerID, currentCity, PanelItem::ItemType::PURCHASE, unit);
+			}
+		}
+	}
+
+	populationPanel->updatePanel(currentCity->populationDistribution, currentCity->population);
+}
+
+//// =============== PopulationDistributionPanel 类实现 =============== ////
 bool PopulationDistributionPanel::init()
 {
 	if (!ui::Layout::init())
@@ -130,7 +184,7 @@ bool PopulationDistributionPanel::init()
 		return false;
 	}
 	auto visibleSize = Director::getInstance()->getVisibleSize();
-	auto panelSize = Size(visibleSize.width / 7, visibleSize.height - 50);
+	auto panelSize = Size(visibleSize.width / 5, visibleSize.height - 50);
 
 	// 初始化人口分配面板的逻辑
 	visible = false; // 初始为隐藏状态
@@ -152,7 +206,7 @@ bool PopulationDistributionPanel::init()
 	// 为标题添加背景
 	auto titleBg = ui::Layout::create();
 	titleBg->setContentSize(Size(panelSize.width, title->getContentSize().height + 10));
-	titleBg->setBackGroundColor(Color3B(153, 204, 255)); // 深蓝色背景
+	titleBg->setBackGroundColor(Color3B(153, 204, 255));
 	titleBg->setBackGroundColorType(ui::Layout::BackGroundColorType::SOLID);
 	titleBg->setAnchorPoint(Vec2(0.5f, 0.5f));
 	titleBg->setPosition(Vec2(panelSize.width / 2, title->getContentSize().height / 2));
@@ -160,6 +214,7 @@ bool PopulationDistributionPanel::init()
 
 	return true;
 }
+
 void PopulationDistributionPanel::updatePanel(std::map<Hex, int> populationDistribution, int population)
 {
 	int unallocated = population;
@@ -167,7 +222,7 @@ void PopulationDistributionPanel::updatePanel(std::map<Hex, int> populationDistr
 	this->workedTilesList->removeAllChildren();
 	currentDistribution = populationDistribution;
 	// 重新添加地块信息
-	for (auto tile : currentDistribution)
+	for (auto& tile : currentDistribution)
 	{
 		bool isWorked = (currentDistribution[tile.first] > 0);
 		createNewItem(tile.first, isWorked);
@@ -178,11 +233,13 @@ void PopulationDistributionPanel::updatePanel(std::map<Hex, int> populationDistr
 	this->title->setString(
 		"Unallocated: " + std::to_string(unallocated) + "/ Total: " + std::to_string(population));
 }
+
 void PopulationDistributionPanel::manualDistribute(Hex tileIndex)
 {
 	// 手动分配人口到指定地块的逻辑
 
 }
+
 void PopulationDistributionPanel::addListItem(Node* item)
 {
 	auto innerContainer = workedTilesList->getInnerContainer();
@@ -220,6 +277,7 @@ void PopulationDistributionPanel::addListItem(Node* item)
 
 	innerContainer->addChild(item);
 }
+
 void PopulationDistributionPanel::createNewItem(Hex tile, bool isWorked) // 创建新的地块项目
 {
 	auto item = ui::Button::create();
@@ -281,7 +339,7 @@ void PopulationDistributionPanel::createNewItem(Hex tile, bool isWorked) // 创建
 	addListItem(item);
 }
 
-//// ProductionPanel 类实现 ////
+//// ===================== ProductionPanel 类实现 ===================== ////
 bool ProductionPanel::init()
 {
 	if (!ui::Layout::init())
@@ -289,7 +347,7 @@ bool ProductionPanel::init()
 		return false;
 	}
 	auto visibleSize = Director::getInstance()->getVisibleSize();
-	auto panelSize = Size(visibleSize.width / 7, visibleSize.height);
+	auto panelSize = Size(visibleSize.width / 5, visibleSize.height);
 	
 	// 按钮切换: 生产
 	this->ProductButton = ui::Button::create();
@@ -323,11 +381,6 @@ bool ProductionPanel::init()
 	this->ProductList->setPosition(Vec2(10, 10));
 	this->ProductList->setInnerContainerSize(Size(panelSize.width - 20, 0)); // 初始内容大小
 	this->ProductList->setVisible(true); // 默认显示生产列表
-	createNewLabelItem("     Districts and Buildings     ", PanelItem::ItemType::PRODUCT);
-	createNewButtonItem("Memorial Hall", PanelItem::ItemType::PRODUCT, 6);
-	createNewLabelItem("             Units             ", PanelItem::ItemType::PRODUCT);
-	createNewButtonItem("Warrior", PanelItem::ItemType::PRODUCT, 4);
-	createNewButtonItem("Constructor", PanelItem::ItemType::PRODUCT, 5);
 	this->addChild(this->ProductList);
 
 	// 购买列表
@@ -338,15 +391,11 @@ bool ProductionPanel::init()
 	this->PurchaseList->setPosition(Vec2(10, 10));
 	this->PurchaseList->setInnerContainerSize(Size(panelSize.width - 20, 0)); // 初始内容大小
 	this->PurchaseList->setVisible(false); // 默认隐藏购买列表
-	createNewLabelItem("     Districts and Buildings    ", PanelItem::ItemType::PURCHASE);
-	createNewButtonItem("Granary", PanelItem::ItemType::PURCHASE, 60);
-	createNewLabelItem("             Units            ", PanelItem::ItemType::PURCHASE);
-	createNewButtonItem("Warrior", PanelItem::ItemType::PURCHASE, 40);
-	createNewButtonItem("Settler", PanelItem::ItemType::PURCHASE, 100);
 	this->addChild(this->PurchaseList);
 
 	return true;
 }
+
 void ProductionPanel::addListItem(cocos2d::ui::ScrollView* listView, Node* item)
 {
 	auto innerContainer = listView->getInnerContainer();
@@ -384,13 +433,60 @@ void ProductionPanel::addListItem(cocos2d::ui::ScrollView* listView, Node* item)
 
 	innerContainer->addChild(item);
 }
-void ProductionPanel::createNewButtonItem(std::string name, PanelItem::ItemType toWhichList, int cost)
+
+void ProductionPanel::createNewButtonItem(int playerID, BaseCity* currentCity, PanelItem::ItemType toWhichList, ProductionProgram* program)
 {
+	auto player = GameManager::getInstance()->getPlayer(playerID);
+
 	auto newItem = ui::Button::create();
-	newItem->setTitleText(name + "     cost:" + std::to_string(cost) + (toWhichList == PanelItem::ItemType::PRODUCT ? " turns" : " golds"));
+	newItem->setTitleText(program->getName() + "     cost:" + std::to_string(program->getCost()) + (toWhichList == PanelItem::ItemType::PRODUCT ? " turns" : " golds"));
 	newItem->setTitleColor(Color3B::WHITE);
 	newItem->setTitleFontSize(20);
-	newItem->setContentSize(Size(this->ProductList->getContentSize().width - 20, 50));
+	newItem->setContentSize(Size(this->ProductList->getContentSize().width - 20, (program->getType() == ProductionProgram::ProductionType::BUILDING) ? 90 : 50));
+	newItem->addClickEventListener([=](Ref* sender) {
+		auto& cities = GameManager::getInstance()->getPlayer(currentPlayer)->getCities();
+		for (auto city : cities)
+		{
+			if (currentCity == city)
+			{
+				auto newProgram = new ProductionProgram(program->getType(), program->getName(), city->gridPos, program->getCost(), program->getCanPurchase(), program->getPurchaseCost());
+				if (program->getType() == ProductionProgram::ProductionType::DISTRICT)
+				{
+					newProgram->setPosOnCreated(city->territory[3]); /// /// /// /// /// /// /// 
+				}
+				if (toWhichList == PanelItem::ItemType::PRODUCT)
+				{
+					currentCity->addNewProduction(newProgram);
+				}
+				else
+				{
+					currentCity->purchaseDirectly(newProgram);
+				}
+				delete newProgram;
+				newProgram;
+			}
+		}
+	});
+
+	if (program->getType() == ProductionProgram::ProductionType::BUILDING)
+	{
+		auto newItemTopBar = ui::Layout::create();
+		auto building = new Building(currentPlayer, program->getName());
+		auto newItemTopBarName = Label::createWithSystemFont(building->getDistrictName(), "Arial", 16);
+		newItemTopBarName->setTextColor(Color4B::WHITE);
+		newItemTopBarName->setAlignment(TextHAlignment::LEFT);
+		newItemTopBarName->setContentSize(Size(newItem->getContentSize().width, 40));
+		newItemTopBarName->setPosition(0, 0);
+		newItemTopBar->setContentSize(Size(newItem->getContentSize().width, 40));
+		newItemTopBar->setPosition(Vec2(0, 50));
+		newItemTopBar->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
+		newItemTopBar->setBackGroundColor(Color3B(204, 204, 0)); // 土黄色
+		newItemTopBar->addChild(newItemTopBarName, 10);
+		newItem->addChild(newItemTopBar, -10);
+		newItem->setContentSize(Size(this->ProductList->getContentSize().width - 20, newItem->getContentSize().height + newItemTopBar->getContentSize().height));
+		delete building;
+	}
+
 	if (toWhichList == PanelItem::ItemType::PRODUCT)
 	{
 		addListItem(this->ProductList, newItem);
@@ -400,7 +496,8 @@ void ProductionPanel::createNewButtonItem(std::string name, PanelItem::ItemType 
 		addListItem(this->PurchaseList, newItem);
 	}
 }
-void ProductionPanel::createNewLabelItem(std::string text, PanelItem::ItemType toWhichList)
+
+void ProductionPanel::createNewLabelItem(int player, BaseCity* currentCity, std::string text, PanelItem::ItemType toWhichList)
 {
 	auto newItem = Label::createWithSystemFont(text, "Arial", 22);
 	newItem->setColor(Color3B(0, 76, 153)); // 蓝色文字
@@ -418,4 +515,20 @@ void ProductionPanel::createNewLabelItem(std::string text, PanelItem::ItemType t
 	{
 		addListItem(this->PurchaseList, newItem);
 	}
+}
+
+void ProductionPanel::clear() {
+	// 遍历移除
+	auto container1 = ProductList->getInnerContainer();
+	container1->removeAllChildrenWithCleanup(true); // true表示同时清理内存
+
+	// 如果使用了自定义布局，需要重置内容大小
+	container1->setContentSize(ProductList->getContentSize());
+
+	// 遍历移除
+	auto container2 = PurchaseList->getInnerContainer();
+	container2->removeAllChildrenWithCleanup(true); // true表示同时清理内存
+
+	// 如果使用了自定义布局，需要重置内容大小
+	container2->setContentSize(PurchaseList->getContentSize());
 }

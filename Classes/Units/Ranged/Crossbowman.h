@@ -33,6 +33,8 @@
 class Crossbowman : public AbstractUnit {
 public:
 
+    Crossbowman() : AbstractUnit() { cost = 50; purchaseCost = 500; prereqTechID = 11; } // 前置科技：机械(ID 11)
+
     /**
      * @brief 获取单位名称
      * @return 弩手名称
@@ -57,16 +59,8 @@ public:
         return "units/crossbowman.png"; 
     }
 
-    int getCost() const override {
-        return 500;
-    }
-
     int getMaintenanceCost() const override {
         return 4;
-    }
-
-    int getProductionCost() const override {
-        return 50;
     }
 
     bool ismilitary() const override {

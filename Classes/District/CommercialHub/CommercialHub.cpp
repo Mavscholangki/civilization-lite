@@ -4,14 +4,17 @@ USING_NS_CC;
 
 
 int CommercialHub::commercialHubCount = 0;
-CommercialHub::CommercialHub(Hex pos, std::string name)
-	: District(pos, DistrictType(District::DistrictType::COMMERCIAL_HUB), name)
+CommercialHub::CommercialHub(int player, Hex pos, std::string name)
+	: District(player, pos, DistrictType(District::DistrictType::COMMERCIAL_HUB), name)
 {
-	isConstructed = false;
-	productionCost = 54; // 商业中心建造成本
-	currentProgress = 0;
-	turnsRemaining = productionCost; // 默认初始剩余回合数等于生产力成本
-	prereqTech = u8"货币"; // 需要“货币”科技解锁
+	cost = 54; // 商业中心建造成本
+	turnsRemaining = cost; // 默认初始剩余回合数等于生产力成本
+	prereqTechID = 6; // 前置科技: 货币(Tech ID 6)
+	possibleBuildings = std::vector<BuildingCategory>({
+		BuildingCategory::MARKET,
+		BuildingCategory::BANK,
+		BuildingCategory::STOCK_EXCHANGE
+		});
 	baseBenefit.goldYield = 4;    // 基础产出: +4金币
 	updateCitizenBenefit();
 	updateGrossYield();
@@ -39,7 +42,7 @@ CommercialHub::CommercialHub(Hex pos, std::string name)
 void CommercialHub::calculateBonus()
 {
 	// 如果未建造完成,则无加成产出
-	if (!isConstructed)
+	if (status != ProductionStatus::COMPLETED)
 	{
 		adjacencyBonus = { 0,0,0,0,0 };
 		return;
@@ -47,11 +50,9 @@ void CommercialHub::calculateBonus()
 	adjacencyBonus = { 0, 0, 0, 0, 0 }; // 重置加成产出
 	// 商业中心的加成产出计算逻辑
 	// 例如：每个相邻的河流地块增加1点金币产出
-	//auto gameScene = static_cast<GameScene*>(Director::getInstance()->getRunningScene());
-	//if (!gameScene) return;
-	//std::vector<Hex> neighbors = getHexNeighbors(_pos);
+	std::vector<Hex> neighbors = getHexNeighbors(_pos);
 	//// 暂不考虑河流加成
-	///*int riverCount = 0;
+	//s*int riverCount = 0;
 	//for (const auto& neighbor : neighbors)
 	//{
 	//	TileData tileData = gameScene->getTileData(neighbor);
@@ -61,67 +62,21 @@ void CommercialHub::calculateBonus()
 	//	}
 	//}
 	//adjacencyBonus.goldYield += riverCount * 1;*/ // 每个河流+1金币
-	//// 每两个相邻区域+1点金币
-	//// 每个相邻港口+2点金币
-	//int districtCount = 0;
-	//for (const auto& neighbor : neighbors)
-	//{
-	//	// 相邻的每两个区域+1点金币
-	//	District* adjacentDistrict = gameScene->getDistrictAtHex(neighbor);
-	//	if (adjacentDistrict)
-	//	{
-	//		districtCount++;
-	//		if (adjacentDistrict->getType() == District::DistrictType::HARBOR)
-	//		{
-	//			adjacencyBonus.goldYield += 2; // 每个相邻港口+2金币
-	//		}
-	//	}
-	//}
+	// 每两个相邻区域+1点金币
+	// 每个相邻港口+2点金币
+	int districtCount = 0;
+	for (const auto& neighbor : neighbors)
+	{
+		// 相邻的每两个区域+1点金币
+		if (District::isThereDistrictAt(neighbor))
+		{
+			districtCount++;
+		}
+	}
+	adjacencyBonus.goldYield += (districtCount / 2) * 1;
 	// 计算建筑加成
 	for (auto building : buildings)
 	{
 		buildingBonus += building->getYield();
 	}
-	adjacencyBonus += buildingBonus;
-}
-
-bool CommercialHub::canErectDistrict(Hex where)
-{
-	auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
-	if (!gameScene) return false;
-	TileData tileData = gameScene->getTileData(where);
-	// 简单示例: 只能在陆地上建造商业中心
-	if (tileData.type != TerrainType::OCEAN &&
-		tileData.type != TerrainType::COAST &&
-		tileData.type != TerrainType::MOUNTAIN)
-	{
-		// if (prereqTech.empty() || gameScene->getPlayer()->isTechResearched(prereqTech))
-			return true;
-	}
-	return true;
-}
-
-bool CommercialHub::addBuilding(Building::BuildingType buildingType)
-{
-	if (buildingType != Building::BuildingType::MARKET &&
-		buildingType != Building::BuildingType::BANK &&
-		buildingType != Building::BuildingType::STOCK_EXCHANGE)
-	{
-		return false; // 商业中心只能建造特定建筑
-	}
-	// 创建建筑实例
-	Building* newBuilding = new Building(buildingType);
-	if (!newBuilding)
-		return false; // 创建失败
-	if (!newBuilding->canErectBuilding())
-	{
-		delete newBuilding;
-		newBuilding = nullptr;
-		return false; // 不满足建造条件
-	}
-	// 添加建筑物
-	buildings.push_back(newBuilding);
-	// 建筑物可能会影响区域产出,调用更新函数
-	updateGrossYield();
-	return true;
 }

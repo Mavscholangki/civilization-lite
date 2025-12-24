@@ -5,10 +5,8 @@
 #include "City/Yield.h"
 class Campus : public District {
 public:
-	Campus(Hex pos, std::string name);
+	Campus(int player, Hex pos, std::string name);
 	virtual void calculateBonus();
-	virtual bool canErectDistrict(Hex where);
-	virtual bool addBuilding(Building::BuildingType building);
 	enum class BuildingType {
 		LIBRARY, // Õº Èπ›
 		UNIVERSITY, // ¥Û—ß

@@ -31,6 +31,9 @@
 class LineInfantry : public AbstractUnit {
 public:
 
+    LineInfantry() { cost = 60; purchaseCost = 600; }
+
+    LineInfantry() : AbstractUnit() { prereqTechID = 12; } // 前置科技：学徒制(ID 12)
     /**
      * @brief 获取单位名称
      * @return 列兵名称
@@ -47,16 +50,8 @@ public:
         return UnitType::MELEE; 
     }
 
-    int getCost() const override {
-        return 600;
-    }
-
     int getMaintenanceCost() const override {
         return 3;
-	}
-
-    int getProductionCost() const override {
-        return 60;
 	}
 
     bool ismilitary() const override {

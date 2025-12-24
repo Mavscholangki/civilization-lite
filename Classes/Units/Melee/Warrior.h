@@ -17,6 +17,8 @@
 class Warrior : public AbstractUnit {
 public:
 
+    Warrior() { cost = 30; purchaseCost = 200; }
+
     /**
      * @brief 获取单位名称
      * @return 战士名称
@@ -33,16 +35,8 @@ public:
         return UnitType::MELEE; 
     }
 
-    int getCost() const override {
-        return 200;
-    }
-
     int getMaintenanceCost() const override {
         return 1;
-    }
-
-    int getProductionCost() const override {
-        return 30;
     }
 
     bool ismilitary() const override {

@@ -31,6 +31,7 @@
  */
 class Swordsman : public AbstractUnit {
 public:
+    Swordsman() : AbstractUnit() { cost = 40; purchaseCost = 500; prereqTechID = 7; } // 前置科技：铁器(ID 7)
 
     /**
      * @brief 获取单位名称
@@ -48,16 +49,8 @@ public:
         return UnitType::MELEE; 
     }
 
-    int getCost() const override {
-        return 500;
-    }
-
     int getMaintenanceCost() const override {
         return 2;
-    }
-
-    int getProductionCost() const override {
-        return 40;
     }
 
     bool ismilitary() const override {

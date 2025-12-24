@@ -17,6 +17,8 @@
 class Archer : public AbstractUnit {
 public:
 
+    Archer() : AbstractUnit() { cost = 30; purchaseCost = 400; prereqTechID = 3; } // 前置科技：弓箭手(ID 3)
+
     /**
      * @brief 获取单位名称
      * @return 弓箭手名称
@@ -41,16 +43,8 @@ public:
         return "units/archer.png"; 
     }
 
-    int getCost() const override {
-        return 400;
-    }
-
     int getMaintenanceCost() const override {
         return 2;
-    }
-
-    int getProductionCost() const override {
-        return 30;
     }
 
     bool ismilitary() const override {

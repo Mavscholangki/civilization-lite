@@ -9,6 +9,7 @@
 #include "../Development/PolicySystem.h"
 #include "../City/Yield.h"
 #include "../Units/Base/AbstractUnit.h"
+#include "Development/ProductionProgram.h"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -134,7 +135,10 @@ public:
     virtual void onResearchProgress(int techId, int currentProgress,
         int totalCost) override;
     virtual void onEurekaTriggered(int techId, const std::string& techName) override;
-
+    void updateUnclockedProduction();
+    void getUnlockedProduction(std::vector<ProductionProgram*>& Units, 
+        std::vector<ProductionProgram*>& Districts, 
+        std::vector<ProductionProgram*>& Buildings);
     // 科技值管理
     void addScience(int amount);
     int getSciencePerTurn() const;
@@ -189,6 +193,9 @@ private:
     TechTree m_techTree;                    // 科技树
     CultureTree m_cultureTree;              // 文化树
     PolicyManager m_policyManager;          // 政策管理器
+    std::vector<ProductionProgram*> unlockedUnits;
+    std::vector<ProductionProgram*> unlockedDistricts;
+    std::vector<ProductionProgram*> unlockedBuildings;
 
     // ==================== 游戏实体 ====================
     std::vector<BaseCity*> m_cities;        // 城市列表

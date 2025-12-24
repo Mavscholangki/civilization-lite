@@ -7,6 +7,16 @@
 
 USING_NS_CC;
 
+GameScene* GameScene::s_instance = nullptr;
+
+// ==================== 单例模式 ====================
+GameScene* GameScene::getInstance() {
+    if (!s_instance) {
+        s_instance = GameScene::create();
+    }
+    return s_instance;
+}
+
 Scene* GameScene::createScene() {
     return GameScene::create();
 }
@@ -63,7 +73,7 @@ bool GameScene::init() {
 
     // 5. 创建生产面板层
     _productionPanelLayer = CityProductionPanel::create();
-    _productionPanelLayer->setVisible(false);
+    _productionPanelLayer->setVisible(true);
     this->addChild(_productionPanelLayer, 120);
 
     // 6. 设置HUD层使用人类玩家的系统实例
@@ -143,6 +153,7 @@ void GameScene::setupCallbacks() {
     _mapLayer->setOnCitySelectedCallback([this](BaseCity* city) {
         if (city) {
             _hudLayer->hideUnitInfo();
+            updateProductionPanel(city->getOwnerPlayer(), city);
             _productionPanelLayer->setVisible(true);
         }
         else {
@@ -191,3 +202,14 @@ void GameScene::onExit() {
 }
 
 TileData GameScene::getTileData(Hex h) { return _mapLayer->getTileData(h); }
+
+void GameScene::updateProductionPanel(int playerID, BaseCity* currentCity)
+{
+    Player* currentPlayer = GameManager::getInstance()->getPlayer(playerID);
+    std::vector<ProductionProgram*> districts;
+    std::vector<ProductionProgram*> buildings;
+    std::vector<ProductionProgram*> units;
+    currentPlayer->getUnlockedProduction(units, districts, buildings);
+    std::vector<ProductionProgram*> programs[3] = { districts, buildings, units };
+    this->_productionPanelLayer->updateProductionPanel(playerID, currentCity, programs);
+}

@@ -6,6 +6,7 @@
 #include <Civilizations/CivChina.h>
 #include <Civilizations/CivGermany.h>
 #include <Civilizations/CivRussia.h>
+#include "Scene/GameScene.h"
 
 USING_NS_CC;
 
@@ -299,6 +300,7 @@ void Player::onTurnEnd() {
 void Player::addCity(BaseCity* city) {
     if (city) {
         m_cities.push_back(city);
+        city->updatePanel();
         city->retain();
 
         // 如果是第一个城市，应用首都加成
@@ -498,6 +500,99 @@ void Player::onEurekaTriggered(int techId, const std::string& techName) {
     applyEurekaBonus(techId);
 
     // TODO: 通知UI显示尤里卡提示
+}
+
+void Player::updateUnclockedProduction()
+{
+    unlockedBuildings.clear();
+    unlockedDistricts.clear();
+    unlockedUnits.clear();
+
+    auto activatedTech = m_techTree.getActivatedTechList();
+    auto activatedCivic = m_cultureTree.getActivatedCultureList();
+    auto search = ProductionProgram::findProgram(-1, -1);
+    for (auto program : search)
+    {
+        if (program.first < 100)
+        {
+            this->unlockedUnits.push_back(
+                new ProductionProgram(ProductionProgram::ProductionType::UNIT,
+                    program.second.name, Hex(), 0, true, 0));
+        }
+        else if (program.first % 100 == 0)
+        {
+            this->unlockedDistricts.push_back(
+                new ProductionProgram(ProductionProgram::ProductionType::DISTRICT,
+                    program.second.name, Hex(), 0, true, 0));
+        }
+        else
+        {
+            this->unlockedBuildings.push_back(
+                new ProductionProgram(ProductionProgram::ProductionType::BUILDING,
+                    program.second.name, Hex(), 0, true, 0));
+        }
+    }
+    for (int tech : activatedTech)
+    {
+        auto search = ProductionProgram::findProgram(tech, -1);
+        for (auto program : search)
+        {
+            if (program.first < 100)
+            {
+                this->unlockedUnits.push_back(
+                    new ProductionProgram(ProductionProgram::ProductionType::UNIT,
+                        program.second.name, Hex(), 0, true, 0));
+            }
+            else if (program.first % 100 == 0)
+            {
+                this->unlockedUnits.push_back(
+                    new ProductionProgram(ProductionProgram::ProductionType::DISTRICT,
+                        program.second.name, Hex(), 0, true, 0));
+            }
+            else
+            {
+                this->unlockedUnits.push_back(
+                    new ProductionProgram(ProductionProgram::ProductionType::BUILDING,
+                        program.second.name, Hex(), 0, true, 0));
+            }
+        }
+    }
+
+    for (int civic : activatedCivic)
+    {
+        auto search = ProductionProgram::findProgram(-1, civic);
+        for (auto program : search)
+        {
+            if (program.first < 100)
+            {
+                this->unlockedUnits.push_back(
+                    new ProductionProgram(ProductionProgram::ProductionType::UNIT,
+                        program.second.name, Hex(), 0, true, 0));
+            }
+            else if (program.first % 100 == 0)
+            {
+                this->unlockedUnits.push_back(
+                    new ProductionProgram(ProductionProgram::ProductionType::DISTRICT,
+                        program.second.name, Hex(), 0, true, 0));
+            }
+            else
+            {
+                this->unlockedUnits.push_back(
+                    new ProductionProgram(ProductionProgram::ProductionType::BUILDING,
+                        program.second.name, Hex(), 0, true, 0));
+            }
+        }
+    }
+}
+
+void Player::getUnlockedProduction(std::vector<ProductionProgram*>& Units,
+    std::vector<ProductionProgram*>& Districts,
+    std::vector<ProductionProgram*>& Buildings)
+{
+    updateUnclockedProduction();
+    Units = unlockedUnits;
+    Districts = unlockedDistricts;
+    Buildings = unlockedBuildings;
 }
 
 void Player::addScience(int amount) {

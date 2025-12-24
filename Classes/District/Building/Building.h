@@ -3,10 +3,12 @@
 
 #include "Scene/GameScene.h"
 #include "City/Yield.h"
+#include "Development/ProductionProgram.h"
+#include "District/Base/District.h"
 #include <string>
 
 
-class Building {
+class Building : public ProductionProgram {
 public:
 	enum class BuildingType {
 		PALACE, // 宫殿
@@ -40,26 +42,28 @@ public:
 		TO_BE_DEFINED
 	};
 
-	Building(BuildingType type);
-	inline int			getBaseProductionCost() const { return baseProductionCost; }
-	inline int			getBasePurchaseCost() const { return basePurchaseCost; }
+	Building(int player, BuildingType type);
+	Building(int player, std::string name);
+	~Building() {}
+	inline int			getPlayerID() const { return playerID; }
+	inline std::string	getDistrictName() const { return districtName; }
 	inline int			getMaintenanceCost() const { return maintenanceCost; }
 	inline Yield		getCitizenBenefit() const { return citizenBenefit; }
-	inline std::string	getPrereqTech() const { return prereqTech; }
-	inline std::string	getPrereqCivic() const { return prereqCivic; }
+	inline int			getPrereqTechID() const { return prereqTechID; }
+	inline int			getPrereqCivicID() const { return prereqCivicID; }
 	inline bool			getIsUnique() const { return isUnique; }
-	inline BuildingType getType() const { return _type; }
+	District::BuildingCategory getType() const;
 	inline Yield		getYield() const { return yield; }
 
 	virtual bool canErectBuilding(); // 检查是否能建造该建筑
 
 private:
-	int			baseProductionCost; // 建筑基础建造成本
-	int			basePurchaseCost;	// 建筑基础购买成本
+	int			playerID;			// 拥有该建筑的玩家ID
+	std::string districtName;		// 所属区域名称
 	int			maintenanceCost;	// 建筑维护费用
 	Yield		citizenBenefit;		// 建筑市民加成
-	std::string prereqTech;			// 前置科技
-	std::string prereqCivic;		// 前置市政
+	int			prereqTechID;		// 前置科技
+	int			prereqCivicID;		// 前置市政
 	bool		isUnique;			// 是否为唯一建筑
 	bool		hasCitizenBenefit;	// 是否有市民加成
 

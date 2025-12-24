@@ -6,8 +6,11 @@
 #include "Utils/HexUtils.h"
 #include "UI/CocosGUI.h"
 #include "City/Yield.h"
-
+#include "Development/ProductionProgram.h"
+#include "City/BaseCity.h"
 USING_NS_CC;
+
+class BaseCity;
 
 class PopulationDistributionPanel : public cocos2d::ui::Layout {
 public:
@@ -27,6 +30,14 @@ private:
 	ui::Button* selectedItem; // 选中的地块对应的按钮
 	ui::Layout* selectedItemBg; // 选中地块按钮的背景
 	Label* title; // 标题(带有人口信息)
+};
+
+struct ProgramInfo {
+	std::string name;
+	int cost;
+	bool canPurchase;
+	int goldCost;
+	ProgramInfo() : name(""), cost(0), canPurchase(true), goldCost(0) {}
 };
 
 class PanelItem : public cocos2d::ui::Button {
@@ -53,22 +64,26 @@ public:
 		PURCHASE
 	};
 
-	void setInfo(std::string name, PanelItem::ItemType type, int cost)
+	void setInfo(std::string name, ProductionProgram::ProductionType produtionType, PanelItem::ItemType type, int cost)
 	{
 		setItemName(name);
 		setItemType(type);
+		setProductionType(produtionType);
 		setCost(cost);
 	}
 
-	void				setItemName(std::string name) { itemName = name; }
-	std::string			getItemName() { return itemName; }
-	void				setItemType(PanelItem::ItemType type) { itemType = type; }
-	PanelItem::ItemType getItemType() { return itemType; }
-	void				setCost(int cost) { this->cost = cost; }
-	int					getCost() { return this->cost; }
+	void								setItemName(std::string name) { itemName = name; }
+	std::string							getItemName() const { return itemName; }
+	void								setItemType(PanelItem::ItemType type) { itemType = type; }
+	PanelItem::ItemType					getItemType() const { return itemType; }
+	void 								setProductionType(ProductionProgram::ProductionType type) { productionType = type; }
+	ProductionProgram::ProductionType	getProductionType() const { return productionType; }
+	void								setCost(int cost) { this->cost = cost; }
+	int									getCost() const { return this->cost; }
 
 	std::string itemName;
 	ItemType itemType;
+	ProductionProgram::ProductionType productionType;
 	int cost; // for product, it costs turns; for purchases it costs golds
 	void updateItem()
 	{
@@ -81,9 +96,15 @@ public:
 	bool init();
 	CREATE_FUNC(ProductionPanel);
 	void addListItem(cocos2d::ui::ScrollView* listView, Node* item);
-	void createNewButtonItem(std::string name, PanelItem::ItemType toWhichList, int cost);
-	void createNewLabelItem(std::string text, PanelItem::ItemType toWhichList);
+	void createNewButtonItem(int player, BaseCity* currentCity, PanelItem::ItemType toWhichList, ProductionProgram* program);
+	void createNewLabelItem(int player, BaseCity* currentCity, std::string text, PanelItem::ItemType toWhichList);
+	void clear();
 private:
+	int currentPlayer;
+	std::vector<ProgramInfo> units;
+	std::vector<ProgramInfo> districts;
+	std::vector<ProgramInfo> buildings;
+
 	cocos2d::ui::Button* ProductButton;
 	cocos2d::ui::Button* PurchaseButton;
 	cocos2d::ui::ScrollView* ProductList;
@@ -94,11 +115,12 @@ class CityProductionPanel : public cocos2d::Layer {
 public:
 	bool init();
 	CREATE_FUNC(CityProductionPanel);
-
+	void updateProductionPanel(int playerID, BaseCity* currrentCity, std::vector<ProductionProgram*> programs[3]);
 	PopulationDistributionPanel* populationPanel; // 人口分配面板
 	ProductionPanel* productionPanel; // 生产面板
 private:
 	bool visible;
+	int currentPlayerID;
 	cocos2d::ui::Layout* PanelBG;
 	
 	cocos2d::ui::Button* Pull; // 拉取按钮

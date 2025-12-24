@@ -1,10 +1,12 @@
 #include "AbstractUnit.h"
 #include " ../../Map/GameMapLayer.h"
+#include "Core/GameManager.h"
 USING_NS_CC;
 
 // 构造函数
 AbstractUnit::AbstractUnit()
-    : _ownerId(-1)
+    : ProductionProgram(ProductionProgram::ProductionType::UNIT, "", Hex(), true, 0)
+    , _ownerId(-1)
     , _currentHp(0)
     , _currentMoves(0)
     , _state(UnitState::IDLE)
@@ -12,6 +14,7 @@ AbstractUnit::AbstractUnit()
     , _selectionRing(nullptr)
     , _hpBarNode(nullptr)
     , _hasActed(false) // 【修改】初始化行动标记
+    , prereqTechID(-1)
 {
 }
 
@@ -412,4 +415,14 @@ void AbstractUnit::hideMoveRange() {
     if (_rangeNode) {
         _rangeNode->clear();
     }
+}
+
+bool AbstractUnit::canErectUnit()
+{
+    if (prereqTechID == -1 || GameManager::getInstance()->getPlayer(_ownerId)->getTechTree()->isActivated(prereqTechID))
+    {
+        return true;
+    }
+    else
+        return false;
 }
