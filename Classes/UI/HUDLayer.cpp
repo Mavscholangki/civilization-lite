@@ -110,45 +110,40 @@ void HUDLayer::createCiv6StyleResourceDisplay() {
     float startX = 40;
     float spacing = 190;
 
-    // 辅助函数：创建资源组（图标 + 文字）
-    auto createResourceItem = [this](Node*& container, Label*& label, const std::string& defaultPath, float x) {
+    auto createResourceItem = [this](Node*& container, Label*& label, const std::string& defaultPath, float x, const std::string& initialText) {
         container = Node::create();
-        container->setPosition(Vec2(x, 22.5)); // 居中于 45 像素高的顶栏
+        container->setPosition(Vec2(x, 22.5));
         _topBar->addChild(container);
 
-        // 1. 图标占位 (Sprite)
-        // 建议图片大小见下文：32x32 或 40x40
         auto icon = Sprite::create(defaultPath);
         if (icon) {
-            icon->setScale(0.8f); // 缩放以适应 45px 的顶栏
+            icon->setScale(0.8f);
             icon->setPosition(Vec2(0, 0));
-            icon->setName("icon");
             container->addChild(icon);
         }
         else {
-            // 如果没图，先用彩色圆点占位
             auto placeholder = DrawNode::create();
             placeholder->drawSolidCircle(Vec2::ZERO, 15, 0, 16, Color4F::GRAY);
             container->addChild(placeholder);
         }
 
-        // 2. 数值标签
-        label = Label::createWithSystemFont("0 (+0)", "Arial-BoldMT", 18);
+        // 初始化时直接应用统一的格式逻辑
+        label = Label::createWithSystemFont(initialText, "Arial-BoldMT", 18);
         label->setAnchorPoint(Vec2(0, 0.5));
-        label->setPosition(Vec2(25, 0)); // 偏移图标中心
+        label->setPosition(Vec2(25, 0));
         container->addChild(label);
         };
 
-    // 创建各项资源
-    createResourceItem(_goldContainer, _goldLabel, "res/icon_gold.png", startX);
-    createResourceItem(_scienceContainer, _scienceLabel, "res/icon_science.png", startX + spacing);
-    createResourceItem(_cultureContainer, _cultureLabel, "res/icon_culture.png", startX + spacing * 2);
+    // 统一初始化文字逻辑
+    createResourceItem(_goldContainer, _goldLabel, "res/icon_gold.png", startX, "Gold: 0");
+    createResourceItem(_scienceContainer, _scienceLabel, "res/icon_science.png", startX + spacing, "Science: 0");
+    createResourceItem(_cultureContainer, _cultureLabel, "res/icon_culture.png", startX + spacing * 2, "Culture: 0");
 
-    // 回合数单独放在右侧
-    _turnLabel = Label::createWithSystemFont("TURN 1", "Arial-BoldMT", 18);
+    // 回合数初始化：修正颜色透明度为 255 (原本是 0)
+    _turnLabel = Label::createWithSystemFont("Turn 1", "Arial-BoldMT", 18);
     _turnLabel->setAnchorPoint(Vec2(1, 0.5));
     _turnLabel->setPosition(Vec2(visibleSize.width - 40, 22.5));
-    _turnLabel->setTextColor(Color4B(255, 255, 200, 0));
+    _turnLabel->setTextColor(Color4B(255, 255, 200, 255)); // 确保透明度为 255
     _topBar->addChild(_turnLabel);
 }
 
