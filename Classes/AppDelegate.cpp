@@ -25,16 +25,15 @@
 #include "AppDelegate.h"
 #include "Scene/GameScene.h"
 #include "Scene/MainMenuScene.h" 
-// #define USE_AUDIO_ENGINE 1
+#define USE_AUDIO_ENGINE 1
 
 #if USE_AUDIO_ENGINE
 #include "audio/include/AudioEngine.h"
-using namespace cocos2d::experimental;
 #endif
 
 USING_NS_CC;
 
-static cocos2d::Size designResolutionSize = cocos2d::Size(1536,1152);
+static cocos2d::Size designResolutionSize = cocos2d::Size(2400*0.8,1600*0.8);
 static cocos2d::Size smallResolutionSize = cocos2d::Size(480, 320);
 static cocos2d::Size mediumResolutionSize = cocos2d::Size(1024, 768);
 static cocos2d::Size largeResolutionSize = cocos2d::Size(2048, 1536);
@@ -45,9 +44,8 @@ AppDelegate::AppDelegate()
 
 AppDelegate::~AppDelegate() 
 {
-#if USE_AUDIO_ENGINE
-    AudioEngine::end();
-#endif
+    // AudioEngine::end() 会在 Director 清理之后自动调用
+    // 不要在这里手动调用，否则会导致访问已释放内存
 }
 
 // if you want a different context, modify the value of glContextAttrs
@@ -108,10 +106,8 @@ bool AppDelegate::applicationDidFinishLaunching() {
     register_all_packages();
 
     // create a scene. it's an autorelease object
-    auto scene = MainMenuScene::createScene(); // 换成这个
+    auto scene = MainMenuScene::createScene();
     director->runWithScene(scene);
-    return true;
-
     return true;
 }
 

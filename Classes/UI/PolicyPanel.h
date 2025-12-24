@@ -3,150 +3,85 @@
 
 #include "cocos2d.h"
 #include "ui/CocosGUI.h"
-#include "../Development/CultureSystem.h"
 #include "../Development/PolicySystem.h"
 
 USING_NS_CC;
 using namespace ui;
 
-class PolicyPanel;
-
-// 政策面板事件监听器
-class PolicyPanelEventListener : public PolicyEventListener, public CultureEventListener {
-private:
-    PolicyPanel* _owner;
-
-public:
-    PolicyPanelEventListener(PolicyPanel* owner) : _owner(owner) {}
-
-    // PolicyEventListener接口
-    virtual void onPolicyUnlocked(int policyId, const std::string& policyName) override;
-    virtual void onPolicyEquipped(int policyId, PolicyType slotType, int slotIndex) override;
-    virtual void onPolicyUnequipped(int policyId, PolicyType slotType, int slotIndex) override;
-    virtual void onPolicyComboTriggered(const std::vector<int>& policyIds,
-        const std::string& comboName) override;
-
-    // CultureEventListener接口
-    virtual void onCultureUnlocked(int cultureId, const std::string& cultureName,
-        const std::string& effect) override;
-    virtual void onCultureProgress(int cultureId, int currentProgress, int totalCost) override;
-    virtual void onInspirationTriggered(int cultureId, const std::string& cultureName) override;
-};
-
-// 政策卡UI槽位状态
-enum class PolicySlotState {
-    EMPTY,          // 空槽位
-    OCCUPIED,       // 已被占用
-    INCOMPATIBLE    // 不兼容当前政体
-};
-
-// 政策面板类
 class PolicyPanel : public Layer {
-    friend class PolicyPanelEventListener;
-
 public:
     CREATE_FUNC(PolicyPanel);
-
     virtual bool init() override;
-    virtual void onExit() override;
 
-    // 设置政策管理器
-    void setPolicyManager(PolicyManager* policyManager);
-
-    // 设置文化树
-    void setCultureTree(CultureTree* cultureTree);
-
-    // 刷新UI
+    void setPolicyManager(PolicyManager* mgr);
+    void setCultureTree(CultureTree* tree);
     void refreshUI();
 
-    // 获取当前选中的政策卡ID
-    int getSelectedPolicyId() const { return _selectedPolicyId; }
-
-    // 设置选中的政策卡
-    void setSelectedPolicy(int policyId);
-
 private:
-    // 系统引用
     PolicyManager* _policyManager = nullptr;
     CultureTree* _cultureTree = nullptr;
 
-    // 事件监听器
-    PolicyPanelEventListener* _eventListener = nullptr;
+    Node* _leftPanel = nullptr;
+    Node* _rightPanel = nullptr;
+    Node* _leftSlotsContainer = nullptr;
+    Label* _govLabel = nullptr;
 
-    // UI元素
-    LayerColor* _background = nullptr;
-    Node* _contentNode = nullptr;
+    // 拖拽相关
+    Node* _draggedNode = nullptr; // 拖拽时的替身节点
+    int _draggedCardId = -1;
+    PolicyType _draggedCardType;
+    bool _isDragActive = false;   // 标记当前是否处于拖拽状态
 
-    // 顶部信息栏
-    Label* _currentGovernmentLabel = nullptr;
-    Label* _policySlotsLabel = nullptr;
+    // 简介面板
+    Node* _descriptionPanel = nullptr;
+    Label* _descriptionTitle = nullptr;
+    Label* _descriptionText = nullptr;
 
-    // 政策卡类型标签页
-    TabControl* _policyTabs = nullptr;
-    std::unordered_map<PolicyType, ScrollView*> _policyListViews;
-
-    // 政策槽位UI
-    struct PolicySlotUI {
-        Layout* slotBg = nullptr;
-        Label* slotLabel = nullptr;
-        Node* policyCardNode = nullptr;
-        PolicySlotState state = PolicySlotState::EMPTY;
+    struct SlotTarget {
+        PolicyType type;
+        int index;
+        Rect worldBoundingBox;
+        bool isOccupied;
     };
+    std::vector<SlotTarget> _slotTargets;
 
-    std::unordered_map<PolicyType, std::vector<PolicySlotUI>> _policySlotsUI;
+    // 【修改点】：变大，变成竖着的长方形
+    const float CARD_W = 140.0f;
+    const float CARD_H = 220.0f;
 
-    // 选中的政策卡
-    int _selectedPolicyId = -1;
-    Node* _selectedCardNode = nullptr;
+    // 颜色配置
+    const Color3B COLOR_MIL = Color3B(180, 40, 40);   // 深红
+    const Color3B COLOR_ECO = Color3B(220, 180, 40);  // 金黄
+    const Color3B COLOR_WILD = Color3B(100, 40, 180); // 紫色
+    const Color3B COLOR_BG_SLOT = Color3B(30, 30, 35); // 槽位底色
 
-    // 详情面板
-    LayerColor* _detailPanel = nullptr;
-    Label* _policyNameLabel = nullptr;
-    Label* _policyDescLabel = nullptr;
-    Label* _policyEffectLabel = nullptr;
-    Button* _equipButton = nullptr;
-    Button* _unequipButton = nullptr;
+    void initLayout();
+    void createLeftSlots();
+    void createRightList();
 
-    // 组合效果显示
-    std::vector<Label*> _comboLabels;
+    // 核心 UI 创建
+    Node* createDraggableCard(const PolicyCard& card);
+    Node* createSlotUI(PolicyType type, int index, int equippedCardId);
+    Node* createCardVisual(const PolicyCard& card, bool isGhost); // 提取出来的通用外观创建函数
 
-    // UI常量
-    const float CARD_WIDTH = 200.0f;
-    const float CARD_HEIGHT = 100.0f;
-    const float SLOT_WIDTH = 180.0f;
-    const float SLOT_HEIGHT = 80.0f;
-    const Color3B POLICY_COLORS[4] = {
-        Color3B(255, 100, 100),   // 军事 - 红色
-        Color3B(100, 255, 100),   // 经济 - 绿色
-        Color3B(100, 150, 255),   // 外交 - 蓝色
-        Color3B(255, 200, 50)     // 通用 - 金色
-    };
+    // 拖拽逻辑
+    void onCardDragBegan(int cardId, PolicyType type, Vec2 touchPos);
+    void onCardDragMoved(Vec2 touchPos);
+    void onCardDragEnded(Vec2 touchPos);
+    void onEquippedCardDragEnded(Touch* touch); // 从槽位卸载的逻辑
 
-    // 私有方法
-    Node* createPolicyCardUI(const PolicyCard* policy);
-    void createPolicySlotsUI();
-    void updatePolicySlotsUI();
-    void updatePolicyCardsUI();
-    void showPolicyDetail(int policyId);
-    void hidePolicyDetail();
-    void equipPolicyToSlot(int policyId, PolicyType slotType, int slotIndex);
-    void unequipPolicy(int policyId);
-    PolicySlotState getSlotState(PolicyType slotType, int slotIndex) const;
-    std::string getPolicyTypeName(PolicyType type) const;
-    std::string getGovernmentName(GovernmentType gov) const;
+    void onChangeGovClicked();
+    void showGovSelectLayer();
+    Node* createGovOptionUI(GovernmentType type);
+    std::vector<GovernmentType> getAllGovTypes();
 
-    // 事件处理
-    void handlePolicyUnlocked(int policyId, const std::string& policyName);
-    void handlePolicyEquipped(int policyId, PolicyType slotType, int slotIndex);
-    void handlePolicyUnequipped(int policyId, PolicyType slotType, int slotIndex);
-    void handlePolicyComboTriggered(const std::vector<int>& policyIds,
-        const std::string& comboName);
-    void handleCultureUnlocked(int cultureId, const std::string& cultureName,
-        const std::string& effect);
+    void createDescriptionPanel();
+    void showPolicyDescription(const PolicyCard& card);
+    void hidePolicyDescription();
+    void onCardClicked(int cardId, const PolicyCard& card);
 
-    // 工具方法
-    bool isPolicyCompatible(int policyId) const;
-    int findAvailableSlot(PolicyType type) const;
+    Color3B getTypeColor(PolicyType type);
+    std::string getTypeName(PolicyType type);
 };
 
 #endif // POLICY_PANEL_H

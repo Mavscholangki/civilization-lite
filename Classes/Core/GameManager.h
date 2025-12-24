@@ -7,6 +7,9 @@
 #include <vector>
 #include <map>
 
+const int MAX_AI_PLAYERS = 6;  // 最大AI玩家数量，方便调试
+const int MIN_AI_PLAYERS = 1;  // 最少AI玩家数量
+
 // 游戏状态
 enum class GameState {
     INITIALIZING,      // 初始化中
@@ -83,11 +86,21 @@ public:
     // 获取当前玩家
     Player* getCurrentPlayer() const;
 
+    // 设置当前玩家
+    void setCurrentPlayer(int index);
+
     // 获取下一个玩家
     Player* getNextPlayer() const;
 
     // 结束当前玩家回合
     void endTurn();
+
+    // 初始化玩家起始单位
+    void initializePlayerStartingUnits(cocos2d::Node* parentNode,
+        std::function<Hex(int)> getStartHexForPlayerFunc,
+        std::function<void(AbstractUnit*)> addToMapFunc,
+        std::function<bool(Hex)> checkCityFunc,
+        std::function<int(Hex)> getTerrainCostFunc);
 
     // 检查胜利条件
     VictoryType checkVictoryConditions();
@@ -109,6 +122,9 @@ public:
 
     // 调试信息
     void debugPrintGameState() const;
+
+    // 检查本回合是否还有未完成决策
+    bool hasPendingDecisions(int playerId) const;
 
     // 清理资源
     void cleanup();
@@ -167,6 +183,8 @@ private:
     std::function<void(int)> m_onTurnStartCallback;
     std::function<void(int)> m_onTurnEndCallback;
     std::function<void(VictoryType, int)> m_onVictoryCallback;
+
+
 };
 
 #endif // __GAME_MANAGER_H__

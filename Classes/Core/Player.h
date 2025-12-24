@@ -1,4 +1,3 @@
-// Player.h
 #ifndef __PLAYER_H__
 #define __PLAYER_H__
 
@@ -21,7 +20,6 @@ enum class CivilizationType {
     CHINA,      // 中国
     RUSSIA      // 俄罗斯
 };
-
 
 // 前向声明
 class BaseCity;
@@ -63,6 +61,9 @@ public:
             unitsTrained(0), buildingsConstructed(0) {
         }
     };
+
+    // 构造函数声明 (修改点：必须显式声明以初始化 PolicyManager)
+    Player();
 
     // 创建玩家
     static Player* create(int playerId, CivilizationType civType);
@@ -128,6 +129,18 @@ public:
     const std::vector<AbstractUnit*>& getUnits() const { return m_units; }
     int getUnitCount() const { return m_units.size(); }
 
+    // ==================== 起始单位管理 ====================
+    AbstractUnit* createStartingSettler(cocos2d::Node* parentNode,
+        std::function<Hex()> getStartHexFunc,
+        std::function<void(AbstractUnit*)> addToMapFunc,
+        std::function<bool(Hex)> checkCityFunc);
+
+    // 设置布局和地图函数回调
+    void setMapCallbacks(std::function<Hex()> getStartHexFunc,
+        std::function<void(AbstractUnit*)> addToMapFunc,
+        std::function<bool(Hex)> checkCityFunc,
+        std::function<int(Hex)> getTerrainCostFunc);
+
     // ==================== 科技系统接口 ====================
     // TechEventListener 实现
     virtual void onTechActivated(int techId, const std::string& techName,
@@ -189,8 +202,9 @@ public:
 private:
     friend class GameManager;
     // ==================== 核心子系统 ====================
-    BaseCiv* m_civilization;                // 文明特性
+    BaseCiv* m_civilization = nullptr;      // 文明特性
     TechTree m_techTree;                    // 科技树
+    // 注意：m_cultureTree 必须在 m_policyManager 之前声明，以确保初始化顺序正确
     CultureTree m_cultureTree;              // 文化树
     PolicyManager m_policyManager;          // 政策管理器
     std::vector<ProductionProgram*> unlockedUnits;
@@ -201,14 +215,22 @@ private:
     std::vector<BaseCity*> m_cities;        // 城市列表
     std::vector<AbstractUnit*> m_units;     // 单位列表
 
+    // 起始单位回调函数
+    std::function<Hex()> m_getStartHexFunc;
+    std::function<void(AbstractUnit*)> m_addToMapFunc;
+    std::function<bool(Hex)> m_checkCityFunc;
+    std::function<int(Hex)> m_getTerrainCostFunc;
+
+    // 起始单位
+    AbstractUnit* m_startingSettler = nullptr;
+
     // ==================== 回合统计 ====================
     TurnStats m_turnStats;
 
-    // ==================== 回合统计 ====================
+    // ==================== 胜利进度 ====================
     VictoryProgress m_vicprogress;
 
     // ==================== 私有方法 ====================
-    void setupPolicyManagerCallbacks();
     void updatePolicySlots();
     void createCivilization(CivilizationType civType);
     void cleanupResources();

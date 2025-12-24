@@ -57,7 +57,7 @@ bool CultureTreePanel::init() {
     // 创建滚动视图
     _scrollView = ScrollView::create();
     _scrollView->setContentSize(Size(visibleSize.width - 40, visibleSize.height - 250));
-    _scrollView->setPosition(Vec2(20, 120));
+    _scrollView->setPosition(Vec2(20, 150));
     _scrollView->setDirection(ScrollView::Direction::HORIZONTAL);
     _scrollView->setBounceEnabled(true);
     _scrollView->setSwallowTouches(true);
@@ -163,30 +163,39 @@ Node* CultureTreePanel::createCultureNodeUI(const CultureNode* cultureData) {
     // 创建背景Layout
     auto background = Layout::create();
     background->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-    background->setBackGroundColor(Color3B(89, 64, 89));
+    background->setBackGroundColor(Color3B(64, 64, 89));
     background->setBackGroundColorOpacity(255);
     background->setContentSize(Size(NODE_WIDTH, NODE_HEIGHT));
-    background->setTouchEnabled(false);
+    background->setTouchEnabled(false);  // 确保背景不拦截触摸
     background->setTag(100);
     container->addChild(background, -1);
 
-    // 使用MenuItem
+    // 创建 MenuItem 并确保它能接收触摸事件
     auto menuItem = MenuItem::create();
     menuItem->setContentSize(Size(NODE_WIDTH, NODE_HEIGHT));
     menuItem->setTag(cultureData->id);
 
-    // 修改点击逻辑：首次点击只显示详情，不直接设为当前研究
-    menuItem->setCallback([this, cultureId = cultureData->id](Ref* sender) {
-        CCLOG("Culture node clicked: %d", cultureId);
-        this->showCultureDetail(cultureId);
+    // 重要：设置回调，让整个区域可点击
+    menuItem->setCallback([this, techId = cultureData->id](Ref* sender) {
+        CCLOG("Tech node clicked: %d", techId);
 
-        // 移除了直接设为当前研究的代码，只显示详情
-        // 用户需要在详情面板中手动点击按钮来设为当前研究
+        if (!this->_detailPanel || this->_detailPanel->getTag() != techId) {
+            this->showCultureDetail(techId);
+        }
+        else {
+            if (this->_cultureTree &&
+                this->_cultureTree->isUnlockable(techId) &&
+                !this->_cultureTree->isActivated(techId)) {
+                this->setAsCurrentResearch(techId);
+                this->hideCultureDetail();
+            }
+        }
         });
 
-    // 创建Menu
+    // 创建 Menu - 重要：设置 position 在中心，确保触摸区域正确
     auto menu = Menu::create(menuItem, nullptr);
-    menu->setPosition(Vec2::ZERO);
+    menu->setPosition(Vec2(NODE_WIDTH / 2, NODE_HEIGHT / 2));
+    menuItem->setPosition(Vec2::ZERO);
     container->addChild(menu);
 
     // 添加边框

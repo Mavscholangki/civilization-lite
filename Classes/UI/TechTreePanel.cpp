@@ -52,7 +52,7 @@ bool TechTreePanel::init() {
 
     // 创建滚动视图
     _scrollView = ScrollView::create();
-    _scrollView->setContentSize(Size(visibleSize.width - 40, visibleSize.height - 250));
+    _scrollView->setContentSize(Size(visibleSize.width - 40, visibleSize.height - 100));
     _scrollView->setPosition(Vec2(20, 120));
     _scrollView->setDirection(ScrollView::Direction::HORIZONTAL);
     _scrollView->setBounceEnabled(true);
@@ -159,50 +159,46 @@ void TechTreePanel::setSciencePerTurn(int science) {
 Node* TechTreePanel::createTechNodeUI(const TechNode* techData) {
     if (!techData) return nullptr;
 
-    // 调试输出，检查数据
-    CCLOG("Creating UI for tech: %d, name: %s", techData->id, techData->name.c_str());
-
     // 创建容器节点
     auto container = Node::create();
     container->setContentSize(Size(NODE_WIDTH, NODE_HEIGHT));
 
-    // 创建背景Layout（用于显示颜色）
+    // 创建背景Layout
     auto background = Layout::create();
     background->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
     background->setBackGroundColor(Color3B(64, 64, 89));
     background->setBackGroundColorOpacity(255);
     background->setContentSize(Size(NODE_WIDTH, NODE_HEIGHT));
-    background->setTouchEnabled(false);
+    background->setTouchEnabled(false);  // 确保背景不拦截触摸
     background->setTag(100);
     container->addChild(background, -1);
 
-    // 使用MenuItem代替Button
+    // 创建 MenuItem 并确保它能接收触摸事件
     auto menuItem = MenuItem::create();
     menuItem->setContentSize(Size(NODE_WIDTH, NODE_HEIGHT));
     menuItem->setTag(techData->id);
 
-    // 设置回调函数
+    // 重要：设置回调，让整个区域可点击
     menuItem->setCallback([this, techId = techData->id](Ref* sender) {
         CCLOG("Tech node clicked: %d", techId);
 
         if (!this->_detailPanel || this->_detailPanel->getTag() != techId) {
-            // 第一次点击，或点击了不同的节点：显示详情
             this->showTechDetail(techId);
         }
         else {
-            // 第二次点击同一个节点（详情已显示）：设为当前研究
             if (this->_techTree &&
                 this->_techTree->isResearchable(techId) &&
                 !this->_techTree->isActivated(techId)) {
                 this->setAsCurrentResearch(techId);
-                this->hideTechDetail();  // 设为研究后隐藏详情
+                this->hideTechDetail();
             }
         }
         });
 
-    // 创建Menu（每个节点一个）
+    // 创建 Menu - 重要：设置 position 在中心，确保触摸区域正确
     auto menu = Menu::create(menuItem, nullptr);
-    menu->setPosition(Vec2::ZERO);
+    menu->setPosition(Vec2(NODE_WIDTH / 2, NODE_HEIGHT / 2));
+    menuItem->setPosition(Vec2::ZERO);
     container->addChild(menu);
 
     // 添加边框（使用DrawNode）

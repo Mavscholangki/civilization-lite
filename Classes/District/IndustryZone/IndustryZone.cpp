@@ -52,7 +52,7 @@ void IndustryZone::calculateBonus()
 	adjacencyBonus = { 0, 0, 0, 0, 0 }; // 重置加成产出
 	// 工业区的加成产出计算逻辑
 	// 例如：每个相邻的森林地块增加1点生产力产出
-	auto gameScene = GameScene::getInstance();
+	auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
 	if (!gameScene) return;
 	std::vector<Hex> neighbors = getHexNeighbors(_pos);
 	for (const auto& neighbor : neighbors)

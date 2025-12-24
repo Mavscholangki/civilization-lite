@@ -74,7 +74,7 @@ bool BaseCity::initCity(int player, Hex pos, std::string name) {
     _nameLabel->setPosition(Vec2(0, 25));
 	_nameLabel->addClickEventListener([=](Ref* sender) {
 		// 点击城市名称时显示生产面板
-		GameScene::getInstance()->updateProductionPanel(this->ownerPlayer, this);
+		dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene())->updateProductionPanel(this->ownerPlayer, this);
 		});
     
     this->addChild(_nameLabel, 100);
@@ -259,7 +259,7 @@ void BaseCity::updateDistribution() // 更新分配信息
 
 void BaseCity::updatePanel() // 更新生产面板信息
 {
-	GameScene::getInstance()->updateProductionPanel(ownerPlayer, this);
+	dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene())->updateProductionPanel(ownerPlayer, this);
 }
 
 void BaseCity::onTurnEnd() {
