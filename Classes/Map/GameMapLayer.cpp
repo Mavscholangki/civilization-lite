@@ -593,9 +593,12 @@ void GameMapLayer::onBuildCityAction() {
         }
     }
 
-    if (_selectedUnit == _myUnit) {
-        _myUnit = nullptr;
+    auto it = std::find(_allUnits.begin(), _allUnits.end(), _selectedUnit);
+    if (it != _allUnits.end()) {
+        _allUnits.erase(it);
     }
+
+    // 然后再进行删除和重置
     _selectedUnit->removeFromParent();
     _selectedUnit = nullptr;
 
