@@ -151,31 +151,49 @@ void HUDLayer::createCiv6StyleResourceDisplay() {
     _turnLabel->setTextColor(Color4B(255, 255, 200, 0));
     _topBar->addChild(_turnLabel);
 }
+
 void HUDLayer::createCiv6StyleNextTurnButton() {
     auto visibleSize = Director::getInstance()->getVisibleSize();
 
-    _btnNextTurn = Button::create();
-    SETUP_BUTTON(_btnNextTurn, Size(100, 100));
-    _btnNextTurn->setPosition(Vec2(visibleSize.width - 70, 70));
+    // 1. 创建按钮，指定三种状态的图片路径
+    // 路径：res/next_turn_normal.png, res/next_turn_pressed.png, res/next_turn_disabled.png
+    _btnNextTurn = Button::create("res/next_turn_normal.png",
+        "res/next_turn_pressed.png",
+        "res/next_turn_disabled.png");
+
+    // 2. 基础属性设置
+    _btnNextTurn->ignoreContentAdaptWithSize(false);
+    _btnNextTurn->setContentSize(Size(100, 100)); // 建议美术按 200x200 制作，此处缩放
+    _btnNextTurn->setPosition(Vec2(visibleSize.width - 80, 80));
     _btnNextTurn->setLocalZOrder(20);
+    _btnNextTurn->setTouchEnabled(true);
+    _btnNextTurn->setSwallowTouches(true);
 
-    // 圆形背景绘制
-    auto drawNode = DrawNode::create();
-    drawNode->drawSolidCircle(Vec2(50, 50), 45, 0, 32, Color4F(0.1f, 0.4f, 0.1f, 1.0f));
-    drawNode->drawCircle(Vec2(50, 50), 45, 0, 32, false, Color4F::WHITE);
-    drawNode->drawTriangle(Vec2(75, 50), Vec2(40, 70), Vec2(40, 30), Color4F::WHITE);
-    _btnNextTurn->addChild(drawNode, -1);
+    // 3. 添加文字标签 (居中或偏下)
+    auto nextTurnLabel = Label::createWithSystemFont("NEXT TURN", "Arial-BoldMT", 14);
+    nextTurnLabel->setPosition(Vec2(50, -10)); // 放在圆钮下方
+    nextTurnLabel->setTextColor(Color4B(255, 255, 200, 255));
+    nextTurnLabel->enableOutline(Color4B::BLACK, 1);
+    _btnNextTurn->addChild(nextTurnLabel);
 
-    auto label = Label::createWithSystemFont("NEXT TURN", "Arial", 12);
-    label->setPosition(Vec2(50, 10));
-    _btnNextTurn->addChild(label);
-
+    // 4. 点击事件
     _btnNextTurn->addClickEventListener([this](Ref* sender) {
+        // 简单的点击反馈：轻微缩放
+        auto scale = Sequence::create(ScaleTo::create(0.05f, 0.9f), ScaleTo::create(0.1f, 1.0f), nullptr);
+        _btnNextTurn->runAction(scale);
+
         CCLOG("HUD: Next Turn Clicked");
         if (_onNextTurn) _onNextTurn();
         });
 
     this->addChild(_btnNextTurn);
+
+    // 初始状态：如果没有图片文件，暂时用颜色块辅助调试
+    if (_btnNextTurn->getRendererNormal()->getContentSize().width == 0) {
+        auto debugCircle = DrawNode::create();
+        debugCircle->drawSolidCircle(Vec2(50, 50), 45, 0, 32, Color4F(0.2f, 0.5f, 0.2f, 1.0f));
+        _btnNextTurn->addChild(debugCircle, -1);
+    }
 }
 
 void HUDLayer::createCiv6StyleFunctionButtons() {
