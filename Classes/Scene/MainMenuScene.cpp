@@ -58,7 +58,7 @@ void MainMenuScene::onNewGameClicked(Ref* sender)
 {
     CCLOG("Start New Game...");
     // 切换场景：带有淡入淡出特效 (1.0秒)
-    auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
+    auto gameScene = GameScene::createScene();
     Director::getInstance()->replaceScene(TransitionFade::create(1.0f, gameScene));
 
     // 音乐保持播放，切换到文明选择界面

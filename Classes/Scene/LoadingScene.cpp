@@ -326,7 +326,12 @@ void LoadingScene::goToNextScene() {
 
     Scene* targetScene = nullptr;
 
-    if (_sceneCreator) {
+    // 优先使用预创建的场景
+    if (_preCreatedScene) {
+        targetScene = _preCreatedScene;
+        CCLOG("Using pre-created GameScene");
+    }
+    else if (_sceneCreator) {
         // 使用场景创建函数
         targetScene = _sceneCreator();
     }
@@ -336,13 +341,20 @@ void LoadingScene::goToNextScene() {
     }
 
     if (targetScene) {
-        // 直接切换到GameScene
-    // GameScene会自己显示覆盖层并完成初始化
-        auto gameScene = GameScene::createScene();
-        Director::getInstance()->replaceScene(gameScene);
+        // 直接替换场景
+        Director::getInstance()->replaceScene(targetScene);
     }
     else {
         CCLOGERROR("Failed to create target scene!");
+        // 备用方案：创建一个基本的GameScene
+        auto fallbackScene = GameScene::createScene();
+        Director::getInstance()->replaceScene(fallbackScene);
+    }
+
+    // 清理预创建的场景引用
+    if (_preCreatedScene) {
+        _preCreatedScene->release();
+        _preCreatedScene = nullptr;
     }
 }
 
