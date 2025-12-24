@@ -5,6 +5,7 @@
 #include "../Core/GameManager.h"
 #include "../Core/Player.h"
 #include "SelectionScene.h"
+#include "../Audio/MusicManager.h"
 
 USING_NS_CC;
 
@@ -108,6 +109,12 @@ bool GameScene::initGameData() {
                 i + 1, static_cast<int>(aiSettings[i].civilization));
         }
     }
+
+    // ==================== 播放文明音乐 ====================
+    // 根据玩家选择的文明播放对应的背景音乐
+    MusicManager::getInstance()->playCivilizationMusic(playerCiv);
+    CCLOG("Started playing civilization music for civ type: %d", static_cast<int>(playerCiv));
+    // ======================================================
 
     CCLOG("GameScene::initGameData() - end");
     _dataInitialized = true;
