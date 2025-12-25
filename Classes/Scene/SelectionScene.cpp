@@ -574,8 +574,8 @@ std::string CivilizationSelectionScene::generateNaturalDescription(const Civiliz
     if (civ.type == CivilizationType::CHINA) {
         description =
             u8"华夏文明由始皇帝领导，是世界上最古老的文明之一。\n\n"
-            u8"此外，中国的尤里卡和灵感加成提升至75%，让科技和文化发展更加迅速。\n\n"
-            u8"中国的特殊单位是虎蹲炮，一种强大的早期攻城武器；"
+            u8"中国的尤里卡和灵感加成提升至75%，让科技和文化发展更加迅速。\n\n"
+            u8"中国的特殊单位是虎蹲炮，一种强大的早期攻城武器。\n\n"
             u8"适合喜欢通过高效建造和快速科技发展来建立优势的玩家。";
     }
     else if (civ.type == CivilizationType::GERMANY) {
