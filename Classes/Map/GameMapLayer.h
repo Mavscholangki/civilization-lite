@@ -130,6 +130,8 @@ private:
      */
     void drawHexOnNode(cocos2d::DrawNode* node, cocos2d::Vec2 pos, float size, cocos2d::Color4F color);
 
+    Color4F applyCivStyle(Color4F c);
+
     /**
      * @brief 在地块上显示资源信息
      * @param hex 六边形坐标
@@ -138,6 +140,16 @@ private:
      * 此方法会在地块中心显示：粮食、生产力、金币、科技、文化产出
      */
     void drawTileResources(Hex hex, const TileData& data);
+
+    void drawMountain(Vec2 center, float size);
+
+    void drawGrassTexture(Vec2 center, float size);
+
+    void drawForest(Vec2 center, float size);
+
+    void drawWaterTexture(Vec2 center, float size);
+
+    void drawHexBoundaries(Hex h, TileData data);
 
     /**
      * @brief 更新地块选中显示

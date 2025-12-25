@@ -292,31 +292,53 @@ void GameMapLayer::initGameManagerAndPlayers() {
 }
 
 void GameMapLayer::generateMap() {
-    int mapWidth = 120;
-    int mapHeight = 50;
-
-    _mapData = MapGenerator::generate(mapWidth, mapHeight);
+    _mapData = MapGenerator::generate(120, 50);
 
     for (auto const& item : _mapData) {
         Hex hex = item.first;
         TileData data = item.second;
+        Vec2 pos = _layout->hexToPixel(hex);
         Color4F color;
 
+        // 使用新调配的 Civ6 风格配色
         switch (data.type) {
-        case TerrainType::OCEAN:    color = Color4F(0.1f, 0.1f, 0.4f, 1); break;
-        case TerrainType::COAST:    color = Color4F(0.2f, 0.5f, 0.7f, 1); break;
-        case TerrainType::SNOW:     color = Color4F(0.95f, 0.95f, 1.0f, 1); break;
-        case TerrainType::TUNDRA:   color = Color4F(0.6f, 0.6f, 0.65f, 1); break;
-        case TerrainType::DESERT:   color = Color4F(0.9f, 0.8f, 0.5f, 1); break;
-        case TerrainType::PLAINS:   color = Color4F(0.6f, 0.7f, 0.3f, 1); break;
-        case TerrainType::GRASSLAND:color = Color4F(0.2f, 0.7f, 0.2f, 1); break;
-        case TerrainType::JUNGLE:   color = Color4F(0.0f, 0.4f, 0.0f, 1); break;
-        case TerrainType::MOUNTAIN: color = Color4F(0.4f, 0.3f, 0.3f, 1); break;
-        default: color = Color4F::WHITE;
+            case TerrainType::OCEAN:     color = Color4F(0.12f, 0.18f, 0.30f, 1.0f); break;
+            case TerrainType::COAST:     color = Color4F(0.25f, 0.45f, 0.55f, 1.0f); break;
+            case TerrainType::SNOW:      color = Color4F(0.90f, 0.92f, 0.98f, 1.0f); break;
+            case TerrainType::TUNDRA:    color = Color4F(0.45f, 0.42f, 0.48f, 1.0f); break;
+            case TerrainType::DESERT:    color = Color4F(0.82f, 0.72f, 0.45f, 1.0f); break;
+            case TerrainType::PLAINS:    color = Color4F(0.55f, 0.52f, 0.30f, 1.0f); break;
+            case TerrainType::GRASSLAND: color = Color4F(0.40f, 0.55f, 0.25f, 1.0f); break;
+            case TerrainType::JUNGLE:    color = Color4F(0.15f, 0.35f, 0.15f, 1.0f); break;
+            case TerrainType::MOUNTAIN:  color = Color4F(0.42f, 0.38f, 0.35f, 1.0f); break;
+            default: color = Color4F::WHITE;
         }
-        
-        drawHexOnNode(_tilesDrawNode, _layout->hexToPixel(hex), _layout->size, color);
+
+        // 应用刚才提到的“羊皮纸化”处理
+        color = applyCivStyle(color);
+
+        // 噪声处理 (保持极小范围，以免颜色变脏)
+        float noise = (sin(hex.q * 0.4f) + cos(hex.r * 0.4f)) * 0.03f;
+        color.r = clampf(color.r + noise, 0.0f, 1.0f);
+        color.g = clampf(color.g + noise, 0.0f, 1.0f);
+        color.b = clampf(color.b + noise, 0.0f, 1.0f);
+
+        // 绘制...
+        drawHexOnNode(_tilesDrawNode, pos, _layout->size, color);
+        if (data.type == TerrainType::MOUNTAIN) {
+            drawMountain(pos, _layout->size);
+        }
+        else if (data.type == TerrainType::GRASSLAND) {
+            drawGrassTexture(pos, _layout->size);
+        }
+        else if (data.type == TerrainType::JUNGLE) {
+            drawForest(pos, _layout->size);
+        }
+        else if (data.type == TerrainType::COAST) {
+            drawWaterTexture(pos, _layout->size);
+        }
         drawTileResources(hex, data);
+        drawHexBoundaries(hex, data);
     }
 }
 
@@ -326,7 +348,42 @@ void GameMapLayer::drawHexOnNode(DrawNode* node, Vec2 pos, float size, Color4F c
         float rad = CC_DEGREES_TO_RADIANS(60 * i - 30);
         vertices[i] = Vec2(pos.x + size * cos(rad), pos.y + size * sin(rad));
     }
-    node->drawPolygon(vertices, 6, color, 1, Color4F(0.0f, 0.0f, 0.0f, 0.1f));
+
+    // 1. 底色填充 (核心地形色)
+    // 稍微降低透明度(如0.8)，可以让地图底色不那么死板
+    node->drawPolygon(vertices, 6, color, 0, Color4F(0, 0, 0, 0));
+
+    // 2. 模拟文明6的“地块网格线”
+    // 使用极细的深色半透明线条，只在边缘勾勒
+    Color4F gridLineColor = Color4F(0, 0, 0, 0.15f);
+    node->drawPoly(vertices, 6, true, gridLineColor);
+
+    // 3. 增加“高光边界”（文明6在不同地形交界处有轻微的亮边）
+    Vec2 innerVertices[6];
+    float innerMargin = 2.0f; // 缩进2像素
+    for (int i = 0; i < 6; i++) {
+        float rad = CC_DEGREES_TO_RADIANS(60 * i - 30);
+        innerVertices[i] = Vec2(pos.x + (size - innerMargin) * cos(rad),
+            pos.y + (size - innerMargin) * sin(rad));
+    }
+    // 绘制一个只有边框的六边形，颜色比底色稍亮，模拟厚度感
+    Color4F highlightColor = Color4F(1, 1, 1, 0.1f);
+    node->drawPoly(innerVertices, 6, true, highlightColor);
+}
+
+Color4F GameMapLayer::applyCivStyle(Color4F c) {
+    // 1. 稍微降低饱和度（向中间灰色靠拢）
+    float gray = (c.r + c.g + c.b) / 3.0f;
+    float sat = 0.8f; // 饱和度系数
+    c.r = gray + (c.r - gray) * sat;
+    c.g = gray + (c.g - gray) * sat;
+    c.b = gray + (c.b - gray) * sat;
+
+    // 2. 注入极其微弱的暖黄色调（模拟旧纸张）
+    c.r = std::min(1.0f, c.r + 0.02f);
+    c.g = std::min(1.0f, c.g + 0.01f);
+
+    return c;
 }
 
 // 绘制地皮资源属性（仅显示高产出的地块）
@@ -368,6 +425,118 @@ void GameMapLayer::drawTileResources(Hex hex, const TileData& data) {
     label->setPosition(centerPos);
     label->setColor(Color3B::WHITE);
     this->addChild(label, 10);
+}
+
+void GameMapLayer::drawMountain(Vec2 center, float size) {
+    // 定义一个完全透明的颜色变量，避免再次写错
+    const Color4F shadowColor = Color4F(0, 0, 0, 0);
+
+    // 绘制两座重叠的山峰（一大一小），增加层次感
+    struct MountainPeak { Vec2 offset; float scale; };
+    MountainPeak peaks[] = { {Vec2(0, 5), 1.0f}, {Vec2(size * 0.4f, -size * 0.2f), 0.6f} };
+
+    for (auto& p : peaks) {
+        float h = size * 0.8f * p.scale; // 山高度
+        float w = size * 0.6f * p.scale; // 山宽度
+
+        Vec2 peak = center + p.offset + Vec2(0, h);
+        Vec2 leftBase = center + p.offset + Vec2(-w, -size * 0.2f);
+        Vec2 rightBase = center + p.offset + Vec2(w, -size * 0.2f);
+        Vec2 midBase = center + p.offset + Vec2(0, -size * 0.1f); // 脊线中点
+
+        // 1. 左侧受光面 (浅灰棕)
+        Vec2 leftSide[] = { peak, midBase, leftBase };
+        _tilesDrawNode->drawPolygon(leftSide, 3, Color4F(0.6f, 0.5f, 0.45f, 1), 0, shadowColor);
+
+        // 2. 右侧背阴面 (深棕)
+        Vec2 rightSide[] = { peak, rightBase, midBase };
+        _tilesDrawNode->drawPolygon(rightSide, 3, Color4F(0.45f, 0.35f, 0.3f, 1), 0, shadowColor);
+
+        // 3. 雪顶 (高海拔的灵魂)
+        // 取山尖往下 30% 的位置
+        Vec2 snowLeft = peak + (leftBase - peak) * 0.3f;
+        Vec2 snowRight = peak + (rightBase - peak) * 0.3f;
+        Vec2 snowMid = peak + (midBase - peak) * 0.35f;
+        Vec2 snowPoints[] = { peak, snowLeft, snowMid, snowRight };
+        _tilesDrawNode->drawPolygon(snowPoints, 4, Color4F(0.9f, 0.95f, 1.0f, 1), 0, shadowColor);
+    }
+}
+
+void GameMapLayer::drawGrassTexture(Vec2 center, float size) {
+    int grassCount = 3; // 每个地块生成3丛小草
+    for (int i = 0; i < grassCount; i++) {
+        // 在六边形内随机偏移
+        float offsetX = (CCRANDOM_0_1() - 0.5f) * size * 0.6f;
+        float offsetY = (CCRANDOM_0_1() - 0.5f) * size * 0.6f;
+        Vec2 p = center + Vec2(offsetX, offsetY);
+
+        // 绘制三叉小草
+        float h = size * 0.15f;
+        _tilesDrawNode->drawSegment(p, p + Vec2(-h * 0.3f, h), 1.0f, Color4F(0, 0, 0, 0.15f));
+        _tilesDrawNode->drawSegment(p, p + Vec2(0, h * 1.2f), 1.0f, Color4F(0, 0, 0, 0.15f));
+        _tilesDrawNode->drawSegment(p, p + Vec2(h * 0.3f, h), 1.0f, Color4F(0, 0, 0, 0.15f));
+    }
+}
+
+void GameMapLayer::drawForest(Vec2 center, float size) {
+    int treeCount = 5;
+    for (int i = 0; i < treeCount; i++) {
+        float offsetX = (CCRANDOM_0_1() - 0.5f) * size * 0.5f;
+        float offsetY = (CCRANDOM_0_1() - 0.5f) * size * 0.5f;
+        Vec2 treePos = center + Vec2(offsetX, offsetY);
+
+        float radius = size * 0.2f;
+        // 树干
+        _tilesDrawNode->drawSegment(treePos, treePos + Vec2(0, -radius), 1.5f, Color4F(0.3f, 0.2f, 0.1f, 1));
+        // 树冠 (深浅绿色交替)
+        Color4F treeColor = (i % 2 == 0) ? Color4F(0.1f, 0.4f, 0.1f, 1) : Color4F(0.15f, 0.45f, 0.15f, 1);
+        _tilesDrawNode->drawDot(treePos, radius, treeColor);
+        // 高光点
+        _tilesDrawNode->drawDot(treePos + Vec2(-radius * 0.3f, radius * 0.3f), radius * 0.2f, Color4F(1, 1, 1, 0.1f));
+    }
+}
+
+void GameMapLayer::drawWaterTexture(Vec2 center, float size) {
+    // 绘制两条波浪线
+    for (int i = 0; i < 2; i++) {
+        float y = (i == 0) ? size * 0.2f : -size * 0.2f;
+        float xRange = size * 0.3f;
+
+        Vec2 p1 = center + Vec2(-xRange, y);
+        Vec2 p2 = center + Vec2(0, y + size * 0.05f);
+        Vec2 p3 = center + Vec2(xRange, y);
+
+        // 用两条线段模拟简易弧线
+        Color4F waveColor = Color4F(1.0f, 1.0f, 1.0f, 0.25f);
+        _tilesDrawNode->drawSegment(p1, p2, 1.0f, waveColor);
+        _tilesDrawNode->drawSegment(p2, p3, 1.0f, waveColor);
+    }
+}
+
+void GameMapLayer::drawHexBoundaries(Hex h, TileData data) {
+    Vec2 center = _layout->hexToPixel(h);
+    float size = _layout->size;
+
+    for (int i = 0; i < 6; i++) {
+        // 获取当前边的两个顶点
+        float rad_1 = CC_DEGREES_TO_RADIANS(60 * i - 30);
+        float rad_2 = CC_DEGREES_TO_RADIANS(60 * (i + 1) - 30);
+        Vec2 v1 = center + Vec2(size * cos(rad_1), size * sin(rad_1));
+        Vec2 v2 = center + Vec2(size * cos(rad_2), size * sin(rad_2));
+
+        // 获取邻居坐标 (需要你的 Hex 类支持获取邻居)
+        // 假设 directions[6] 是六个轴向偏移
+        // Hex neighbor = h + directions[i];
+        // TileData nData = getTileData(neighbor);
+
+        // 逻辑 A：陆地与水的交界线（海岸线）
+        // if (isLand(data) && isWater(nData)) {
+        //     _tilesDrawNode->drawSegment(v1, v2, 1.5f, Color4F(0.9f, 0.8f, 0.6f, 1.0f)); // 浅金色沙滩感
+        // }
+
+        // 逻辑 B：默认全地块细微勾边（增强棋盘感）
+        _tilesDrawNode->drawSegment(v1, v2, 0.5f, Color4F(0, 0, 0, 0.1f));
+    }
 }
 
 int GameMapLayer::getTerrainCost(Hex h) {
