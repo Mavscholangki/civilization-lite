@@ -325,18 +325,7 @@ void GameMapLayer::generateMap() {
 
         // 绘制...
         drawHexOnNode(_tilesDrawNode, pos, _layout->size, color);
-        if (data.type == TerrainType::MOUNTAIN) {
-            drawMountain(pos, _layout->size);
-        }
-        else if (data.type == TerrainType::GRASSLAND) {
-            drawGrassTexture(pos, _layout->size);
-        }
-        else if (data.type == TerrainType::JUNGLE) {
-            drawForest(pos, _layout->size);
-        }
-        else if (data.type == TerrainType::COAST) {
-            drawWaterTexture(pos, _layout->size);
-        }
+        drawTileDecorations(hex, pos, _layout->size, data);
         drawTileResources(hex, data);
         drawHexBoundaries(hex, data);
     }
@@ -461,81 +450,110 @@ void GameMapLayer::drawMountain(Vec2 center, float size) {
         _tilesDrawNode->drawPolygon(snowPoints, 4, Color4F(0.9f, 0.95f, 1.0f, 1), 0, shadowColor);
     }
 }
+void GameMapLayer::drawSmoothWave(Vec2 startPos, float length, float height) {
+    const int segments = 8; // 段数越多越圆滑
+    Color4F waveColor = Color4F(1.0f, 1.0f, 1.0f, 0.18f); // 淡淡的白色
 
-void GameMapLayer::drawGrassTexture(Vec2 center, float size) {
-    int grassCount = 3; // 每个地块生成3丛小草
-    for (int i = 0; i < grassCount; i++) {
-        // 在六边形内随机偏移
-        float offsetX = (CCRANDOM_0_1() - 0.5f) * size * 0.6f;
-        float offsetY = (CCRANDOM_0_1() - 0.5f) * size * 0.6f;
-        Vec2 p = center + Vec2(offsetX, offsetY);
+    Vec2 prevPoint = startPos;
+    for (int i = 1; i <= segments; i++) {
+        float t = (float)i / segments;
+        // 使用正弦函数模拟圆润的弧度：y = sin(PI * t) * height
+        float x = startPos.x + t * length;
+        float y = startPos.y + sinf(M_PI * t) * height;
+        Vec2 currentPoint = Vec2(x, y);
 
-        // 绘制三叉小草
-        float h = size * 0.15f;
-        _tilesDrawNode->drawSegment(p, p + Vec2(-h * 0.3f, h), 1.0f, Color4F(0, 0, 0, 0.15f));
-        _tilesDrawNode->drawSegment(p, p + Vec2(0, h * 1.2f), 1.0f, Color4F(0, 0, 0, 0.15f));
-        _tilesDrawNode->drawSegment(p, p + Vec2(h * 0.3f, h), 1.0f, Color4F(0, 0, 0, 0.15f));
+        _tilesDrawNode->drawSegment(prevPoint, currentPoint, 0.8f, waveColor);
+        prevPoint = currentPoint;
     }
 }
+void GameMapLayer::drawTileDecorations(Hex hex, Vec2 pos, float size, const TileData& data) {
+    // 1. 基于坐标生成固定随机种子
+    unsigned int seed = std::hash<int>{}(hex.q) ^ std::hash<int>{}(hex.r);
+    auto getRand = [&seed]() {
+        seed = seed * 1103515245 + 12345;
+        return (float)((seed / 65536) % 32768) / 32768.0f;
+        };
 
-void GameMapLayer::drawForest(Vec2 center, float size) {
-    int treeCount = 5;
-    for (int i = 0; i < treeCount; i++) {
-        float offsetX = (CCRANDOM_0_1() - 0.5f) * size * 0.5f;
-        float offsetY = (CCRANDOM_0_1() - 0.5f) * size * 0.5f;
-        Vec2 treePos = center + Vec2(offsetX, offsetY);
-
-        float radius = size * 0.2f;
-        // 树干
-        _tilesDrawNode->drawSegment(treePos, treePos + Vec2(0, -radius), 1.5f, Color4F(0.3f, 0.2f, 0.1f, 1));
-        // 树冠 (深浅绿色交替)
-        Color4F treeColor = (i % 2 == 0) ? Color4F(0.1f, 0.4f, 0.1f, 1) : Color4F(0.15f, 0.45f, 0.15f, 1);
-        _tilesDrawNode->drawDot(treePos, radius, treeColor);
-        // 高光点
-        _tilesDrawNode->drawDot(treePos + Vec2(-radius * 0.3f, radius * 0.3f), radius * 0.2f, Color4F(1, 1, 1, 0.1f));
+    // 2. 绘制山脉 (最优先，因为山体大)
+    if (data.type == TerrainType::MOUNTAIN) {
+        drawMountain(pos, size);
     }
-}
-
-void GameMapLayer::drawWaterTexture(Vec2 center, float size) {
-    // 绘制两条波浪线
-    for (int i = 0; i < 2; i++) {
-        float y = (i == 0) ? size * 0.2f : -size * 0.2f;
-        float xRange = size * 0.3f;
-
-        Vec2 p1 = center + Vec2(-xRange, y);
-        Vec2 p2 = center + Vec2(0, y + size * 0.05f);
-        Vec2 p3 = center + Vec2(xRange, y);
-
-        // 用两条线段模拟简易弧线
-        Color4F waveColor = Color4F(1.0f, 1.0f, 1.0f, 0.25f);
-        _tilesDrawNode->drawSegment(p1, p2, 1.0f, waveColor);
-        _tilesDrawNode->drawSegment(p2, p3, 1.0f, waveColor);
+    // 3. 绘制森林/丛林
+    else if (data.type == TerrainType::JUNGLE || data.type == TerrainType::JUNGLE) {
+        for (int i = 0; i < 5; i++) {
+            Vec2 tPos = pos + Vec2((getRand() - 0.5f) * size * 0.6f, (getRand() - 0.5f) * size * 0.6f);
+            float r = size * 0.18f;
+            _tilesDrawNode->drawDot(tPos, r, Color4F(0.15f, 0.35f, 0.15f, 1.0f)); // 树冠
+            _tilesDrawNode->drawDot(tPos + Vec2(-r * 0.3f, r * 0.3f), r * 0.2f, Color4F(1, 1, 1, 0.08f)); // 高光
+        }
+    }
+    // 4. 绘制草地/平原纹理
+    else if (data.type == TerrainType::GRASSLAND || data.type == TerrainType::PLAINS) {
+        for (int i = 0; i < 3; i++) {
+            Vec2 p = pos + Vec2((getRand() - 0.5f) * size * 0.7f, (getRand() - 0.5f) * size * 0.7f);
+            float h = size * 0.12f;
+            _tilesDrawNode->drawSegment(p, p + Vec2(-h * 0.2f, h), 1.0f, Color4F(0, 0, 0, 0.1f));
+            _tilesDrawNode->drawSegment(p, p + Vec2(h * 0.2f, h), 1.0f, Color4F(0, 0, 0, 0.1f));
+        }
+    }
+    // 5. 绘制高级水纹
+    else if (data.type == TerrainType::COAST) { // 仅在浅海绘制波浪
+        // 浅海绘制 1-2 条长弧线波浪
+        int waveCount = (getRand() > 0.5f) ? 2 : 1;
+        for (int i = 0; i < waveCount; i++) {
+            Vec2 wPos = pos + Vec2((getRand() - 0.5f) * size * 0.6f, (getRand() - 0.5f) * size * 0.6f);
+            float waveLength = size * (0.4f + getRand() * 0.3f); // 长度增加
+            drawSmoothWave(wPos, waveLength, size * 0.08f); // 调用平滑波浪绘制
+        }
     }
 }
 
 void GameMapLayer::drawHexBoundaries(Hex h, TileData data) {
     Vec2 center = _layout->hexToPixel(h);
     float size = _layout->size;
+    bool isCurrentWater = (data.type == TerrainType::COAST || data.type == TerrainType::OCEAN);
 
     for (int i = 0; i < 6; i++) {
-        // 获取当前边的两个顶点
         float rad_1 = CC_DEGREES_TO_RADIANS(60 * i - 30);
         float rad_2 = CC_DEGREES_TO_RADIANS(60 * (i + 1) - 30);
+
+        // 原始顶点
         Vec2 v1 = center + Vec2(size * cos(rad_1), size * sin(rad_1));
         Vec2 v2 = center + Vec2(size * cos(rad_2), size * sin(rad_2));
 
-        // 获取邻居坐标 (需要你的 Hex 类支持获取邻居)
-        // 假设 directions[6] 是六个轴向偏移
-        // Hex neighbor = h + directions[i];
-        // TileData nData = getTileData(neighbor);
+        Hex neighbor = h.getNeighbor(i);
+        TileData nData = getTileData(neighbor);
+        bool isNeighborLand = (nData.type != TerrainType::OCEAN && nData.type != TerrainType::COAST);
 
-        // 逻辑 A：陆地与水的交界线（海岸线）
-        // if (isLand(data) && isWater(nData)) {
-        //     _tilesDrawNode->drawSegment(v1, v2, 1.5f, Color4F(0.9f, 0.8f, 0.6f, 1.0f)); // 浅金色沙滩感
-        // }
+        if (isCurrentWater && isNeighborLand) {
+            // --- 柔和泡沫效果优化 ---
 
-        // 逻辑 B：默认全地块细微勾边（增强棋盘感）
-        _tilesDrawNode->drawSegment(v1, v2, 0.5f, Color4F(0, 0, 0, 0.1f));
+            // 1. 计算缩进方向（从边界向六边形中心靠拢 2-3 像素）
+            Vec2 edgeMid = (v1 + v2) * 0.5f;
+            Vec2 dirToCenter = (center - edgeMid).getNormalized();
+            float inset = 2.5f;
+
+            Vec2 sv1 = v1 + dirToCenter * inset;
+            Vec2 sv2 = v2 + dirToCenter * inset;
+
+            // 2. 第一层：底层微弱蓝光 (较粗，模拟水下的浅色)
+            _tilesDrawNode->drawSegment(sv1, sv2, 3.5f, Color4F(0.8f, 0.95f, 1.0f, 0.15f));
+
+            // 3. 第二层：核心白色泡沫 (较细，且缩短一点，避免在顶点处生硬重叠)
+            Vec2 shortV1 = sv1 + (sv2 - sv1) * 0.1f;
+            Vec2 shortV2 = sv1 + (sv2 - sv1) * 0.9f;
+            _tilesDrawNode->drawSegment(shortV1, shortV2, 1.2f, Color4F(1.0f, 1.0f, 1.0f, 0.25f));
+
+            // 4. 第三层：增加一点点随机的细浪花
+            if (std::hash<float>{}(v1.x + v2.y) > 0.5) { // 简单随机判断
+                Vec2 vMid = (shortV1 + shortV2) * 0.5f;
+                _tilesDrawNode->drawSegment(vMid, vMid + (shortV2 - shortV1) * 0.2f, 2.0f, Color4F(1, 1, 1, 0.1f));
+            }
+        }
+        else {
+            // 普通地块网格：变得更淡，几乎看不见，减少干扰
+            _tilesDrawNode->drawSegment(v1, v2, 0.5f, Color4F(0, 0, 0, 0.05f));
+        }
     }
 }
 

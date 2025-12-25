@@ -143,11 +143,10 @@ private:
 
     void drawMountain(Vec2 center, float size);
 
-    void drawGrassTexture(Vec2 center, float size);
+    void drawSmoothWave(Vec2 startPos, float length, float height);
 
-    void drawForest(Vec2 center, float size);
 
-    void drawWaterTexture(Vec2 center, float size);
+    void drawTileDecorations(Hex hex, Vec2 pos, float size, const TileData& data);
 
     void drawHexBoundaries(Hex h, TileData data);
 
