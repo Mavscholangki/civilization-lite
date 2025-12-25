@@ -12,6 +12,9 @@ bool GameMapLayer::init() {
 
     _isDragging = false;
     _layout = new HexLayout(RADIUS); // 尖顶六边形布局
+    _isSelectingTile = false;
+    _highlightNode = nullptr;
+    _onSelectionCancelled = nullptr;
 
     // 1. 初始化双击变量
     _lastClickHex = Hex(-999, -999);
@@ -381,9 +384,13 @@ int GameMapLayer::getTerrainCost(Hex h) {
     return 1;
 }
 
+// 修改 onTouchBegan 函数，支持Esc键或特殊手势取消（如果需要的话）
 bool GameMapLayer::onTouchBegan(Touch* touch, Event* event) {
     _isDragging = false;
-    return true; // 返回 true 才能接收后续的 Moved 和 Ended
+    _mouseDownPos = touch->getLocation();  // 记录触摸开始位置
+
+    // 如果在选择模式下，可以考虑添加取消手势（例如双击空白处取消）
+    return true;
 }
 
 void GameMapLayer::onTouchMoved(Touch* touch, Event* event) {
@@ -400,6 +407,52 @@ void GameMapLayer::onTouchMoved(Touch* touch, Event* event) {
 void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
     // 首先判断是否是拖拽，如果是就不处理单元逻辑
     if (_isDragging) return;
+
+    // 如果在选择模式下，优先处理地块选择
+    if (_isSelectingTile) {
+        handleTileSelection(touch);
+        return;
+    }
+    // 如果在选择模式下，处理特殊取消手势
+    if (_isSelectingTile) {
+        Vec2 clickPos = this->convertToNodeSpace(touch->getLocation());
+        Hex clickHex = _layout->pixelToHex(clickPos);
+
+        // 检查是否是双击取消（双击非可选地块）
+        auto now = std::chrono::steady_clock::now();
+        long long diff = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - _lastClickTime).count();
+
+        bool isDoubleTap = false;
+        if (clickHex == _lastClickHex && diff < 300) {
+            isDoubleTap = true;
+        }
+
+        _lastClickTime = now;
+        _lastClickHex = clickHex;
+
+        // 如果是双击并且点击的是非可选地块，则取消选择
+        if (isDoubleTap) {
+            // 检查是否在允许列表中
+            bool isAllowed = false;
+            for (const Hex& allowedHex : _allowedTiles) {
+                if (allowedHex == clickHex) {
+                    isAllowed = true;
+                    break;
+                }
+            }
+
+            if (!isAllowed) {
+                CCLOG("Double tap on invalid tile, canceling selection");
+                cancelTileSelection(true);  // 触发取消回调
+                return;
+            }
+        }
+
+        // 正常处理选择
+        handleTileSelection(touch);
+        return;
+    }
 
     // 1. 将触摸转换 (Touch -> NodeSpace -> Hex)
     Vec2 clickPos = this->convertToNodeSpace(touch->getLocation());
@@ -698,3 +751,249 @@ bool GameMapLayer::isValidStartingPosition(Hex centerHex) {
     return true;
 }
 
+
+// =========================地块选择模式======================== //
+
+// 实现 enableTileSelection 函数
+// 修改 enableTileSelection 函数，添加取消回调参数
+void GameMapLayer::enableTileSelection(const std::vector<Hex>& allowedTiles,
+    const std::function<void(Hex)>& callback,
+    const std::function<void()>& cancelCallback) {
+    CCLOG("Enable tile selection mode with %zu allowed tiles", allowedTiles.size());
+
+    // 清除之前的选中单位
+    if (_selectedUnit) {
+        _selectedUnit->hideMoveRange();
+        _selectedUnit = nullptr;
+    }
+
+    // 清除城市选择
+    if (_onCitySelected) {
+        _onCitySelected(nullptr);
+    }
+
+    // 设置选择模式
+    _isSelectingTile = true;
+    _allowedTiles = allowedTiles;
+    _tileSelectionCallback = callback;
+    _onSelectionCancelled = cancelCallback;  // 保存取消回调
+
+    // 创建高亮节点（如果不存在）
+    if (!_highlightNode) {
+        _highlightNode = DrawNode::create();
+        this->addChild(_highlightNode, 15);
+    }
+
+    // 高亮显示可选地块
+    highlightAllowedTiles(allowedTiles);
+}
+
+// 实现 disableTileSelection 函数
+// 修改 disableTileSelection 函数，添加参数支持
+void GameMapLayer::disableTileSelection(bool triggerCancelCallback) {
+    // 直接调用 cancelTileSelection
+    cancelTileSelection(triggerCancelCallback);
+}
+
+// 实现 highlightAllowedTiles 函数
+void GameMapLayer::highlightAllowedTiles(const std::vector<Hex>& allowedTiles) {
+    if (!_highlightNode) return;
+
+    _highlightNode->clear();
+
+    // 清除之前的标签
+    for (auto label : _highlightLabels) {
+        label->removeFromParent();
+    }
+    _highlightLabels.clear();
+
+    // 为每个可选地块绘制高亮效果
+    for (const Hex& hex : allowedTiles) {
+        Vec2 center = _layout->hexToPixel(hex);
+
+        // 绘制高亮边框
+        Vec2 vertices[6];
+        for (int i = 0; i < 6; i++) {
+            float rad = CC_DEGREES_TO_RADIANS(60 * i - 30);
+            vertices[i] = Vec2(center.x + _layout->size * cos(rad),
+                center.y + _layout->size * sin(rad));
+        }
+
+        // 使用半透明的绿色边框表示可选地块
+        _highlightNode->drawPoly(vertices, 6, false, Color4F(0.0f, 1.0f, 0.0f, 0.7f));
+        _highlightNode->setLineWidth(4.0f);
+
+        // 可选：在地块上添加序号标签
+        int index = &hex - &allowedTiles[0];  // 获取在数组中的索引
+        std::string labelText = std::to_string(index + 1);
+
+        auto label = Label::createWithSystemFont(labelText, "Arial", 18);
+        label->setPosition(center);
+        label->setColor(Color3B::WHITE);
+        label->enableOutline(Color4B::BLACK, 2);
+        this->addChild(label, 16);  // 在边框之上
+        _highlightLabels.push_back(label);
+    }
+
+    CCLOG("Highlighted %zu allowed tiles", allowedTiles.size());
+}
+
+// 实现 clearHighlights 函数
+void GameMapLayer::clearHighlights() {
+    if (_highlightNode) {
+        _highlightNode->clear();
+    }
+
+    for (auto label : _highlightLabels) {
+        label->removeFromParent();
+    }
+    _highlightLabels.clear();
+}
+
+// 添加处理地块选择的函数
+// 修改 handleTileSelection 函数，在点击不允许地块时提供反馈
+void GameMapLayer::handleTileSelection(Touch* touch) {
+    // 将触摸转换 (Touch -> NodeSpace -> Hex)
+    Vec2 clickPos = this->convertToNodeSpace(touch->getLocation());
+    Hex clickHex = _layout->pixelToHex(clickPos);
+
+    CCLOG("Tile selection mode: Clicked Hex (%d, %d)", clickHex.q, clickHex.r);
+
+    // 检查点击的地块是否在允许的列表中
+    bool isAllowed = false;
+    for (const Hex& allowedHex : _allowedTiles) {
+        if (allowedHex == clickHex) {
+            isAllowed = true;
+            break;
+        }
+    }
+
+    if (isAllowed) {
+        CCLOG("Tile (%d, %d) selected!", clickHex.q, clickHex.r);
+
+        // 临时保存回调，然后清理状态
+        auto callback = _tileSelectionCallback;
+        cancelTileSelection(false);  // 不触发取消回调
+
+        // 触发选择回调
+        if (callback) {
+            callback(clickHex);
+        }
+
+        // 显示选中标记
+        showSelectionMarker(clickHex);
+    }
+    else {
+        CCLOG("Tile (%d, %d) is not in allowed list", clickHex.q, clickHex.r);
+
+        // 可选：提供视觉反馈（例如闪烁红色边框）
+        showInvalidSelectionFeedback(clickHex);
+    }
+}
+
+// 添加显示选中标记的函数
+void GameMapLayer::showSelectionMarker(Hex hex) {
+    // 创建临时的选中标记（例如一个闪烁的星星）
+    Vec2 center = _layout->hexToPixel(hex);
+
+    auto marker = Sprite::create("selection_marker.png"); // 需要准备这个图片
+    if (!marker) {
+        // 如果图片不存在，绘制一个简单的星星
+        auto drawNode = DrawNode::create();
+        float radius = _layout->size * 0.3f;
+        Vec2 starPoints[10];
+        for (int i = 0; i < 10; i++) {
+            float angle = CC_DEGREES_TO_RADIANS(36 * i);
+            float r = (i % 2 == 0) ? radius : radius * 0.5f;
+            starPoints[i] = Vec2(center.x + r * cos(angle),
+                center.y + r * sin(angle));
+        }
+        drawNode->drawPolygon(starPoints, 10, Color4F(1.0f, 1.0f, 0.0f, 0.3f),
+            1.0f, Color4F(1.0f, 1.0f, 0.0f, 0.8f));
+        drawNode->setTag(9999); // 使用tag便于后续移除
+        this->addChild(drawNode, 18);
+
+        // 添加闪烁动画
+        auto fadeIn = FadeTo::create(0.5f, 255);
+        auto fadeOut = FadeTo::create(0.5f, 128);
+        auto sequence = Sequence::create(fadeIn, fadeOut, nullptr);
+        auto repeat = RepeatForever::create(sequence);
+        drawNode->runAction(repeat);
+    }
+    else {
+        marker->setPosition(center);
+        marker->setTag(9999);
+        this->addChild(marker, 18);
+
+        // 旋转动画
+        auto rotate = RotateBy::create(2.0f, 360);
+        auto repeat = RepeatForever::create(rotate);
+        marker->runAction(repeat);
+    }
+}
+
+// 添加清除选中标记的函数
+void GameMapLayer::clearSelectionMarker() {
+    this->removeChildByTag(9999);
+}
+
+// 添加 cancelTileSelection 函数实现
+void GameMapLayer::cancelTileSelection(bool triggerCancelCallback) {
+    if (!_isSelectingTile) {
+        CCLOG("Not in tile selection mode, nothing to cancel");
+        return;
+    }
+
+    CCLOG("Canceling tile selection mode");
+
+    // 清除选择模式状态
+    _isSelectingTile = false;
+    _allowedTiles.clear();
+
+    // 触发取消回调（如果需要）
+    if (triggerCancelCallback && _onSelectionCancelled) {
+        _onSelectionCancelled();
+        CCLOG("Tile selection cancelled by user");
+    }
+
+    // 清除回调函数
+    _tileSelectionCallback = nullptr;
+    _onSelectionCancelled = nullptr;
+
+    // 清除所有视觉元素
+    clearHighlights();
+    clearSelectionMarker();
+
+    // 可选：播放取消音效
+    // AudioEngine::play2d("cancel_sound.mp3");
+}
+
+// 添加显示无效选择反馈的函数
+void GameMapLayer::showInvalidSelectionFeedback(Hex hex) {
+    Vec2 center = _layout->hexToPixel(hex);
+
+    // 创建红色闪烁边框
+    auto feedbackNode = DrawNode::create();
+
+    Vec2 vertices[6];
+    for (int i = 0; i < 6; i++) {
+        float rad = CC_DEGREES_TO_RADIANS(60 * i - 30);
+        vertices[i] = Vec2(center.x + _layout->size * cos(rad),
+            center.y + _layout->size * sin(rad));
+    }
+
+    // 绘制红色边框
+    feedbackNode->drawPoly(vertices, 6, false, Color4F(1.0f, 0.0f, 0.0f, 0.8f));
+    feedbackNode->setLineWidth(3.0f);
+    feedbackNode->setTag(9998);  // 用于后续移除
+
+    this->addChild(feedbackNode, 17);
+
+    // 闪烁动画
+    auto fadeOut = FadeOut::create(0.3f);
+    auto remove = CallFunc::create([feedbackNode]() {
+        feedbackNode->removeFromParent();
+        });
+
+    feedbackNode->runAction(Sequence::create(fadeOut, remove, nullptr));
+}

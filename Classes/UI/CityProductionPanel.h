@@ -98,9 +98,11 @@ public:
 	void addListItem(cocos2d::ui::ScrollView* listView, Node* item);
 	void createNewButtonItem(int player, BaseCity* currentCity, PanelItem::ItemType toWhichList, ProductionProgram* program);
 	void createNewLabelItem(int player, BaseCity* currentCity, std::string text, PanelItem::ItemType toWhichList);
+	void updateCurrentPanel(BaseCity* currentCity);
 	void clear();
 private:
 	int currentPlayer;
+	bool isSelectingTile;
 	std::vector<ProgramInfo> units;
 	std::vector<ProgramInfo> districts;
 	std::vector<ProgramInfo> buildings;
@@ -109,7 +111,9 @@ private:
 	cocos2d::ui::Button* PurchaseButton;
 	cocos2d::ui::ScrollView* ProductList;
 	cocos2d::ui::ScrollView* PurchaseList;
-};
+	cocos2d::Label* currentProductionInfo;
+
+}; 
 
 class CityProductionPanel : public cocos2d::Layer {
 public:

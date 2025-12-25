@@ -31,8 +31,6 @@ bool GameScene::init() {
     return true;
 }
 
-
-
 bool GameScene::initGameData() {
     if (_dataInitialized) {
         return true;
@@ -458,6 +456,11 @@ void GameScene::onEnter() {
 void GameScene::onExit() {
     CCLOG("GameScene onExit called");
 
+    // 如果在地块选择模式下，取消它
+    if (_mapLayer && _mapLayer->isSelectingTile()) {
+        cancelTileSelection(false);  // 不触发回调，因为场景正在退出
+    }
+
     // 停止游戏循环
     this->unscheduleUpdate();
 
@@ -486,6 +489,7 @@ void GameScene::initPolicySystem() {
 }
 
 void GameScene::setupCallbacks() {
+
     // 地图层选中单位 -> 更新HUD显示
     _mapLayer->setOnUnitSelectedCallback([this](AbstractUnit* unit) {
         if (unit) {
@@ -598,4 +602,54 @@ void GameScene::updateProductionPanel(int playerID, BaseCity* currentCity)
     currentPlayer->getUnlockedProduction(units, districts, buildings);
     std::vector<ProductionProgram*> programs[3] = { districts, buildings, units };
     this->_productionPanelLayer->updateProductionPanel(playerID, currentCity, programs);
+}
+
+// 实现 selectTileFromOptions 函数
+Hex GameScene::selectTileFromOptions(const std::vector<Hex>& allowedTiles) {
+    // 注意：由于选择是异步的（需要用户点击），我们需要使用回调或等待机制
+    // 这里返回一个默认值，实际选择通过回调处理
+    CCLOG("selectTileFromOptions called with %zu allowed tiles", allowedTiles.size());
+
+    if (!allowedTiles.empty()) {
+        return allowedTiles[0]; // 返回第一个作为默认值
+    }
+
+    return Hex(0, 0); // 默认返回值
+}
+
+// 实现 setTileSelectionCallback 函数
+void GameScene::setTileSelectionCallback(const std::function<void(Hex)>& callback,
+    const std::function<void()>& cancelCallback) {
+    if (_mapLayer) {
+        // 使用已有的 selectTile 函数启动选择
+        _mapLayer->enableTileSelection({}, callback, cancelCallback); // 空数组表示所有地块都可选
+    }
+}
+
+
+// 实现 cancelTileSelection 函数
+void GameScene::cancelTileSelection(bool triggerCallback) {
+    if (_mapLayer && _mapLayer->isSelectingTile()) {
+        _mapLayer->cancelTileSelection(triggerCallback);
+        CCLOG("GameScene: Tile selection cancelled");
+    }
+    else {
+        CCLOG("GameScene: Not in tile selection mode, nothing to cancel");
+    }
+}
+
+// 修改现有的 selectTileAsync 函数，支持取消回调
+void GameScene::selectTileAsync(const std::vector<Hex>& allowedTiles,
+    const std::function<void(Hex)>& selectionCallback,
+    const std::function<void()>& cancelCallback) {
+    if (_mapLayer) {
+
+        // 启用选择模式，传入取消回调
+        _mapLayer->enableTileSelection(allowedTiles, selectionCallback, cancelCallback);
+    }
+    else {
+        if (cancelCallback) {
+            cancelCallback();  // 如果地图层不存在，直接调用取消回调
+        }
+    }
 }

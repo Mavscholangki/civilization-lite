@@ -19,8 +19,10 @@ bool District::isThereDistrictAt(Hex where)
 	return false;
 }
 
+
+
 District::District(int player, Hex pos, DistrictType type, std::string name):
-	ProductionProgram(ProductionType::DISTRICT, "", pos, 0, false), // 区域不可以用黄金购买完成
+	ProductionProgram(ProductionType::DISTRICT, name, pos, 0, false), // 区域不可以用黄金购买完成
 	playerID(player),
 	_id(count++),
 	_pos(pos),
@@ -49,6 +51,41 @@ District::District(int player, Hex pos, DistrictType type, std::string name):
 {
 	// 记录区域位置
 	districtPositions.push_back(pos);
+	if (name == "Downtown")
+	{
+		_type = District::DistrictType::DOWNTOWN;
+		cost = 54;
+	}
+	else if (name == "Campus")
+	{
+		_type = District::DistrictType::CAMPUS;
+		cost = 54;
+	}
+	else if (name == "IndustryZone")
+	{
+		_type = District::DistrictType::INDUSTRY_ZONE;
+		cost = 54;
+	}
+	else if (name == "CommercialHub")
+	{
+		_type = District::DistrictType::COMMERCIAL_HUB;
+		cost = 110;
+	}
+	else if (name == "TheaterSquare")
+	{
+		_type = District::DistrictType::THEATER_SQUARE;
+		cost = 54;
+	}
+	else if (name == "Harbor")
+	{
+		_type = District::DistrictType::HARBOR;
+		cost = 54;
+	}
+	else if (name == "Spaceport")
+	{
+		_type = District::DistrictType::SPACEPORT;
+		cost = 1800;
+	}
 }
 
 District::~District()

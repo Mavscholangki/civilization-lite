@@ -76,11 +76,11 @@ public:
 	void updateGrossYield();
 	void updateCitizenBenefit();
 
-	
+
 	virtual bool addBuilding(BuildingCategory building);
-	
+
 	inline int						getPlayerID() const { return playerID; }
-	inline int						getID() const { return _id; }
+	inline int						getDistrictID() const { return _id; }
 	inline DistrictType				getType() const { return _type; }
 	inline std::string				getName() { return _name; }
 	inline Hex						getPos() const { return _pos; }
@@ -92,6 +92,7 @@ public:
 	inline Yield					getCitizenBenefit() const { return citizenBenefit; }
 	inline Yield					getYield() const { return grossYield; }
 
+	inline std::vector<Building*>   getBuildings() const { return buildings; }
 protected:
 	std::vector<Hex> getHexNeighbors(Hex center);
 	// 计数所有的区域,便于编号
