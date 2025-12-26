@@ -86,6 +86,7 @@ public:
     * 当玩家点击选中城市时会调用此回调
     */
     void setOnCitySelectedCallback(const std::function<void(BaseCity*)>& cb);
+    void setOnInvalidSeletedCallback(const std::function<void()>& cb);  ///< 城市选中回调
 
     /**
      * @brief 处理建立城市的动作
@@ -255,7 +256,8 @@ private:
     std::vector<BaseCity*> _cities;        ///< 所有城市列表
     std::vector<AbstractUnit*> _allUnits;  ///< 所有单位列表（包括敌方）
     AbstractUnit* _selectedUnit;           ///< 当前选中的单位
-	std::function<void(BaseCity*)> _onCitySelected;  ///< 城市选中回调
+    std::function<void(BaseCity*)> _onCitySelected;  ///< 城市选中回调
+    std::function<void()> _onInvalidSelected;  ///< 无效选中
 	BaseCity* getCityAt(Hex hex);   ///<  获取指定位置的城市指针（无城市返回 nullptr）
     AbstractUnit* getUnitAt(Hex h);
 

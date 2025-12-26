@@ -528,6 +528,10 @@ void GameScene::setupCallbacks() {
         }
         });
 
+    _mapLayer->setOnInvalidSeletedCallback([this]() {
+        _productionPanelLayer->setVisible(false);
+        });
+
     _mapLayer->setOnCitySelectedCallback([this](BaseCity* city) {
         if (city) 
         {

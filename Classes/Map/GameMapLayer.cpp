@@ -578,7 +578,7 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
             _selectedUnit->showMoveRange(_layout, costFunc);
         }
         // 单击单位时关闭城市面板
-        if (_onCitySelected) _onCitySelected(nullptr);
+        if (_onInvalidSelected) _onInvalidSelected();
     }
     else if (clickedCity) {
         // --- 情况2: 点击城市 ---
@@ -594,7 +594,7 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
         // --- 情况3: 点击空地 ---
         // 空地位置可以通过点击移动，或需要再次点击(双击)来移动。
         // 只关闭城市面板
-        if (_onCitySelected) _onCitySelected(nullptr);
+        if (_onInvalidSelected) _onInvalidSelected();
     }
 }
 
@@ -678,6 +678,9 @@ TileData GameMapLayer::getTileData(Hex h)
 // 1. 实现设置回调
 void GameMapLayer::setOnCitySelectedCallback(const std::function<void(BaseCity*)>& cb) {
     _onCitySelected = cb;
+}
+void GameMapLayer::setOnInvalidSeletedCallback(const std::function<void()>& cb) {
+    _onInvalidSelected = cb;
 }
 
 // 2. 实现查找城市

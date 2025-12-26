@@ -41,9 +41,9 @@ bool CityProductionPanel::init()
 	// 面板拉出按钮
 	this->Pull = ui::Button::create();
 	this->Pull->setTitleText(" <[ ");
-	this->Pull->setTitleColor(Color3B(204, 204, 0)); // 黄色文字
+	this->Pull->setTitleColor(Color3B::WHITE); // 黄色文字
 	this->Pull->setTitleFontSize(36);
-	this->Pull->setPosition(Vec2(-Pull->getContentSize().width, 100));
+	this->Pull->setPosition(Vec2(-Pull->getContentSize().width, 200));
 	this->Pull->addClickEventListener([=](Ref* sender) {
 		if (visible)
 		{
@@ -64,12 +64,18 @@ bool CityProductionPanel::init()
 	});
 	PanelBG->addChild(this->Pull);
 
+	if (!Pull) return false;
+	auto pullBg = DrawNode::create();
+	pullBg->drawSolidCircle(Vec2(0, 0), 30, 10, 25, Color4F(Color3B(204, 204, 0)));
+	pullBg->setPosition(Pull->getPosition());
+	PanelBG->addChild(pullBg, -10);
+
 	// 显示生产面板按钮
 	this->showProductionPanel = ui::Button::create();
 	this->showProductionPanel->setTitleText("[ Production ]");
 	this->showProductionPanel->setTitleColor(Color3B(204, 204, 0)); // 黄色文字
 	this->showProductionPanel->setTitleFontSize(24);
-	this->showProductionPanel->setPosition(Vec2(-showProductionPanel->getContentSize().width / 2, 150)); // 初始位置在面板外
+	this->showProductionPanel->setPosition(Vec2(-showProductionPanel->getContentSize().width / 2, 250)); // 初始位置在面板外
 	this->showProductionPanel->addClickEventListener([=](Ref* sender) {
 		if (currentShownPanel != productionPanel)
 		{
@@ -95,7 +101,7 @@ bool CityProductionPanel::init()
 	this->showPopulationPanel->setTitleText("[ Population Distribution ]");
 	this->showPopulationPanel->setTitleColor(Color3B(204, 204, 0)); // 黄色文字
 	this->showPopulationPanel->setTitleFontSize(24);
-	this->showPopulationPanel->setPosition(Vec2(-showPopulationPanel->getContentSize().width / 2, 200)); // 初始位置在面板外
+	this->showPopulationPanel->setPosition(Vec2(-showPopulationPanel->getContentSize().width / 2, 300)); // 初始位置在面板外
 	this->showPopulationPanel->addClickEventListener([=](Ref* sender) {
 		if (currentShownPanel != populationPanel)
 		{
@@ -123,7 +129,8 @@ void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentC
 {
 	this->productionPanel->clear();
 	currentPlayerID = playerID;
-
+	if (currentCity == nullptr)
+		return;
 	// Districts
 	bool firstPurchase = false;
 	if (!programs[0].empty())
