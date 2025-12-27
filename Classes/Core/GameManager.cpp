@@ -1,6 +1,10 @@
 // GameManager.cpp
 #include "GameManager.h"
 #include "Player.h"
+// 【修复】必须包含 BaseCity 的头文件，因为我们要调用它的方法
+#include "../City/BaseCity.h" 
+// 【修复】包含 AbstractUnit 以便创建单位
+#include "../Units/Base/AbstractUnit.h"
 #include <algorithm>
 
 USING_NS_CC;
@@ -199,15 +203,21 @@ void GameManager::endTurn() {
         Director::getInstance()->getEventDispatcher()->dispatchCustomEvent(
             "player_turn_resource_update", &resourceData
         );
+
+        // ==================== 【AI 逻辑触发点】 ====================
+        if (!nextPlayer->getIsHuman()) {
+            this->processAITurn(nextPlayer);
+        }
+        // ========================================================
     }
 
     // 6. 检查胜利条件
     VictoryType victoryType = checkVictoryConditions();
     if (victoryType != VictoryType::NONE) {
         int winnerId = -1;
-        for(Player* checked : m_players)
+        for (Player* checked : m_players)
         {
-            if(checked->m_vicprogress.hasDominationVictory||checked->m_vicprogress.hasLaunchedSatellite)
+            if (checked->m_vicprogress.hasDominationVictory || checked->m_vicprogress.hasLaunchedSatellite)
                 winnerId = checked->getPlayerId();
         }
         if (winnerId != -1) {
@@ -314,6 +324,8 @@ bool GameManager::hasPendingDecisions(int playerId) const {
     return (techIdle || cultureIdle);
 }
 
+// ==================== AI 逻辑 ====================
+
 void GameManager::processAITurn(Player* aiPlayer) {
     if (!aiPlayer || aiPlayer->getIsHuman()) {
         return;
@@ -321,13 +333,45 @@ void GameManager::processAITurn(Player* aiPlayer) {
 
     CCLOG("Processing AI turn for player %d", aiPlayer->getPlayerId());
 
-    // TODO: 简化AI逻辑
-    // 1. 如果城市少于2个，生产移民者
-    // 2. 如果有空闲建造者，让他们改进地块
-    // 3. 如果科技未研究，继续研究
-    // 4. 移动军事单位巡逻或攻击附近敌人
+    // 1. 获取所有城市
+    const std::vector<BaseCity*>& cities = aiPlayer->getCities();
 
-    CCLOG("AI player %d turn processed (simplified)", aiPlayer->getPlayerId());
+    for (BaseCity* city : cities) {
+        if (!city) continue;
+
+        // 2. 检查城市是否空闲
+        // 使用 getCurrentProduction 判断，如果为 nullptr 则表示闲置
+        if (city->getCurrentProduction() == nullptr) {
+
+            CCLOG("AI: City %s is idle, starting production", city->getCityName().c_str());
+
+            // 3. 创建单位
+            // 直接创建 AbstractUnit，使用字符串构造函数
+            // "Warrior" 必须匹配 AbstractUnit 构造函数中的字符串判断
+            AbstractUnit* newWarrior = new AbstractUnit("Warrior");
+
+            // 4. 加入生产队列
+            // BaseCity 负责管理这个指针的生命周期
+            city->addNewProduction(newWarrior);
+        }
+    }
+
+    // 5. 自动结束回合
+    // 使用 Scheduler 延迟1秒执行，模拟 AI 思考时间
+    Director::getInstance()->getScheduler()->schedule(
+        [this](float dt) {
+            // 确保游戏还在运行
+            if (this->m_gameState == GameState::PLAYING) {
+                this->endTurn();
+            }
+        },
+        this,           // target
+        0,              // interval (0 = 一次)
+        0,              // repeat
+        1.0f,           // delay
+        false,          // paused
+        "ai_turn_end"   // key
+    );
 }
 
 // ==================== 胜利条件检查 ====================
@@ -644,7 +688,6 @@ void GameManager::cleanup() {
     CCLOG("GameManager cleanup completed");
 }
 
-// 添加setGameState方法（如果不存在）
 void GameManager::setGameState(GameState state) {
     m_gameState = state;
     CCLOG("Game state changed to: %d", (int)state);
