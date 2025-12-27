@@ -215,7 +215,7 @@ bool AbstractUnit::initUnit(int ownerId, Hex startPos) {
         updateVisualColor();
     }
 
-    this->addChild(_unitSprite);
+    this->addChild(_unitSprite, 50);
 
     // 3. —°÷–π‚»¶
     auto ringDraw = DrawNode::create();

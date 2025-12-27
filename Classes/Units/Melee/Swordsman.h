@@ -64,7 +64,7 @@ public:
     std::string getSpritePath() const override { 
         return "units/swordsman.png"; 
     }
-    i
+    
     /**
      * @brief 获取最大生命值
      * @return 150 点生命值

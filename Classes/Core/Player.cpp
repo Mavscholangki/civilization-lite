@@ -477,94 +477,101 @@ void Player::onEurekaTriggered(int techId, const std::string& techName) {
     applyEurekaBonus(techId);
 }
 
-void Player::updateUnclockedProduction()
+void Player::updateUnlockedProduction()
 {
+    // 1. 先释放原有内存
+    for (auto* building : unlockedBuildings) delete building;
+    for (auto* district : unlockedDistricts) delete district;
+    for (auto* unit : unlockedUnits) delete unit;
+
+    // 2. 清空列表
     unlockedBuildings.clear();
     unlockedDistricts.clear();
     unlockedUnits.clear();
 
-    auto activatedTech = m_techTree.getActivatedTechList();
-    auto activatedCivic = m_cultureTree.getActivatedCultureList();
-    auto search = ProductionProgram::findProgram(-1, -1);
-    for (auto program : search)
-    {
-        if (program.first < 100)
-        {
-            this->unlockedUnits.push_back(
-                new ProductionProgram(ProductionProgram::ProductionType::UNIT,
-                    program.second.name, Hex(), 0, true, 0));
+    // 3. 辅助函数：检查是否已解锁并添加
+    auto addIfNotExists = [&](ProductionProgram* newProgram) {
+        auto& targetList = (newProgram->getType() == ProductionProgram::ProductionType::UNIT) ? unlockedUnits :
+            (newProgram->getType() == ProductionProgram::ProductionType::DISTRICT) ? unlockedDistricts :
+            unlockedBuildings;
+
+        for (auto* existing : targetList) {
+            if (existing->getName() == newProgram->getName()) {
+                delete newProgram;  // 避免内存泄漏
+                return false;
+            }
         }
-        else if (program.first % 100 == 0)
-        {
-            this->unlockedDistricts.push_back(
-                new ProductionProgram(ProductionProgram::ProductionType::DISTRICT,
-                    program.second.name, Hex(), 0, true, 0));
+        targetList.push_back(newProgram);
+        return true;
+        };
+
+    // 4. 辅助函数：处理单个程序
+    auto processProgram = [&](const auto& programPair) {
+        ProductionProgram::ProductionType type;
+        int id = programPair.first;
+        ProductionProgram* newProgram = nullptr;
+        if (id < 100) {
+            type = ProductionProgram::ProductionType::UNIT;
+            newProgram = new ProductionProgram(
+                type,
+                programPair.second.name,
+                Hex(), 0, true, 0
+            );
         }
-        else
-        {
-            this->unlockedBuildings.push_back(
-                new ProductionProgram(ProductionProgram::ProductionType::BUILDING,
-                    program.second.name, Hex(), 0, true, 0));
+        else if (id % 10 == 0) {
+            type = ProductionProgram::ProductionType::DISTRICT;
+            newProgram = new ProductionProgram(
+                type,
+                programPair.second.name,
+                Hex(), 0, false, 0
+            );
         }
+        else {
+            type = ProductionProgram::ProductionType::BUILDING;
+            newProgram = new ProductionProgram(
+                type,
+                programPair.second.name,
+                Hex(), 0, true, 0
+            );
+        }
+
+        addIfNotExists(newProgram);
+        };
+
+    // 5. 按设计意图应该只解锁已激活的科技和文化对应的项目
+    // 假设初始解锁项目有特殊处理，这里保留原始逻辑但注释说明
+
+    // 初始解锁的项目（如果需要的话）
+    
+    auto initialSearch = ProductionProgram::findProgram(-1, -1);  // 可能需要改为 findInitialPrograms()
+    for (auto program : initialSearch) {
+        processProgram(program);
     }
-    for (int tech : activatedTech)
-    {
+    
+
+    // 6. 解锁科技对应的项目
+    auto activatedTech = m_techTree.getActivatedTechList();
+    for (int tech : activatedTech) {
         auto search = ProductionProgram::findProgram(tech, -1);
-        for (auto program : search)
-        {
-            if (program.first < 100)
-            {
-                this->unlockedUnits.push_back(
-                    new ProductionProgram(ProductionProgram::ProductionType::UNIT,
-                        program.second.name, Hex(), 0, true, 0));
-            }
-            else if (program.first % 100 == 0)
-            {
-                this->unlockedUnits.push_back(
-                    new ProductionProgram(ProductionProgram::ProductionType::DISTRICT,
-                        program.second.name, Hex(), 0, true, 0));
-            }
-            else
-            {
-                this->unlockedUnits.push_back(
-                    new ProductionProgram(ProductionProgram::ProductionType::BUILDING,
-                        program.second.name, Hex(), 0, true, 0));
-            }
+        for (auto program : search) {
+            processProgram(program);
         }
     }
 
-    for (int civic : activatedCivic)
-    {
+    // 7. 解锁文化对应的项目（之前漏掉的！）
+    auto activatedCivic = m_cultureTree.getActivatedCultureList();
+    for (int civic : activatedCivic) {
         auto search = ProductionProgram::findProgram(-1, civic);
-        for (auto program : search)
-        {
-            if (program.first < 100)
-            {
-                this->unlockedUnits.push_back(
-                    new ProductionProgram(ProductionProgram::ProductionType::UNIT,
-                        program.second.name, Hex(), 0, true, 0));
-            }
-            else if (program.first % 100 == 0)
-            {
-                this->unlockedUnits.push_back(
-                    new ProductionProgram(ProductionProgram::ProductionType::DISTRICT,
-                        program.second.name, Hex(), 0, true, 0));
-            }
-            else
-            {
-                this->unlockedUnits.push_back(
-                    new ProductionProgram(ProductionProgram::ProductionType::BUILDING,
-                        program.second.name, Hex(), 0, true, 0));
-            }
+        for (auto program : search) {
+            processProgram(program);
         }
     }
 }
-
 void Player::getUnlockedProduction(std::vector<ProductionProgram*>& Units,
     std::vector<ProductionProgram*>& Districts,
     std::vector<ProductionProgram*>& Buildings)
 {
-    updateUnclockedProduction();
+    updateUnlockedProduction();
     Units = unlockedUnits;
     Districts = unlockedDistricts;
     Buildings = unlockedBuildings;

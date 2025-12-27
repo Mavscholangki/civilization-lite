@@ -134,18 +134,19 @@ bool GameScene::initGraphics() {
     this->addChild(_mapLayer, zOrder++);
     CCLOG("地图层创建完成，zOrder: %d", zOrder - 1);
 
-    // 2. 创建HUD层
+    // 2. 创建生产面板层
+    _productionPanelLayer = CityProductionPanel::create();
+    _productionPanelLayer->setVisible(false);
+    this->addChild(_productionPanelLayer, zOrder++);
+    CCLOG("生产面板层创建完成，zOrder: %d", zOrder - 1);
+
+    // 3. 创建HUD层
     _hudLayer = HUDLayer::create();
     if (!_hudLayer) return false;
     this->addChild(_hudLayer, zOrder++);
     CCLOG("HUD层创建完成，zOrder: %d", zOrder - 1);
 
-    // 3. 创建生产面板层
-    _productionPanelLayer = CityProductionPanel::create();
-    _productionPanelLayer->setVisible(true);
-    this->addChild(_productionPanelLayer, zOrder++);
-    CCLOG("生产面板层创建完成，zOrder: %d", zOrder - 1);
-
+    
     // 4. 设置HUD层使用人类玩家的系统实例
     if (m_humanPlayer) {
         _hudLayer->setTechTree(m_humanPlayer->getTechTree());
@@ -526,6 +527,37 @@ void GameScene::setupCallbacks() {
         if (!currentPlayer || !currentPlayer->getIsHuman()) {
             //return; // 不是人类玩家回合，理论上按钮应不可点，此处做安全保护
         }
+        // --- 新增：快捷研究逻辑 ---
+        if (currentPlayer->getIsHuman() && m_gameManager->hasPendingDecisions(currentPlayer->getPlayerId()))
+        {
+            // 有待决事项，优先处理
+            if (currentPlayer->getCurrentResearchTechId() == -1) {
+                CCLOG("Tech tree idle. Opening tech panel...");
+                _hudLayer->openTechTree(); // 打开科技树面板
+                return; // 不进入下一回合
+            }
+            else if (currentPlayer->getCurrentResearchCivicId() == -1) {
+                CCLOG("Culture tree idle. Opening culture panel...");
+                _hudLayer->openCultureTree(); // 打开文化树面板
+                return; // 不进入下一回合
+            }
+            else
+            {
+                for (auto city : currentPlayer->getCities())
+                {
+                    if (city->currentProduction == nullptr && city->suspendedProductions.empty())
+                    {
+                        _productionPanelLayer->setVisible(true);
+                        updateProductionPanel(currentPlayer->getPlayerId(), city);
+                        _mapLayer->updateSelection(city->gridPos);
+                        return;
+                    }
+                }
+                _productionPanelLayer->setVisible(false);
+            }
+        }
+        // 没有待决事项，正常结束回合
+        m_gameManager->endTurn();
         });
 
     _mapLayer->setOnInvalidSeletedCallback([this]() {
@@ -533,7 +565,7 @@ void GameScene::setupCallbacks() {
         });
 
     _mapLayer->setOnCitySelectedCallback([this](BaseCity* city) {
-        if (city) 
+        if (city)
         {
             _hudLayer->hideUnitInfo();
             updateProductionPanel(city->getOwnerPlayer(), city);
@@ -542,27 +574,8 @@ void GameScene::setupCallbacks() {
         else
         {
             _productionPanelLayer->setVisible(false);
-            auto currentPlayer = this->getCurrentPlayer();
-            // --- 新增：快捷研究逻辑 ---
-            if (currentPlayer->getIsHuman() && m_gameManager->hasPendingDecisions(currentPlayer->getPlayerId()))
-            {
-                // 有待决事项，优先处理
-                if (currentPlayer->getCurrentResearchTechId() == -1) {
-                    CCLOG("Tech tree idle. Opening tech panel...");
-                    _hudLayer->openTechTree(); // 打开科技树面板
-                    return; // 不进入下一回合
-                }
-                else if (currentPlayer->getCurrentResearchCivicId() == -1) {
-                    CCLOG("Culture tree idle. Opening culture panel...");
-                    _hudLayer->openCultureTree(); // 打开文化树面板
-                    return; // 不进入下一回合
-                }
-            }
         }
-        // --- 结束新增 ---
 
-        // 没有待决事项，正常结束回合
-        m_gameManager->endTurn();
         });
 
     // 添加资源更新事件监听

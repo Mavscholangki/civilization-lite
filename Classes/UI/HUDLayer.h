@@ -39,6 +39,7 @@ public:
     void setCultureTree(CultureTree* cultureTree);
     void updateCulturePerTurn(int culture);
 
+
     // 政策系统相关方法
     void openPolicyPanel();
     void closePolicyPanel();

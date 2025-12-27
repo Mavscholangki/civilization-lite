@@ -125,6 +125,15 @@ public:
         const std::function<void(Hex)>& callback,
         const std::function<void()>& cancelCallback);
 
+    /**
+     * @brief 更新地块选中显示
+     * @param h 要选中的六边形坐标
+     *
+     * 此方法会在指定地块周围绘制黄色边框
+     */
+    void updateSelection(Hex h);
+
+
 
     /**
     * @brief 禁用地块选择模式
@@ -208,14 +217,7 @@ private:
 
     void drawHexBoundaries(Hex h, TileData data);
 
-    /**
-     * @brief 更新地块选中显示
-     * @param h 要选中的六边形坐标
-     * 
-     * 此方法会在指定地块周围绘制黄色边框
-     */
-    void updateSelection(Hex h);
-
+    
     /**
      * @brief 获取地块的移动成本
      * @param h 六边形坐标

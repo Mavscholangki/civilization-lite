@@ -78,6 +78,7 @@ bool GameMapLayer::init() {
 
     initGameManagerAndPlayers();
 
+
     return true;
 }
 
@@ -813,7 +814,10 @@ void GameMapLayer::onBuildCityAction() {
     Hex pos = _selectedUnit->getGridPos();
 
     auto city = BaseCity::create(0, pos, "Rome");
-    city->setPosition(_layout->hexToPixel(pos));
+
+    // 关键修复2：获取像素位置时确保使用正确的转换
+    Vec2 pixelPos = _layout->hexToPixel(pos);
+    city->setPosition(pixelPos);
     this->addChild(city, 5);
     _cities.push_back(city);
 

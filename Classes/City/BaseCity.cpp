@@ -5,6 +5,10 @@
 #include "District/Building/Building.h"
 #include "Core/GameManager.h"
 #include "Scene/GameScene.h"
+#include "Map/GameMapLayer.h"
+#include "AllKindsOfUnits.h"
+#include "UnitFactory.h"
+#include "DistrictFactory.h"
 #include <cmath>
 #define RADIUS 50.0f // 六边形半径
 
@@ -182,21 +186,31 @@ void BaseCity::updateProduction()
 	{
 		if (currentProduction->getType() == ProductionProgram::ProductionType::DISTRICT)
 		{
-			districts.push_back(static_cast<District*>(currentProduction));
+			Node* districtVisual = nullptr;
+			auto newDistrict = DistrictFactory::createDistrict(currentProduction->getName(), ownerPlayer, currentProduction->getPosOnCreated(), districtVisual);
+			districts.push_back(newDistrict);
+			auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
+			districtVisual->setPosition(gameScene->getMapLayer()->getLayout()->hexToPixel(currentProduction->getPosOnCreated()));
+			gameScene->getMapLayer()->addChild(districtVisual, 5);
+			delete currentProduction;
 		}
 		else if(currentProduction->getType() == ProductionProgram::ProductionType::BUILDING)
 		{
-			auto newBuilding = dynamic_cast<Building*>(currentProduction);
 			for (auto district : districts)
 			{
-				district->addBuilding(newBuilding->getName());
+				district->addBuilding(currentProduction->getName());
 			}
-			delete newBuilding;
 		}
 		else if(currentProduction->getType() == ProductionProgram::ProductionType::UNIT)
 		{
-			GameManager::getInstance()->getPlayer(ownerPlayer)->addUnit(dynamic_cast<AbstractUnit*>(currentProduction));
+			AbstractUnit* newUnit = UnitFactory::createUnit(currentProduction->getName(), this->ownerPlayer, this->gridPos);
+			if (newUnit)
+			{
+				GameManager::getInstance()->getPlayer(ownerPlayer)->addUnit(newUnit);
+				GameManager::getInstance()->getPlayer(ownerPlayer)->addToMapFunc(newUnit);
+			}
 		}
+		currentProduction = nullptr;
 		if (suspendedProductions.empty())
 		{
 			currentProduction = nullptr;
@@ -221,7 +235,13 @@ void BaseCity::purchaseDirectly(ProductionProgram* newProgram)
 		player->setGold(player->getGold() - newProgram->getPurchaseCost());
 		if (newProgram->getType() == ProductionProgram::ProductionType::DISTRICT)
 		{
-			districts.push_back(static_cast<District*>(newProgram));
+			Node* districtVisual = nullptr;
+			auto newDistrict = DistrictFactory::createDistrict(newProgram->getName(), ownerPlayer, newProgram->getPosOnCreated(), districtVisual);
+			districts.push_back(newDistrict);
+			auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
+			districtVisual->setPosition(gameScene->getMapLayer()->getLayout()->hexToPixel(currentProduction->getPosOnCreated()));
+			gameScene->getMapLayer()->addChild(districtVisual, 5);
+			delete newProgram;
 		}
 		else if (newProgram->getType() == ProductionProgram::ProductionType::BUILDING)
 		{
@@ -234,8 +254,15 @@ void BaseCity::purchaseDirectly(ProductionProgram* newProgram)
 		}
 		else if (newProgram->getType() == ProductionProgram::ProductionType::UNIT)
 		{
-			GameManager::getInstance()->getPlayer(ownerPlayer)->addUnit(dynamic_cast<AbstractUnit*>(newProgram));
+			AbstractUnit* newUnit = UnitFactory::createUnit(newProgram->getName(), this->ownerPlayer, this->gridPos);
+			if (newUnit)
+			{
+				GameManager::getInstance()->getPlayer(ownerPlayer)->addUnit(newUnit);
+				GameManager::getInstance()->getPlayer(ownerPlayer)->addToMapFunc(newUnit);
+			}
+			delete newProgram;
 		}
+		newProgram = nullptr;
 	}
 	else
 	{
@@ -268,4 +295,6 @@ void BaseCity::onTurnEnd() {
 	updateProduction();
     // 人口增长
 	updatePopulation();
+	// 面板更新
+	updatePanel();
 }

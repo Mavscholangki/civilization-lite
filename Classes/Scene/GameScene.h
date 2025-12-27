@@ -45,7 +45,7 @@ public:
     Player* getCurrentPlayer() const;
 
     Hex selectTileFromOptions(const std::vector<Hex>& allowedTiles);
-    void GameScene::setTileSelectionCallback(const std::function<void(Hex)>& callback,
+    void setTileSelectionCallback(const std::function<void(Hex)>& callback,
         const std::function<void()>& cancelCallback);
 
     GameMapLayer* getMapLayer() const { return _mapLayer;};
@@ -58,9 +58,11 @@ public:
     void cancelTileSelection(bool triggerCallback = true);
 
 
-    void GameScene::selectTileAsync(const std::vector<Hex>& allowedTiles,
+    void selectTileAsync(const std::vector<Hex>& allowedTiles,
         const std::function<void(Hex)>& selectionCallback,
         const std::function<void()>& cancelCallback);
+
+   
 private:
     CREATE_FUNC(GameScene);
 
@@ -68,6 +70,8 @@ private:
     void initCultureTree();
     void initPolicySystem();
     void setupCallbacks();
+
+    cocos2d::Camera* _uiCamera; // 添加UI摄像机成员
 
     GameManager* m_gameManager;
     Player* m_humanPlayer;
@@ -90,6 +94,7 @@ private:
     bool _coverLayerCreated;                    // 覆盖层是否已创建
     Node* _coverContainer;
     LayerColor* _coverProgressBarForeground;
+
 };
 
 #endif

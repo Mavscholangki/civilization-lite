@@ -12,8 +12,8 @@ public:
 		UNIVERSITY, // 大学
 		RESEARCH_LAB // 研究实验室
 	};
+	cocos2d::Node* _campusVisual;
 private:
 	static int campusCount; // 校园区计数器
-	cocos2d::Node* _campusVisual;
 };
 #endif

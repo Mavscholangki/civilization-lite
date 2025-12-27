@@ -1,4 +1,5 @@
 #include "HUDLayer.h"
+#include "City/BaseCity.h"
 #include <functional>
 
 USING_NS_CC;
@@ -275,7 +276,7 @@ void HUDLayer::openTechTree() {
     if (_isTechTreeOpen || !_techTree) return;
     _techTreePanel = TechTreePanel::create();
     _techTreePanel->setTechTree(_techTree);
-    this->addChild(_techTreePanel, 100);
+    this->addChild(_techTreePanel, 200);
     _isTechTreeOpen = true;
     _btnTechTree->setEnabled(false);
     _btnTechTree->setOpacity(150);
@@ -300,7 +301,7 @@ void HUDLayer::openCultureTree() {
     if (_isCultureTreeOpen || !_cultureTree) return;
     _cultureTreePanel = CultureTreePanel::create();
     _cultureTreePanel->setCultureTree(_cultureTree);
-    this->addChild(_cultureTreePanel, 100);
+    this->addChild(_cultureTreePanel, 200);
     _isCultureTreeOpen = true;
     _btnCultureTree->setEnabled(false);
 }
