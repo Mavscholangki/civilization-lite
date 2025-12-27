@@ -26,7 +26,7 @@ bool LoadingScene::init() {
     this->addChild(bg);
 
     // 2. ÓÎÏ·Logo
-    auto title = Label::createWithSystemFont("CIVILIZATION LITE", "Arial", 60);
+    auto title = Label::createWithSystemFont("CIVILIZATION VI", "Georgia", 60);
     title->setPosition(center.x, visibleSize.height - 150);
     title->setColor(Color3B(220, 200, 120));
     title->enableShadow(Color4B::BLACK, Size(2, -2), 2);

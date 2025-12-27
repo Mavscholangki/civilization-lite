@@ -215,7 +215,7 @@ void GameScene::createCoverLayer() {
 
     // 3. 将所有UI元素添加到容器中
     // 游戏Logo
-    _coverTitleLabel = Label::createWithSystemFont("CIVILIZATION LITE", "Arial", 60);
+    _coverTitleLabel = Label::createWithSystemFont("CIVILIZATION VI", "Georgia", 60);
     _coverTitleLabel->setPosition(center.x, visibleSize.height - 150);
     _coverTitleLabel->setColor(Color3B(220, 200, 120));
     _coverTitleLabel->enableShadow(Color4B::BLACK, Size(2, -2), 2);

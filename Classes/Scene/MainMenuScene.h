@@ -10,6 +10,7 @@ class MainMenuScene : public cocos2d::Scene {
 public:
     static cocos2d::Scene* createScene();
     virtual bool init();
+    void addAtmosphericCenterpiece(Vec2 center);
     CREATE_FUNC(MainMenuScene);
 
 private:

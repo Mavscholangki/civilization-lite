@@ -75,7 +75,7 @@ struct Hex {
      * @return 新的坐标结果
      */
     Hex operator+(const Hex& other) const {
-        return Hex(q + other.q, r + other.r);
+        return Hex(this->q + other.q, this->r + other.r);
     }
 
     /**
@@ -88,6 +88,20 @@ struct Hex {
         int dr = std::abs(r - other.r);
         int ds = std::abs(s - other.s);
         return (dq + dr + ds) / 2;
+    }
+
+    Hex getNeighbor(int direction) const {
+        // 尖顶六边形(Pointy-topped) 对应的 6 个立方体坐标方向偏移
+        // 顺序通常为：右、右上、左上、左、左下、右下
+        static const int dirs[6][2] = {
+            {1, 0}, {0, 1}, {-1, 1}, {-1, 0}, {0, -1}, {1, -1}
+        };
+
+        // 直接手动构造，绕过 operator+ 可能存在的类型推导问题
+        int targetDir = direction % 6;
+        if (targetDir < 0) targetDir += 6; // 处理负数情况
+
+        return Hex(this->q + dirs[targetDir][0], this->r + dirs[targetDir][1]);
     }
 };
 
@@ -132,6 +146,7 @@ public:
         float r = (2.0f / 3.0f * p.y) / size;
         return hexRound(q, r);
     }
+
 
 private:
     /**
