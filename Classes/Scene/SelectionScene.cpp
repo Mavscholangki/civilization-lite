@@ -84,25 +84,18 @@ bool CivilizationSelectionScene::init() {
 void CivilizationSelectionScene::createBackground() {
     auto visibleSize = Director::getInstance()->getVisibleSize();
 
-    // 渐变背景 - 深蓝色调，类似文明6
-    auto bg = LayerGradient::create(
-        Color4B(20, 25, 40, 255),     // 顶部颜色 - 深蓝
-        Color4B(10, 15, 25, 255),     // 底部颜色 - 更深蓝
-        Vec2(0, -1)
-    );
-    bg->setContentSize(visibleSize);
-    this->addChild(bg);
+    // 1. 渐变底色
+    auto bg = LayerGradient::create(Color4B(10, 15, 30, 255), Color4B(30, 35, 50, 255), Vec2(0, -1));
+    this->addChild(bg, -2);
 
-    // 添加一些装饰性元素
-    // 顶部装饰线
-    auto topLine = LayerColor::create(Color4B(220, 200, 120, 100), visibleSize.width, 3);
-    topLine->setPosition(0, visibleSize.height - 120);
-    this->addChild(topLine);
+    // 2. 延续主菜单的圆环元素 (但是要更淡、更大)
+    auto bgDecor = DrawNode::create();
+    bgDecor->drawCircle(Vec2(visibleSize.width * 0.8f, visibleSize.height * 0.5f),
+        400, 0, 100, false, 1.0f, 1.0f, Color4F(0.75f, 0.65f, 0.35f, 0.05f));
+    this->addChild(bgDecor, -1);
 
-    // 底部装饰线
-    auto bottomLine = LayerColor::create(Color4B(220, 200, 120, 80), visibleSize.width, 2);
-    bottomLine->setPosition(0, visibleSize.height * 0.25f - 5);
-    this->addChild(bottomLine);
+    // 让大圆环缓慢旋转
+    bgDecor->runAction(RepeatForever::create(RotateBy::create(100.0f, 360)));
 }
 
 void CivilizationSelectionScene::createTitle() {
@@ -124,76 +117,59 @@ void CivilizationSelectionScene::createTitle() {
 
 void CivilizationSelectionScene::createPlayerCivilizationPanel() {
     auto visibleSize = Director::getInstance()->getVisibleSize();
+    Color4F civGold(0.75f, 0.65f, 0.35f, 0.6f);
+    Color4F panelBg(0.05f, 0.07f, 0.12f, 0.8f);
 
-    // 左侧文明列表区域
+    // --- 左侧面板 ---
     auto leftPanel = Layout::create();
-    leftPanel->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-    leftPanel->setBackGroundColor(Color3B(40, 40, 55));
-    leftPanel->setContentSize(Size(visibleSize.width * 0.25f, visibleSize.height * 0.5f));
-    leftPanel->setPosition(Vec2(visibleSize.width * 0.05f, visibleSize.height * 0.25f));
-    leftPanel->setOpacity(200);
-    this->addChild(leftPanel);
+    leftPanel->setContentSize(Size(visibleSize.width * 0.22f, visibleSize.height * 0.55f));
+    leftPanel->setPosition(Vec2(visibleSize.width * 0.04f, visibleSize.height * 0.25f)); // 稍微上移避开下划线
+    this->addChild(leftPanel, 2); // 确保层级足够高
 
-    // 左侧面板标题
-    auto leftTitle = Label::createWithSystemFont(u8"可用文明", "Arial", 24);
-    leftTitle->setPosition(leftPanel->getContentSize().width * 0.5f,
-        leftPanel->getContentSize().height - 30);
-    leftTitle->setColor(Color3B(180, 180, 200));
-    leftPanel->addChild(leftTitle);
+    auto leftBorder = DrawNode::create();
+    leftPanel->addChild(leftBorder, -1);
+    leftBorder->drawSolidRect(Vec2::ZERO, leftPanel->getContentSize(), panelBg);
+    leftBorder->drawRect(Vec2::ZERO, leftPanel->getContentSize(), civGold);
 
-    // 创建文明选择按钮
-    float buttonHeight = 60;
-    float buttonSpacing = 10;
+    // 重新添加左侧文明选择按钮 (关键点：确保在这里循环添加)
+    float buttonHeight = 55;
     float startY = leftPanel->getContentSize().height - 80;
 
+    _civButtons.clear(); // 清空旧引用
     for (int i = 0; i < _civilizations.size(); i++) {
         const auto& civ = _civilizations[i];
-
-        // 文明按钮
         auto civButton = Button::create();
         civButton->setTitleText(civ.name);
+        civButton->setTitleFontName("Georgia"); // 使用衬线体
         civButton->setTitleFontSize(22);
-        civButton->setTitleColor(Color3B::WHITE);
         civButton->setContentSize(Size(leftPanel->getContentSize().width * 0.9f, buttonHeight));
-        civButton->setPosition(Vec2(leftPanel->getContentSize().width * 0.5f,
-            startY - i * (buttonHeight + buttonSpacing)));
-        civButton->setColor(civ.color);
+        civButton->setPosition(Vec2(leftPanel->getContentSize().width * 0.5f, startY - i * (buttonHeight + 15)));
 
-        // 按钮回调
+        // 设置按钮基础颜色
+        civButton->setTitleColor(Color3B(200, 200, 200));
         civButton->addClickEventListener([this, civ](Ref* sender) {
             this->onCivilizationSelected(sender, civ.type);
             });
 
         leftPanel->addChild(civButton);
-
-        // 存储按钮引用，用于高亮
         _civButtons.push_back(civButton);
     }
 
-    // 右侧详细信息面板
+    // --- 右侧面板 ---
     _selectedPanel = Layout::create();
-    _selectedPanel->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-    _selectedPanel->setBackGroundColor(Color3B(35, 35, 50));
-    _selectedPanel->setContentSize(Size(visibleSize.width * 0.65f, visibleSize.height * 0.5f));
-    _selectedPanel->setPosition(Vec2(visibleSize.width * 0.32f, visibleSize.height * 0.25f));
-    _selectedPanel->setOpacity(220);
-    this->addChild(_selectedPanel);
+    _selectedPanel->setContentSize(Size(visibleSize.width * 0.68f, visibleSize.height * 0.55f));
+    _selectedPanel->setPosition(Vec2(visibleSize.width * 0.28f, visibleSize.height * 0.25f));
+    this->addChild(_selectedPanel, 2);
 
-    // 右侧面板标题
-    auto rightTitle = Label::createWithSystemFont(u8"文明详情", "Arial", 26);
-    rightTitle->setPosition(_selectedPanel->getContentSize().width * 0.5f,
-        _selectedPanel->getContentSize().height - 30);
-    rightTitle->setColor(Color3B(200, 180, 100));
-    rightTitle->enableShadow(Color4B::BLACK, Size(1, -1), 1);
-    _selectedPanel->addChild(rightTitle);
+    auto rightBorder = DrawNode::create();
+    _selectedPanel->addChild(rightBorder, -1);
+    rightBorder->drawSolidRect(Vec2::ZERO, _selectedPanel->getContentSize(), panelBg);
+    rightBorder->drawRect(Vec2::ZERO, _selectedPanel->getContentSize(), civGold);
 
-    // 文明名称（大标题）
-    _selectedLabel = Label::createWithSystemFont("", "Arial", 40);
-    _selectedLabel->setAnchorPoint(Vec2(0.5f, 0.5f));  // 居中锚点
-    _selectedLabel->setPosition(_selectedPanel->getContentSize().width * 0.5f,
-        _selectedPanel->getContentSize().height * 0.85f);
-    _selectedLabel->setColor(Color3B::YELLOW);
-    _selectedLabel->enableShadow(Color4B::BLACK, Size(2, -2), 2);
+    // 文明标题
+    _selectedLabel = Label::createWithSystemFont("", "Georgia", 40);
+    _selectedLabel->setPosition(_selectedPanel->getContentSize().width * 0.5f, _selectedPanel->getContentSize().height - 40);
+    _selectedLabel->setColor(Color3B(255, 230, 150));
     _selectedPanel->addChild(_selectedLabel);
 
     // 领袖名称（副标题）
@@ -273,21 +249,19 @@ void CivilizationSelectionScene::createPlayerCivilizationPanel() {
 
 void CivilizationSelectionScene::createAISettingsPanel() {
     auto visibleSize = Director::getInstance()->getVisibleSize();
+    Color4F civGold(0.75f, 0.65f, 0.35f, 0.4f);
 
-    // AI设置面板标题
-    auto aiTitle = Label::createWithSystemFont(u8"AI对手配置", "Arial", 30);
-    aiTitle->setPosition(visibleSize.width * 0.5f, visibleSize.height * 0.23f);
-    aiTitle->setColor(Color3B(200, 150, 100));
-    this->addChild(aiTitle);
-
-    // AI设置面板背景
     _aiSettingsPanel = Layout::create();
-    _aiSettingsPanel->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-    _aiSettingsPanel->setBackGroundColor(Color3B(45, 45, 60));
-    _aiSettingsPanel->setContentSize(Size(visibleSize.width * 0.9f, visibleSize.height * 0.2f));
-    _aiSettingsPanel->setPosition(Vec2(visibleSize.width * 0.05f, 20));
-    _aiSettingsPanel->setOpacity(200);
+    _aiSettingsPanel->setContentSize(Size(visibleSize.width * 0.92f, visibleSize.height * 0.18f));
+    _aiSettingsPanel->setPosition(Vec2(visibleSize.width * 0.04f, 25));
     this->addChild(_aiSettingsPanel);
+
+    auto aiBorder = DrawNode::create();
+    _aiSettingsPanel->addChild(aiBorder, -1);
+    // 仅绘制上下两条横线，营造开放式面板感
+    aiBorder->drawSegment(Vec2(0, _aiSettingsPanel->getContentSize().height),
+        Vec2(_aiSettingsPanel->getContentSize().width, _aiSettingsPanel->getContentSize().height), 1.0f, civGold);
+    aiBorder->drawSegment(Vec2(0, 0), Vec2(_aiSettingsPanel->getContentSize().width, 0), 1.0f, civGold);
 
     // AI数量显示
     _aiCountLabel = Label::createWithSystemFont(u8"AI对手数量: 2", "Arial", 24);
@@ -334,52 +308,61 @@ void CivilizationSelectionScene::createAISettingsPanel() {
 void CivilizationSelectionScene::createControlButtons() {
     auto visibleSize = Director::getInstance()->getVisibleSize();
 
-    // 返回按钮
+    // --- 1. 返回按钮 ---
     auto backButton = Button::create();
-    backButton->setTitleText(u8"返回主菜单");
-    backButton->setTitleFontSize(24);
-    backButton->setTitleColor(Color3B(200, 200, 200));
-    backButton->setContentSize(Size(200, 50));
-    backButton->setPosition(Vec2(visibleSize.width * 0.25f,
-        _aiSettingsPanel->getPositionY() + _aiSettingsPanel->getContentSize().height + 25));
+    backButton->setTitleText(u8"BACK TO MENU");
+    backButton->setTitleFontName("Georgia");
+    backButton->setTitleFontSize(20);
+    backButton->setAnchorPoint(Vec2(0, 0.5f));
+    backButton->setPosition(Vec2(visibleSize.width * 0.05f, 50));
     backButton->addClickEventListener(CC_CALLBACK_1(CivilizationSelectionScene::onBackClicked, this));
-    this->addChild(backButton);
+    this->addChild(backButton, 10); // 提高层级
 
-    // 开始游戏按钮
+    // --- 2. 开始按钮 (BEGIN JOURNEY) ---
     auto startButton = Button::create();
-    startButton->setTitleText(u8"开始游戏");
+    // 使用九宫格设置背景，如果没有图片，我们可以手动设置一个纯色块作为背景
+    startButton->setScale9Enabled(true);
+    startButton->setContentSize(Size(260, 70)); // 手动指定可点击区域大小
+
+    startButton->setTitleText(u8"BEGIN JOURNEY");
+    startButton->setTitleFontName("Georgia");
     startButton->setTitleFontSize(28);
     startButton->setTitleColor(Color3B::WHITE);
-    startButton->setContentSize(Size(250, 60));
-    startButton->setPosition(Vec2(visibleSize.width * 0.75f,
-        _aiSettingsPanel->getPositionY() + _aiSettingsPanel->getContentSize().height + 25));
-    startButton->setColor(Color3B(100, 180, 100));
+
+    // 修正坐标与锚点：居中对齐，距离右边 10% 屏幕宽度
+    startButton->setAnchorPoint(Vec2(0.5f, 0.5f));
+    startButton->setPosition(Vec2(visibleSize.width * 0.85f, 50));
+
+    // 核心：设置点击回调
     startButton->addClickEventListener(CC_CALLBACK_1(CivilizationSelectionScene::onStartGameClicked, this));
-    this->addChild(startButton);
+
+    // 视觉装饰：不要挂在子节点，直接画在 Scene 上或给按钮加一层描边
+    auto btnDecor = DrawNode::create();
+    this->addChild(btnDecor, 9); // 放在按钮下面一层
+
+    // 以按钮坐标为中心画框
+    Vec2 pos = startButton->getPosition();
+    btnDecor->drawSolidRect(pos - Vec2(130, 35), pos + Vec2(130, 35), Color4F(0.4f, 0.35f, 0.2f, 0.5f));
+    btnDecor->drawRect(pos - Vec2(130, 35), pos + Vec2(130, 35), Color4F(0.75f, 0.65f, 0.35f, 1.0f));
+
+    this->addChild(startButton, 10);
 }
 
-void CivilizationSelectionScene::onCivilizationSelected(cocos2d::Ref* sender, CivilizationType civType) {
-    CCLOG("Player civilization selected: %d", static_cast<int>(civType));
-
+void CivilizationSelectionScene::onCivilizationSelected(Ref* sender, CivilizationType civType) {
     _currentSelection = civType;
     updateSelection(civType);
 
-    // 更新按钮高亮
     for (int i = 0; i < _civilizations.size(); i++) {
         if (_civilizations[i].type == civType) {
-            // 选中按钮变为高亮
-            //_civButtons[i]->setTitleColor(Color3B::YELLOW);
-            _civButtons[i]->setTitleFontSize(30);  // 稍微放大表示选中
+            // 选中的按钮效果：金色边框，文字变亮
+            _civButtons[i]->setTitleColor(Color3B(255, 230, 150));
+            _civButtons[i]->setScale(1.05f);
         }
         else {
-            // 其他按钮恢复正常
-            _civButtons[i]->setTitleColor(Color3B::WHITE);
-            _civButtons[i]->setTitleFontSize(22);
+            _civButtons[i]->setTitleColor(Color3B(180, 180, 180));
+            _civButtons[i]->setScale(1.0f);
         }
     }
-
-    // 更新AI设置
-    updateAISettingsDisplay();
 }
 
 void CivilizationSelectionScene::onAIButtonClicked(cocos2d::Ref* sender, int aiIndex) {
@@ -453,42 +436,38 @@ void CivilizationSelectionScene::onAIRemoveClicked(cocos2d::Ref* sender) {
 }
 
 void CivilizationSelectionScene::updateSelection(CivilizationType selectedCiv) {
-    // 查找选中的文明信息
     for (const auto& civ : _civilizations) {
         if (civ.type == selectedCiv) {
-            // 更新所有标签
             _selectedLabel->setString(civ.name);
             _leaderLabel->setString(civ.leader);
+            _descriptionLabel->setString(generateNaturalDescription(civ));
 
-            // 生成自然语言描述，将各项特性整合成一段话
-            std::string naturalDescription = generateNaturalDescription(civ);
-            _descriptionLabel->setString(naturalDescription);
+            // 清理旧画像
+            _portraitFrame->removeAllChildren();
 
-            // 更新领袖画像占位符颜色（根据不同文明）
-            updatePortraitColor(civ.color);
+            std::string portraitPath = "";
+            if (civ.type == CivilizationType::CHINA) portraitPath = "Images/Leaders/civChina.png";
+            else if (civ.type == CivilizationType::GERMANY) portraitPath = "Images/Leaders/civGerman.png";
+            else if (civ.type == CivilizationType::RUSSIA) portraitPath = "Images/Leaders/civRussia.png";
 
-            std::string portraitPath;
-            switch (civ.type) {
-                case CivilizationType::CHINA:
-                    portraitPath = "Images/Leaders/civChina.png";
-                    break;
-                case CivilizationType::GERMANY:
-                    portraitPath = "Images/Leaders/civGerman.png";
-                    break;
-                case CivilizationType::RUSSIA:
-                    portraitPath = "Images/Leaders/civRussia.png";
-                    break;
+            auto leaderSprite = Sprite::create(portraitPath);
+            if (leaderSprite) {
+                // 确保图片居中
+                leaderSprite->setPosition(_portraitFrame->getContentSize().width / 2,
+                    _portraitFrame->getContentSize().height / 2);
+
+                // 缩放逻辑
+                float scale = (_portraitFrame->getContentSize().height * 0.9f) / leaderSprite->getContentSize().height;
+                leaderSprite->setScale(scale);
+
+                _portraitFrame->addChild(leaderSprite);
             }
-
-            // 创建并显示领袖图片
-             auto leaderSprite = Sprite::create(portraitPath);
-             if (leaderSprite) {
-                 leaderSprite->setPosition(_portraitFrame->getContentSize().width * 0.5f, 
-                                          _portraitFrame->getContentSize().height * 0.5f);
-                 leaderSprite->setScale(0.9f); // 适当缩放
-                 _portraitFrame->addChild(leaderSprite);
-             }
-
+            else {
+                // 如果图片加载失败，显示占位文字
+                auto failLabel = Label::createWithSystemFont("Image Missing", "Arial", 20);
+                failLabel->setPosition(_portraitFrame->getContentSize().width / 2, _portraitFrame->getContentSize().height / 2);
+                _portraitFrame->addChild(failLabel);
+            }
             break;
         }
     }
@@ -595,8 +574,8 @@ std::string CivilizationSelectionScene::generateNaturalDescription(const Civiliz
     if (civ.type == CivilizationType::CHINA) {
         description =
             u8"华夏文明由始皇帝领导，是世界上最古老的文明之一。\n\n"
-            u8"此外，中国的尤里卡和灵感加成提升至75%，让科技和文化发展更加迅速。\n\n"
-            u8"中国的特殊单位是虎蹲炮，一种强大的早期攻城武器；"
+            u8"中国的尤里卡和灵感加成提升至75%，让科技和文化发展更加迅速。\n\n"
+            u8"中国的特殊单位是虎蹲炮，一种强大的早期攻城武器。\n\n"
             u8"适合喜欢通过高效建造和快速科技发展来建立优势的玩家。";
     }
     else if (civ.type == CivilizationType::GERMANY) {
