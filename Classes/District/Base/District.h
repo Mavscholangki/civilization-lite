@@ -77,7 +77,7 @@ public:
 	void updateCitizenBenefit();
 
 
-	virtual bool addBuilding(BuildingCategory building);
+	virtual bool addBuilding(std::string buildingName);
 
 	inline int						getPlayerID() const { return playerID; }
 	inline int						getDistrictID() const { return _id; }

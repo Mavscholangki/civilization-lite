@@ -132,10 +132,14 @@ void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentC
 	if (currentCity == nullptr)
 		return;
 	// Districts
+	bool firstProgram = false;
 	bool firstPurchase = false;
 	if (!programs[0].empty())
 	{
-		productionPanel->createNewLabelItem(playerID, currentCity, "       Districts      ", PanelItem::ItemType::PRODUCT);
+		if (firstProgram)
+		{
+			productionPanel->createNewLabelItem(playerID, currentCity, "       Districts      ", PanelItem::ItemType::PRODUCT);
+		}
 		for (auto d: programs[0])
 		{
 			if (currentCity)
@@ -164,8 +168,7 @@ void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentC
 				if (isAlreadyExisting)
 					continue;
 			}
-			else if (d->getName() == "Downtown")
-				continue;
+			firstProgram = true;
 			auto district = new District(playerID, Hex(), District::DistrictType::TO_BE_DEFINED, d->getName());
 			productionPanel->createNewButtonItem(playerID, currentCity, PanelItem::ItemType::PRODUCT, district);
 			if(district->getCanPurchase())
@@ -179,10 +182,14 @@ void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentC
 			}
 		}
 	}
+	firstProgram = false;
 	firstPurchase = false;
 	if (!programs[1].empty())
 	{
-		productionPanel->createNewLabelItem(playerID, currentCity, "       Buildings      ", PanelItem::ItemType::PRODUCT);
+		if (firstProgram)
+		{
+			productionPanel->createNewLabelItem(playerID, currentCity, "       Buildings      ", PanelItem::ItemType::PRODUCT);
+		}
 		for (auto b : programs[1])
 		{
 			if (currentCity)
@@ -229,6 +236,7 @@ void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentC
 			}
 		}
 	}
+	firstProgram = false;
 	firstPurchase = false;
 	if (!programs[2].empty())
 	{

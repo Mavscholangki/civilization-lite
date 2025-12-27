@@ -178,19 +178,23 @@ Building::BuildingType convertToBuildingType(District::BuildingCategory category
 	}
 }
 
-bool District::addBuilding(District::BuildingCategory buildingType)
+bool District::addBuilding(std::string buildingName)
 {
 	bool hasThisBuilding = false;
+	Building* newBuilding = new Building(this->playerID, buildingName);
 	for (auto possibleBuilding : possibleBuildings)
 	{
-		if (possibleBuilding == buildingType)
+		if (possibleBuilding == newBuilding->getType())
 		{
 			hasThisBuilding = true;
 			break;
 		}
 	}
 	if (!hasThisBuilding)
+	{
+		delete newBuilding;
 		return false;
+	}
 
 	if (status != ProductionStatus::COMPLETED)
 	{
@@ -198,7 +202,6 @@ bool District::addBuilding(District::BuildingCategory buildingType)
 	}
 
 	// 创建建筑实例
-	Building* newBuilding = new Building(this->playerID, convertToBuildingType(buildingType));
 	if (!newBuilding)
 		return false; // 创建失败
 	if (!newBuilding->canErectBuilding())

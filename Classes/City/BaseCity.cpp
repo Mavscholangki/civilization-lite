@@ -189,7 +189,7 @@ void BaseCity::updateProduction()
 			auto newBuilding = dynamic_cast<Building*>(currentProduction);
 			for (auto district : districts)
 			{
-				district->addBuilding(newBuilding->getType());
+				district->addBuilding(newBuilding->getName());
 			}
 			delete newBuilding;
 		}
@@ -213,11 +213,11 @@ void BaseCity::purchaseDirectly(ProductionProgram* newProgram)
 {
 	if (!newProgram->getCanPurchase())
 		return;
-	newProgram->purchaseCompletion();
 	int cost = newProgram->getPurchaseCost();
 	Player* player = GameManager::getInstance()->getPlayer(this->ownerPlayer);
 	if(cost <= player->getGold())
 	{
+		newProgram->purchaseCompletion();
 		player->setGold(player->getGold() - newProgram->getPurchaseCost());
 		if (newProgram->getType() == ProductionProgram::ProductionType::DISTRICT)
 		{
@@ -228,9 +228,9 @@ void BaseCity::purchaseDirectly(ProductionProgram* newProgram)
 			auto newBuilding = static_cast<Building*>(newProgram);
 			for (auto district : districts)
 			{
-				district->addBuilding(newBuilding->getType());
+				district->addBuilding(newBuilding->getName());
 			}
-			delete newBuilding;
+			delete newProgram;
 		}
 		else if (newProgram->getType() == ProductionProgram::ProductionType::UNIT)
 		{
