@@ -183,7 +183,7 @@ Building::Building(int player, BuildingType type)
 }
 Building::Building(int player, std::string name)
 	:_type(BuildingType::TO_BE_DEFINED),
-	ProductionProgram(ProductionType::BUILDING, "", Hex(), 0, true, 0), // 建筑可以用黄金购买完成
+	ProductionProgram(ProductionType::BUILDING, name, Hex(), 0, true, 0), // 建筑可以用黄金购买完成
 	playerID(player),
 	districtName(""),
 	maintenanceCost(0),

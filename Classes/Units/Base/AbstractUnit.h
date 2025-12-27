@@ -19,6 +19,25 @@ enum class UnitType {
 	AVIATION   // 航空
 };
 
+enum class UnitName {
+    SETTLER,
+    BUILDER,
+    
+    WARRIOR,
+    SWORDSMAN,
+    LINE_INFANTRY,
+
+    ARCHER,
+    CROSSBOWMAN,
+    MUSKETEERS,
+
+    CATAPULT,
+    CANNON,
+
+    BIPLANE,
+    JET_FIGHTER
+};
+
 /**
  * @brief 单位状态枚举
  */
@@ -41,6 +60,7 @@ enum class UnitState {
 class AbstractUnit : public cocos2d::Node, public ProductionProgram {
 public:
     AbstractUnit();
+    AbstractUnit(std::string unitName);
     virtual ~AbstractUnit();
 
     using CheckCityCallback = std::function<bool(Hex)>;
@@ -83,17 +103,17 @@ public:
     // 2. 纯虚函数 (必须由子类实现 - 配置数据)
     // ==========================================
 
-    virtual std::string getUnitName() const = 0;    // 单位名称
-    virtual UnitType getUnitType() const = 0;       // 单位类型
-    virtual std::string getSpritePath() const = 0;  // 图片路径
+    virtual std::string getUnitName() const { return ""; };    // 单位名称
+    virtual UnitType getUnitType() const { return UnitType::CIVILIAN; };       // 单位类型
+    virtual std::string getSpritePath() const { return ""; };  // 图片路径
 
     // --- 基础属性 ---
-    virtual int getMaxHp() const = 0;       // 最大生命值
-    virtual int getBaseAttack() const = 0;  // 基础攻击力
-    virtual int getMaxMoves() const = 0;    // 最大移动力
-    virtual int getAttackRange() const = 0; // 攻击距离 (1=近战)
+    virtual int getMaxHp() const { return 100; }       // 最大生命值
+    virtual int getBaseAttack() const { return 20; };  // 基础攻击力
+    virtual int getMaxMoves() const { return 2; };    // 最大移动力
+    virtual int getAttackRange() const { return 1; }; // 攻击距离 (1=近战)
     virtual int getVisionRange() const { return 2; } // 视野范围 (默认2)
-	virtual int getMaintenanceCost() const = 0; // 维护费用
+    virtual int getMaintenanceCost() const { return 2; }; // 维护费用
     virtual int getPrereqTechID() const { return prereqTechID; }    // 前置科技
 
     // ==========================================
@@ -196,6 +216,7 @@ protected:
 
     // --- 成员变量 ---
     int _ownerId;           // 所属玩家
+    UnitName _type;
     Hex _gridPos;           // 逻辑坐标
     int _currentHp;         // 当前血量
     int _currentMoves;      // 当前移动力

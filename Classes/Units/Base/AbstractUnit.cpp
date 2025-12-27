@@ -18,6 +18,162 @@ AbstractUnit::AbstractUnit()
     , _hasActed(false) // 【修改】初始化行动标记
     , prereqTechID(-1)
 {
+    switch (_type)
+    {
+    case UnitName::SETTLER:
+        ProductionProgram::_name = "Settler";
+        cost = 80;
+        purchaseCost = 400;
+        break;
+    case UnitName::BUILDER:
+        ProductionProgram::_name = "Builder";
+        cost = 50;
+        purchaseCost = 200;
+        break;
+    case UnitName::WARRIOR:
+        ProductionProgram::_name = "Warrior";
+        cost = 30;
+        purchaseCost = 200;
+        break;
+    case UnitName::SWORDSMAN:
+        ProductionProgram::_name = "Swordsman";
+        cost = 40;
+        purchaseCost = 500;
+        break;
+    case UnitName::LINE_INFANTRY:
+        ProductionProgram::_name = "LineInfantry";
+        cost = 60;
+        purchaseCost = 600;
+        break;
+    case UnitName::ARCHER:
+        ProductionProgram::_name = "Archer";
+        cost = 30;
+        purchaseCost = 400;
+        break;
+    case UnitName::CROSSBOWMAN:
+        ProductionProgram::_name = "CrossBowman";
+        cost = 50;
+        purchaseCost = 500;
+        break;
+    case UnitName::MUSKETEERS:
+        ProductionProgram::_name = "Settler";
+        cost = 80;
+        purchaseCost = 600;
+        break;
+    case UnitName::CATAPULT:
+        ProductionProgram::_name = "Settler";
+        cost = 30;
+        purchaseCost = 200;
+        break;
+    case UnitName::CANNON:
+        ProductionProgram::_name = "Settler";
+        cost = 50;
+        purchaseCost = 400;
+        break;
+    case UnitName::BIPLANE:
+        ProductionProgram::_name = "Settler";
+        cost = 60;
+        purchaseCost = 1000;
+        break;
+    case UnitName::JET_FIGHTER:
+        ProductionProgram::_name = "Settler";
+        cost = 80;
+        purchaseCost = 10600;
+        break;
+    default:
+        break;
+    }
+}
+
+AbstractUnit::AbstractUnit(std::string unitName)
+    : ProductionProgram(ProductionProgram::ProductionType::UNIT, unitName, Hex(), true, 0)
+    , _ownerId(-1)
+    , _currentHp(0)
+    , _currentMoves(0)
+    , _state(UnitState::IDLE)
+    , _unitSprite(nullptr)
+    , _selectionRing(nullptr)
+    , _hpBarNode(nullptr)
+    , _hasActed(false) // 【修改】初始化行动标记
+    , prereqTechID(-1)
+{
+    if (ProductionProgram::_name == "Settler")
+    {
+        _type = UnitName::SETTLER;
+        cost = 80;
+        purchaseCost = 400;
+    }
+    else if (ProductionProgram::_name == "Builder")
+    {
+        _type = UnitName::BUILDER;
+        cost = 50;
+        purchaseCost = 200;
+    }
+    else if (ProductionProgram::_name == "Warrior")
+    {
+        _type = UnitName::WARRIOR;
+        cost = 30;
+        purchaseCost = 200;
+    }
+    else if (ProductionProgram::_name == "Swordsman")
+    {
+        _type = UnitName::SWORDSMAN;
+        cost = 40;
+        purchaseCost = 500;
+    }
+    else if (ProductionProgram::_name == "LineInfantry")
+    {
+        _type = UnitName::LINE_INFANTRY;
+        cost = 60;
+        purchaseCost = 600;
+    }
+    else if (ProductionProgram::_name == "Archer")
+    {
+        _type = UnitName::ARCHER;
+        cost = 30;
+        purchaseCost = 400;
+    }
+    else if (ProductionProgram::_name == "CrossBowman")
+    {
+        _type = UnitName::CROSSBOWMAN;
+        cost = 50;
+        purchaseCost = 500;
+    }
+    else if (ProductionProgram::_name == "Musketeers")
+    {
+        _type = UnitName::MUSKETEERS;
+        cost = 80;
+        purchaseCost = 600;
+    }
+    else if (ProductionProgram::_name == "Catapult")
+    {
+        _type = UnitName::CATAPULT;
+        cost = 30;
+        purchaseCost = 200;
+    }
+    else if (ProductionProgram::_name == "Cannon")
+    {
+        _type = UnitName::CANNON;
+        cost = 50;
+        purchaseCost = 400;
+    }
+    else if (ProductionProgram::_name == "Biplane")
+    {
+        _type = UnitName::BIPLANE;
+        cost = 60;
+        purchaseCost = 1000;
+    }
+    else if (ProductionProgram::_name == "JetFighter")
+    {
+        _type = UnitName::JET_FIGHTER;
+        cost = 80;
+        purchaseCost = 10600;
+    }
+    else
+    {
+        // 默认处理，保持_type的当前值或设置为默认值
+        // 如果需要，可以添加_type = UnitName::DEFAULT; 或处理错误情况
+    }
 }
 
 AbstractUnit::~AbstractUnit() {

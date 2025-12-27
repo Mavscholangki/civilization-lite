@@ -44,12 +44,26 @@ public:
     // 添加获取当前玩家的方法
     Player* getCurrentPlayer() const;
 
+    Hex selectTileFromOptions(const std::vector<Hex>& allowedTiles);
+    void GameScene::setTileSelectionCallback(const std::function<void(Hex)>& callback,
+        const std::function<void()>& cancelCallback);
 
+    GameMapLayer* getMapLayer() const { return _mapLayer;};
+    /**
+     * @brief 取消当前的地块选择操作
+     * @param triggerCallback 是否触发取消回调
+     *
+     * 当玩家改变主意或需要中断选择时调用
+     */
+    void cancelTileSelection(bool triggerCallback = true);
+
+
+    void GameScene::selectTileAsync(const std::vector<Hex>& allowedTiles,
+        const std::function<void(Hex)>& selectionCallback,
+        const std::function<void()>& cancelCallback);
 private:
     CREATE_FUNC(GameScene);
 
-
-private:
     void initTechTree();
     void initCultureTree();
     void initPolicySystem();

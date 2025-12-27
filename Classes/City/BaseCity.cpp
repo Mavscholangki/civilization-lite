@@ -59,7 +59,7 @@ bool BaseCity::initCity(int player, Hex pos, std::string name) {
 	this->addToTerritory(Hex(pos.q - 1, pos.r + 1));
 	
 	// 创建并添加市中心区
-	Downtown* downtownDistrict = new Downtown(this->ownerPlayer, pos, name + " Downtown");
+	Downtown* downtownDistrict = new Downtown(this->ownerPlayer, pos, "Downtown");
 	this->addDistrict(static_cast<District*>(downtownDistrict)); // 添加市中心区
 
 	_visual = Node::create();
@@ -88,7 +88,7 @@ bool BaseCity::initCity(int player, Hex pos, std::string name) {
 void BaseCity::drawTerritory() // 绘制城市边界
 {
 	auto draw = DrawNode::create();
-	for (auto tile : territory) {
+	for (auto& tile : territory) {
 		// 计算每个格子的像素位置
 		HexLayout layout(RADIUS);
 		Vec2 center = layout.hexToPixel(tile) - layout.hexToPixel(this->gridPos); // 相对于城市中心的位置
@@ -162,8 +162,9 @@ void BaseCity::updatePopulation()
 void BaseCity::addNewProduction(ProductionProgram* newProgram)
 {
 	if (this->currentProduction != nullptr)
-		this->suspendedProductions.push_back(new ProductionProgram(*currentProduction));
+		this->suspendedProductions.push_back(currentProduction);
 	currentProduction = newProgram;
+	updatePanel();
 }
 
 void BaseCity::updateProduction()
@@ -188,7 +189,7 @@ void BaseCity::updateProduction()
 			auto newBuilding = dynamic_cast<Building*>(currentProduction);
 			for (auto district : districts)
 			{
-				district->addBuilding(newBuilding->getType());
+				district->addBuilding(newBuilding->getName());
 			}
 			delete newBuilding;
 		}
@@ -212,11 +213,11 @@ void BaseCity::purchaseDirectly(ProductionProgram* newProgram)
 {
 	if (!newProgram->getCanPurchase())
 		return;
-	newProgram->purchaseCompletion();
 	int cost = newProgram->getPurchaseCost();
 	Player* player = GameManager::getInstance()->getPlayer(this->ownerPlayer);
 	if(cost <= player->getGold())
 	{
+		newProgram->purchaseCompletion();
 		player->setGold(player->getGold() - newProgram->getPurchaseCost());
 		if (newProgram->getType() == ProductionProgram::ProductionType::DISTRICT)
 		{
@@ -227,9 +228,9 @@ void BaseCity::purchaseDirectly(ProductionProgram* newProgram)
 			auto newBuilding = static_cast<Building*>(newProgram);
 			for (auto district : districts)
 			{
-				district->addBuilding(newBuilding->getType());
+				district->addBuilding(newBuilding->getName());
 			}
-			delete newBuilding;
+			delete newProgram;
 		}
 		else if (newProgram->getType() == ProductionProgram::ProductionType::UNIT)
 		{

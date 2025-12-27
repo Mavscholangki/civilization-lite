@@ -86,6 +86,7 @@ public:
     * 当玩家点击选中城市时会调用此回调
     */
     void setOnCitySelectedCallback(const std::function<void(BaseCity*)>& cb);
+    void setOnInvalidSeletedCallback(const std::function<void()>& cb);  ///< 城市选中回调
 
     /**
      * @brief 处理建立城市的动作
@@ -108,7 +109,64 @@ public:
      */
     void onNextTurnAction();
 	TileData getTileData(Hex h);
+
+    //========地块选择模式========//
+
+    /**
+     * @brief 启用地块选择模式
+     * @param allowedTiles 允许选择的地块数组
+     * @param callback 选择完成后的回调函数
+     *
+     * 进入此模式后，玩家可以点击地图选择地块
+     * 只有 allowedTiles 中的地块可以被选择
+     * 点击其他地块会被忽略
+     */
+    void enableTileSelection(const std::vector<Hex>& allowedTiles,
+        const std::function<void(Hex)>& callback,
+        const std::function<void()>& cancelCallback);
+
+
+    /**
+    * @brief 禁用地块选择模式
+    */
+   
+    void disableTileSelection(bool triggerCancelCallback);
+    /**
+     * @brief 检查是否在选择模式下
+     * @return true 如果在地块选择模式下
+     */
+    bool isSelectingTile() const { return _isSelectingTile; }
+
+    /**
+     * @brief 高亮显示可选地块
+     * @param allowedTiles 需要高亮的地块数组
+     */
+    void highlightAllowedTiles(const std::vector<Hex>& allowedTiles);
+
+    /**
+     * @brief 清除所有高亮显示
+     */
+    void clearHighlights();
+
+    void handleTileSelection(Touch* touch);
+    void showSelectionMarker(Hex hex);
+
+    void clearSelectionMarker();
+
+    /**
+        * @brief 强制退出手动选择模式
+        * @param cancelCallback 是否触发取消回调（可选，默认不触发）
+        *
+        * 当玩家改变主意或需要取消当前选择操作时调用
+        */
+    void cancelTileSelection(bool cancelCallback = false);
+    void GameMapLayer::showInvalidSelectionFeedback(Hex hex);
+    HexLayout* getLayout() const { return _layout; }                    ///< 六边形布局对象
+
+
 private:
+    // 添加取消回调函数
+    std::function<void()> _onSelectionCancelled;
     /**
      * @brief 生成六边形网格地图
      * 
@@ -194,6 +252,8 @@ private:
      */
     void handleUnitAttack(AbstractUnit* attacker, Hex targetHex);
 
+    
+
     // 用于判断是否在拖拽地图
     cocos2d::Vec2 _mouseDownPos;
     // ============ 成员变量 ============
@@ -207,7 +267,8 @@ private:
     std::vector<BaseCity*> _cities;        ///< 所有城市列表
     std::vector<AbstractUnit*> _allUnits;  ///< 所有单位列表（包括敌方）
     AbstractUnit* _selectedUnit;           ///< 当前选中的单位
-	std::function<void(BaseCity*)> _onCitySelected;  ///< 城市选中回调
+    std::function<void(BaseCity*)> _onCitySelected;  ///< 城市选中回调
+    std::function<void()> _onInvalidSelected;  ///< 无效选中
 	BaseCity* getCityAt(Hex hex);   ///<  获取指定位置的城市指针（无城市返回 nullptr）
     AbstractUnit* getUnitAt(Hex h);
 
@@ -219,6 +280,15 @@ private:
     Hex _lastClickHex;
 
     bool isValidStartingPosition(Hex centerHex);
+
+private:
+    // 选择模式相关成员变量
+    bool _isSelectingTile;
+    std::vector<Hex> _allowedTiles;
+    std::function<void(Hex)> _tileSelectionCallback;
+    cocos2d::DrawNode* _highlightNode;  // 用于绘制高亮地块
+    std::vector<cocos2d::Node*> _highlightLabels;  // 高亮地块上的标签
+
 };
 
 #endif // __GAME_MAP_LAYER_H__
