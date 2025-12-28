@@ -60,9 +60,12 @@ public:
 	void purchaseDirectly(ProductionProgram* newProgram); // 购买生产项目
 	void deduceHealth(int damage); // 扣除健康度
     void updateDistribution(); // 更新分配信息
-    
+	void updateTerritory();
+	void updateExpandVisualization();
 
 	void updatePanel(); // 更新生产面板信息
+	void choosePossibleExpand();
+	int calculateTileYield(const TileData& data);
 
     // 城市属性
 	int ownerPlayer; // 城市所属玩家ID
@@ -82,7 +85,9 @@ public:
 	std::vector<Hex> territory; // 城市领土范围(包含城市所在格子)
 	std::vector<Hex> vacantTiles; // 空闲格
 	std::map<Hex, int> populationDistribution; // 人口分配情况(地块坐标 -> 分配人口数)
-
+	Hex nextTerritoryTile;
+	int expandAccumulation; // 积累量
+	int turnsLeftToExpand;
 
     
     // 回合结算逻辑
@@ -99,6 +104,7 @@ private:
     cocos2d::ui::Button * _nameLabel;
     cocos2d::Node* _visual;
 	cocos2d::Node* _boundaryVisual;
+	cocos2d::Node* _expandVisual;
 };
 
 #endif

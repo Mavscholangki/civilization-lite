@@ -108,6 +108,7 @@ public:
      * 3. 触发回合相关事件
      */
     void onNextTurnAction();
+
 	TileData getTileData(Hex h);
 
     //========地块选择模式========//
@@ -170,6 +171,8 @@ public:
         */
     void cancelTileSelection(bool cancelCallback = false);
     void GameMapLayer::showInvalidSelectionFeedback(Hex hex);
+
+
     HexLayout* getLayout() const { return _layout; }                    ///< 六边形布局对象
 
 

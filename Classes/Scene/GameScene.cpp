@@ -655,6 +655,25 @@ void GameScene::cancelTileSelection(bool triggerCallback) {
     }
 }
 
+bool GameScene::isTileOccupied(Hex h)
+{
+    for (auto player : GameManager::getInstance()->getAllPlayers())
+    {
+        for (auto city : player->getCities())
+        {
+            for (auto& tile : city->territory)
+            {
+                if (h == tile)
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+
 // 修改现有的 selectTileAsync 函数，支持取消回调
 void GameScene::selectTileAsync(const std::vector<Hex>& allowedTiles,
     const std::function<void(Hex)>& selectionCallback,

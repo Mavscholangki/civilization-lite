@@ -4,6 +4,7 @@
 #include "cocos2d.h"
 #include <cmath>
 #include <algorithm>
+#include <functional>
 
 /**
  * @brief 六边形坐标系统
@@ -104,6 +105,25 @@ struct Hex {
         return Hex(this->q + dirs[targetDir][0], this->r + dirs[targetDir][1]);
     }
 };
+
+namespace std {
+    template<>
+    struct hash<Hex> {
+        size_t operator()(const Hex& h) const noexcept {
+            // 使用简单的哈希组合
+            size_t hq = hash<int>{}(h.q);
+            size_t hr = hash<int>{}(h.r);
+            size_t hs = hash<int>{}(h.s);
+
+            // 组合哈希值（使用黄金比例混合）
+            return hq ^ (hr << 1) ^ (hs << 2);
+
+            // 或者使用更复杂的组合
+            // return ((hq * 16777619) ^ hr) * 16777619 ^ hs;
+        }
+    };
+}
+
 
 /**
  * @brief 六边形布局类

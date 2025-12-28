@@ -858,6 +858,8 @@ void GameMapLayer::onNextTurnAction() {
     }
 }
 
+
+
 // 获取指定地块的数据
 TileData GameMapLayer::getTileData(Hex h)
 {
