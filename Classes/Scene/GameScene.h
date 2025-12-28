@@ -56,6 +56,7 @@ public:
      * 当玩家改变主意或需要中断选择时调用
      */
     void cancelTileSelection(bool triggerCallback = true);
+    bool isTileOccupied(Hex h);
 
 
     void selectTileAsync(const std::vector<Hex>& allowedTiles,

@@ -10,6 +10,7 @@
 #include "UnitFactory.h"
 #include "DistrictFactory.h"
 #include <cmath>
+#include <unordered_set>
 #define RADIUS 50.0f // 六边形半径
 
 USING_NS_CC;
@@ -61,7 +62,72 @@ bool BaseCity::initCity(int player, Hex pos, std::string name) {
 	this->addToTerritory(Hex(pos.q, pos.r - 1));
 	this->addToTerritory(Hex(pos.q + 1, pos.r - 1));
 	this->addToTerritory(Hex(pos.q - 1, pos.r + 1));
-	
+	this->nextTerritoryTile = Hex();
+	this->turnsLeftToExpand = 999;
+	this->expandAccumulation = 0;
+
+	// === 修正2：先更新领土，再检查是否有可扩展的地块 ===
+	auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
+	if (gameScene) {
+		// 选择下一个可能的扩展地块
+		choosePossibleExpand();
+	}
+
+	// === 修正3：只有在有扩展地块时才创建可视化 ===
+	if (nextTerritoryTile != Hex())
+	{
+		updateTerritory();
+
+		// 创建扩展可视化
+		auto draw = DrawNode::create();
+		auto layout = HexLayout(RADIUS);
+
+		// 修正4：正确的坐标转换
+		// 扩展可视化应该在地图层的坐标系统中，而不是相对于城市
+		// 我们需要获取地图层来转换坐标
+		if (gameScene && gameScene->getMapLayer()) {
+			auto mapLayer = gameScene->getMapLayer();
+			auto gameLayout = mapLayer->getLayout();
+
+			if (gameLayout) {
+				// 计算扩展地块的世界坐标
+				Vec2 expandPos = gameLayout->hexToPixel(nextTerritoryTile);
+
+				// 创建六边形
+				Vec2 vertices[6];
+				float size = RADIUS; // 使用布局的尺寸
+
+				for (int i = 0; i < 6; i++) {
+					float angle = 2.0f * M_PI / 6.0f * i + M_PI / 6.f;
+					float x = expandPos.x + size * cos(angle);
+					float y = expandPos.y + size * sin(angle);
+					vertices[i] = Vec2(x, y);
+				}
+
+				// 绘制半透明的六边形
+				draw->drawSolidPoly(vertices, 6, Color4F(255 / 255.f, 51 / 255.f, 255 / 255.f, 0.3f));
+
+				// 添加回合数标签
+				std::string expandText = std::to_string(turnsLeftToExpand) + " turns";
+				auto leftTurnLabel = Label::createWithSystemFont(expandText, "Arial", 14);
+				leftTurnLabel->setPosition(Vec2(expandPos.x, expandPos.y));
+				leftTurnLabel->setTextColor(Color4B::WHITE);
+				leftTurnLabel->enableOutline(Color4B::BLACK, 1);
+				draw->addChild(leftTurnLabel);
+
+				// 添加到地图层，而不是城市节点
+				mapLayer->addChild(draw, 20);
+				_expandVisual = draw;
+			}
+		}
+	}
+	else
+	{
+		// 没有扩展地块，设置为空
+		_expandVisual = nullptr;
+	}
+
+
 	// 创建并添加市中心区
 	Downtown* downtownDistrict = new Downtown(this->ownerPlayer, pos, "Downtown");
 	this->addDistrict(static_cast<District*>(downtownDistrict)); // 添加市中心区
@@ -91,6 +157,11 @@ bool BaseCity::initCity(int player, Hex pos, std::string name) {
 
 void BaseCity::drawTerritory() // 绘制城市边界
 {
+	// 移除旧的扩展可视化
+	if (this->_boundaryVisual) {
+		_boundaryVisual->removeFromParent();
+		_boundaryVisual = nullptr;
+	}
 	auto draw = DrawNode::create();
 	for (auto& tile : territory) {
 		// 计算每个格子的像素位置
@@ -151,12 +222,14 @@ void BaseCity::updatePopulation()
 	if (currentAccumulation >= neededFoodToMultiply)
 	{
 		population++;
+		unallocated++;
 		neededFoodToMultiply = 15 + 8 * (population - 1) + (float)(pow(population - 1, 1.5) + 0.5f);
 		currentAccumulation = 0;
 	}
 	else if (currentAccumulation < 0)
 	{
 		population--;
+		unallocated--;
 		neededFoodToMultiply = 15 + 8 * (population - 1) + (float)(pow(population - 1, 1.5) + 0.5f);
 		currentAccumulation += neededFoodToMultiply;
 	}
@@ -272,14 +345,21 @@ void BaseCity::purchaseDirectly(ProductionProgram* newProgram)
 
 void BaseCity::updateDistribution() // 更新分配信息
 {
-	int i = 0;
+	if (unallocated < 0)
+	{
+		for (auto& tile : populationDistribution)
+		{
+			populationDistribution[tile.first] = 0;
+		}
+		unallocated = population;
+	}
 	for (auto& tile : populationDistribution) {
 		if (unallocated == 0)
 			break;
 		if(populationDistribution[tile.first] == 0)
 		{
 			unallocated--;
-			populationDistribution[tile.first] += 1;
+			populationDistribution[tile.first] = 1;
 		}
 	}
 	updateYield(); // 更新城市总产出
@@ -290,11 +370,227 @@ void BaseCity::updatePanel() // 更新生产面板信息
 	dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene())->updateProductionPanel(ownerPlayer, this);
 }
 
+void BaseCity::choosePossibleExpand()
+{
+	// 最多36个
+	if (territory.size() >= 36)
+	{
+		nextTerritoryTile = Hex();
+		return;
+	}
+
+	auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
+	if (!gameScene) return;
+
+	// 使用集合避免重复
+	std::unordered_set<Hex> possibleExpandSet;
+
+	// 从当前领土边界寻找可扩展地块
+	for (const auto& tile : territory)
+	{
+		// 只考虑距离城市中心不超过5的地块
+		if (tile.distance(gridPos) >= 5)
+			continue;
+
+		// 检查六个邻接方向（轴向坐标系）
+		const std::vector<Hex> directions = {
+			Hex(1, 0),   // 东
+			Hex(1, -1),   // 东南
+			Hex(0, -1),   // 西南
+			Hex(-1, 0),   // 西
+			Hex(-1, 1),   // 西北
+			Hex(0, 1)    // 东北
+		};
+
+		for (const auto& dir : directions)
+		{
+			Hex neighbor = tile + dir;
+
+			// 检查是否已经在领土中
+			bool alreadyInTerritory = false;
+			for (const auto& t : territory) {
+				if (t == neighbor) {
+					alreadyInTerritory = true;
+					break;
+				}
+			}
+			if (alreadyInTerritory) continue;
+
+			// 检查是否被占用
+			if (!gameScene->isTileOccupied(neighbor))
+			{
+				possibleExpandSet.insert(neighbor);
+			}
+		}
+	}
+
+	// 转换为向量
+	std::vector<Hex> possibleExpand(possibleExpandSet.begin(), possibleExpandSet.end());
+
+	if (possibleExpand.empty())
+	{
+		nextTerritoryTile = Hex();
+		return;
+	}
+
+	// 寻找最优地块
+	Hex optimalExpand = possibleExpand[0];
+	int optimalYield = calculateTileYield(gameScene->getTileData(optimalExpand));
+
+	for (const auto& possibleTile : possibleExpand)
+	{
+		int thisYield = calculateTileYield(gameScene->getTileData(possibleTile));
+		if (thisYield > optimalYield)
+		{
+			optimalExpand = possibleTile;
+			optimalYield = thisYield;
+		}
+		else if (thisYield == optimalYield)
+		{
+			// 如果产出相同，选择距离城市更近的
+			if (possibleTile.distance(gridPos) < optimalExpand.distance(gridPos))
+			{
+				optimalExpand = possibleTile;
+				optimalYield = thisYield;
+			}
+		}
+	}
+
+	this->nextTerritoryTile = optimalExpand;
+}
+
+// 辅助函数：计算地块总产出
+int BaseCity::calculateTileYield(const TileData& data)
+{
+	return data.food + data.gold + data.culture + data.science + data.production;
+}
+
+void BaseCity::updateTerritory()
+{
+	if (nextTerritoryTile == Hex())
+	{
+		choosePossibleExpand();
+		if (nextTerritoryTile == Hex())
+		{
+			// 没有可扩展的地块，清除可视化
+			if (_expandVisual) {
+				_expandVisual->removeFromParent();
+				_expandVisual = nullptr;
+			}
+			return;
+		}
+	}
+
+	int neededAccumulation = (20 + 10 * (territory.size() - 7));
+
+	// 防止除零
+	if (cityYield.cultureYield <= 0) {
+		turnsLeftToExpand = 999; // 文化为0，几乎不可能扩展
+		return;
+	}
+
+	expandAccumulation += cityYield.cultureYield;
+	turnsLeftToExpand = (neededAccumulation - expandAccumulation + cityYield.cultureYield - 1) / cityYield.cultureYield;
+
+	if (expandAccumulation >= neededAccumulation)
+	{
+		// 添加新领土
+		territory.push_back(nextTerritoryTile);
+
+		// 重置
+		nextTerritoryTile = Hex();
+		expandAccumulation = 0;
+
+		// 立即开始选择下一个扩展地块
+		choosePossibleExpand();
+
+		// 移除旧的扩展可视化
+		if (_expandVisual) {
+			_expandVisual->removeFromParent();
+			_expandVisual = nullptr;
+		}
+
+		// 如果有新的扩展地块，创建可视化
+		if (nextTerritoryTile != Hex())
+		{
+			turnsLeftToExpand = (neededAccumulation - expandAccumulation + cityYield.cultureYield - 1) / cityYield.cultureYield;
+			updateExpandVisualization();
+		}
+	}
+	else
+	{
+		// 更新扩展可视化
+		updateExpandVisualization();
+	}
+	drawTerritory();
+}
+
+void BaseCity::updateExpandVisualization()
+{
+	if (nextTerritoryTile == Hex()) return;
+
+	auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
+	if (!gameScene) return;
+
+	auto mapLayer = gameScene->getMapLayer();
+	if (!mapLayer) return;
+
+	// 移除旧的扩展可视化
+	if (_expandVisual) {
+		_expandVisual->removeFromParent();
+		_expandVisual = nullptr;
+	}
+
+	// 创建新的扩展可视化
+	auto draw = DrawNode::create();
+
+	// 获取布局
+	auto layout = mapLayer->getLayout();
+	if (!layout) return;
+
+	// 计算世界坐标
+	Vec2 center = layout->hexToPixel(nextTerritoryTile);
+
+	// 创建六边形
+	std::vector<Vec2> vertices;
+	float size = layout->size; // 假设有getSize()方法
+
+	for (int i = 0; i < 6; i++) {
+		float angle = 2.0f * M_PI / 6.0f * i + M_PI / 6.f;
+		float x = center.x + size * cos(angle);
+		float y = center.y + size * sin(angle);
+		vertices.push_back(Vec2(x, y));
+	}
+
+	// 绘制半透明的六边形
+	Color4F expandColor(255 / 255.f, 51 / 255.f, 255 / 255.f, 0.3f);
+	draw->drawSolidPoly(&vertices[0], 6, expandColor);
+
+	// 绘制边框
+	draw->drawPoly(&vertices[0], 6, true, Color4F(1.0f, 0.2f, 1.0f, 0.8f));
+
+	// 添加回合数标签
+	std::string expandText = std::to_string(turnsLeftToExpand) + " turns";
+	auto leftTurnLabel = Label::createWithSystemFont(expandText, "Arial", 14);
+	leftTurnLabel->setPosition(center);
+	leftTurnLabel->setTextColor(Color4B::WHITE);
+	leftTurnLabel->enableOutline(Color4B::BLACK, 1);
+	draw->addChild(leftTurnLabel);
+
+	// 添加到地图层
+	mapLayer->addChild(draw, 20); // 较高的z-order确保在最上层
+	_expandVisual = draw;
+}
+
 void BaseCity::onTurnEnd() {
 	// 处理生产
 	updateProduction();
     // 人口增长
 	updatePopulation();
+	// 人口分配
+	updateDistribution();
+	// 领土扩张
+	updateTerritory();
 	// 面板更新
 	updatePanel();
 }
