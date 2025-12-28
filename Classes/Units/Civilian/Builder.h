@@ -55,7 +55,7 @@ public:
         return "units/builder.png"; 
     }
 
-    int getCost() const override {
+    int getCost() const {
         return 200;
     }
 
@@ -63,7 +63,7 @@ public:
         return 0;
 	}
 
-    int getProductionCost() const override {
+    int getProductionCost() const {
         return 50;
     }
 

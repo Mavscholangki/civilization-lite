@@ -141,6 +141,9 @@ public:
         std::function<bool(Hex)> checkCityFunc,
         std::function<int(Hex)> getTerrainCostFunc);
 
+    void addToMapFunc(AbstractUnit* unit) { m_addToMapFunc(unit); }
+
+
     // ==================== 科技系统接口 ====================
     // TechEventListener 实现
     virtual void onTechActivated(int techId, const std::string& techName,
@@ -148,7 +151,7 @@ public:
     virtual void onResearchProgress(int techId, int currentProgress,
         int totalCost) override;
     virtual void onEurekaTriggered(int techId, const std::string& techName) override;
-    void updateUnclockedProduction();
+    void updateUnlockedProduction();
     void getUnlockedProduction(std::vector<ProductionProgram*>& Units, 
         std::vector<ProductionProgram*>& Districts, 
         std::vector<ProductionProgram*>& Buildings);

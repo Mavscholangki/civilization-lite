@@ -320,8 +320,17 @@ bool GameManager::hasPendingDecisions(int playerId) const {
     // 检查文化树：如果没有当前研究，则有待决事项
     bool cultureIdle = (player->getCurrentResearchCivicId() == -1);
 
+    bool productionIdle = false;
+    for (auto city : player->getCities())
+    {
+        if (city->currentProduction == nullptr && city->getSuspendedProductions().empty())
+        {
+            productionIdle = true;
+            break;
+        }
+    }
     // 注意：这里只检查了“未选择研究”，未来可以扩展其他待决事项（如政策卡、单位指令）
-    return (techIdle || cultureIdle);
+    return (techIdle || cultureIdle || productionIdle);
 }
 
 // ==================== AI 逻辑 ====================

@@ -132,14 +132,10 @@ void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentC
 	if (currentCity == nullptr)
 		return;
 	// Districts
-	bool firstProgram = false;
 	bool firstPurchase = false;
 	if (!programs[0].empty())
 	{
-		if (firstProgram)
-		{
-			productionPanel->createNewLabelItem(playerID, currentCity, "       Districts      ", PanelItem::ItemType::PRODUCT);
-		}
+		productionPanel->createNewLabelItem(playerID, currentCity, "       Districts      ", PanelItem::ItemType::PRODUCT);
 		for (auto d: programs[0])
 		{
 			if (currentCity)
@@ -168,7 +164,6 @@ void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentC
 				if (isAlreadyExisting)
 					continue;
 			}
-			firstProgram = true;
 			auto district = new District(playerID, Hex(), District::DistrictType::TO_BE_DEFINED, d->getName());
 			productionPanel->createNewButtonItem(playerID, currentCity, PanelItem::ItemType::PRODUCT, district);
 			if(district->getCanPurchase())
@@ -182,14 +177,10 @@ void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentC
 			}
 		}
 	}
-	firstProgram = false;
 	firstPurchase = false;
 	if (!programs[1].empty())
 	{
-		if (firstProgram)
-		{
-			productionPanel->createNewLabelItem(playerID, currentCity, "       Buildings      ", PanelItem::ItemType::PRODUCT);
-		}
+		productionPanel->createNewLabelItem(playerID, currentCity, "       Buildings      ", PanelItem::ItemType::PRODUCT);
 		for (auto b : programs[1])
 		{
 			if (currentCity)
@@ -222,8 +213,24 @@ void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentC
 				}
 				if (isAlreadyExisting)
 					continue;
+				
 			}
 			auto building = new Building(playerID, b->getName());
+			bool prereqDistrictExist = false;
+			for (auto district : currentCity->districts)
+			{
+				if (district->getName() == building->getDistrictName())
+				{
+					prereqDistrictExist = true;
+					break;
+				}
+			}
+			if (!prereqDistrictExist)
+			{
+				delete building;
+				building = nullptr;
+				continue;
+			}
 			productionPanel->createNewButtonItem(playerID, currentCity, PanelItem::ItemType::PRODUCT, building);
 			if (building->getCanPurchase())
 			{
@@ -236,7 +243,6 @@ void CityProductionPanel::updateProductionPanel(int playerID, BaseCity* currentC
 			}
 		}
 	}
-	firstProgram = false;
 	firstPurchase = false;
 	if (!programs[2].empty())
 	{
@@ -268,7 +274,7 @@ bool PopulationDistributionPanel::init()
 		return false;
 	}
 	auto visibleSize = Director::getInstance()->getVisibleSize();
-	auto panelSize = Size(visibleSize.width / 5, visibleSize.height - 50);
+	auto panelSize = Size(visibleSize.width / 5, visibleSize.height - 100);
 
 	// 初始化人口分配面板的逻辑
 	visible = false; // 初始为隐藏状态
@@ -277,14 +283,15 @@ bool PopulationDistributionPanel::init()
 	this->workedTilesList->setDirection(ui::ScrollView::Direction::VERTICAL); // 垂直滚动
 	this->workedTilesList->setBounceEnabled(true);
 	this->workedTilesList->setContentSize(panelSize); // 和productionPanel大小相同
+	this->workedTilesList->setContentSize(Size(panelSize.width - 20, panelSize.height - 80));
 	this->workedTilesList->setScrollBarWidth(5);
 	this->addChild(this->workedTilesList);
 
 	// 标题
-	this->title = Label::createWithSystemFont("Population Distribution", "Arial", 24);
+	this->title = Label::createWithSystemFont("      Population Distribution    ", "Arial", 24);
 	this->title->setTextColor(Color4B(Color3B(0, 76, 153)));
 	this->title->setContentSize(Size(panelSize.width, 40));
-	this->title->setPosition(Vec2(panelSize.width / 2, panelSize.height - title->getContentSize().height / 2 + 50));
+	this->title->setPosition(Vec2(panelSize.width / 2, panelSize.height - title->getContentSize().height / 2));
 	this->addChild(this->title);
 
 	// 为标题添加背景
@@ -315,7 +322,7 @@ void PopulationDistributionPanel::updatePanel(std::map<Hex, int> populationDistr
 	}
 	// 更新标题显示人口信息
 	this->title->setString(
-		"Unallocated: " + std::to_string(unallocated) + "/ Total: " + std::to_string(population));
+		"         Unallocated: " + std::to_string(unallocated) + "/ Total: " + std::to_string(population));
 }
 
 void PopulationDistributionPanel::manualDistribute(Hex tileIndex)
@@ -441,7 +448,7 @@ bool ProductionPanel::init()
 	this->ProductButton->setTitleText("[ Product ]");
 	this->ProductButton->setTitleColor(Color3B(204, 204, 0)); // 黄色文字
 	this->ProductButton->setTitleFontSize(20);
-	this->ProductButton->setPosition(Vec2(70, panelSize.height - 30));
+	this->ProductButton->setPosition(Vec2(70, panelSize.height - 80));
 	this->ProductButton->addClickEventListener([=](Ref* sender) {
 		this->ProductList->setVisible(true);
 		this->PurchaseList->setVisible(false);
@@ -453,7 +460,7 @@ bool ProductionPanel::init()
 	this->PurchaseButton->setTitleText("[ Purchase ]");
 	this->PurchaseButton->setTitleColor(Color3B(255, 255, 51)); // 浅黄色文字
 	this->PurchaseButton->setTitleFontSize(20);
-	this->PurchaseButton->setPosition(Vec2(60 + panelSize.width / 2, panelSize.height - 30));
+	this->PurchaseButton->setPosition(Vec2(60 + panelSize.width / 2, panelSize.height - 80));
 	this->PurchaseButton->addClickEventListener([=](Ref* sender) {
 		this->ProductList->setVisible(false);
 		this->PurchaseList->setVisible(true);
@@ -464,7 +471,7 @@ bool ProductionPanel::init()
 	this->ProductList = ui::ScrollView::create();
 	this->ProductList->setDirection(ui::ScrollView::Direction::VERTICAL); // 垂直滚动
 	this->ProductList->setBounceEnabled(true);
-	this->ProductList->setContentSize(Size(panelSize.width - 20, panelSize.height - 50));
+	this->ProductList->setContentSize(Size(panelSize.width - 20, panelSize.height - 100));
 	this->ProductList->setPosition(Vec2(10, 10));
 	this->ProductList->setInnerContainerSize(Size(panelSize.width - 20, 0)); // 初始内容大小
 	this->ProductList->setVisible(true); // 默认显示生产列表
@@ -474,7 +481,7 @@ bool ProductionPanel::init()
 	this->PurchaseList = ui::ScrollView::create();
 	this->PurchaseList->setDirection(ui::ScrollView::Direction::VERTICAL); // 垂直滚动
 	this->PurchaseList->setBounceEnabled(true);
-	this->PurchaseList->setContentSize(Size(panelSize.width - 20, panelSize.height - 50));
+	this->PurchaseList->setContentSize(Size(panelSize.width - 20, panelSize.height - 100));
 	this->PurchaseList->setPosition(Vec2(10, 10));
 	this->PurchaseList->setInnerContainerSize(Size(panelSize.width - 20, 0)); // 初始内容大小
 	this->PurchaseList->setVisible(false); // 默认隐藏购买列表
@@ -557,93 +564,93 @@ void ProductionPanel::createNewButtonItem(int playerID, BaseCity* currentCity, P
 	newItem->setTitleFontSize(22);
 	newItem->setContentSize(Size(this->ProductList->getContentSize().width - 20, (program->getType() == ProductionProgram::ProductionType::BUILDING) ? 120 : 50));
 	newItem->addClickEventListener([=](Ref* sender) {
-		newItem->addClickEventListener([=](Ref* sender) {
-			// 直接使用 currentCity，不需要遍历所有城市
-			if (program->getType() == ProductionProgram::ProductionType::DISTRICT)
+		// 直接使用 currentCity，不需要遍历所有城市
+		if (program->getType() == ProductionProgram::ProductionType::DISTRICT)
+		{
+			auto newProgram = new District(currentPlayer, 
+				Hex(),
+				District::DistrictType::TO_BE_DEFINED, 
+				program->getName());
+			auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
+			if (!gameScene) return;
+
+			auto _mapLayer = gameScene->getMapLayer();
+			if (!_mapLayer) return;
+
+			// 检查是否已经在选择模式中
+			bool isSelecting = _mapLayer->isSelectingTile();
+
+			if (!isSelecting)
 			{
-				auto newProgram = new District(currentPlayer, 
-					Hex(),
-					District::DistrictType::TO_BE_DEFINED, 
-					program->getName());
-				auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
-				if (!gameScene) return;
+				// 获取城市的可建造地块（排除水域、山脉等）
+				auto allTerritory = currentCity->getTerritory();
+				std::vector<Hex> allowedTiles;
 
-				auto _mapLayer = gameScene->getMapLayer();
-				if (!_mapLayer) return;
-
-				// 检查是否已经在选择模式中
-				bool isSelecting = _mapLayer->isSelectingTile();
-
-				if (!isSelecting)
+				for (Hex& hex : allTerritory)
 				{
-					// 获取城市的可建造地块（排除水域、山脉等）
-					auto allTerritory = currentCity->getTerritory();
-					std::vector<Hex> allowedTiles;
-
-					for (Hex& hex : allTerritory)
+					// 检查地块是否适合建造区域
+					if (newProgram->canErectDistrict(hex))
 					{
-						// 检查地块是否适合建造区域
-						if (newProgram->canErectDistrict(hex))
+						allowedTiles.push_back(hex);
+					}
+				}
+
+				if (allowedTiles.empty())
+				{
+					CCLOG("No valid tiles to build district");
+					return;
+				}
+
+				// 启用地块选择模式
+				_mapLayer->enableTileSelection(allowedTiles,
+					[this, currentCity, toWhichList, program, gameScene](Hex selectedHex) {
+						// 创建新的区域对象
+						District* newDistrict = new District(
+							currentPlayer,
+							selectedHex,
+							District::DistrictType::TO_BE_DEFINED,
+							program->getName()
+						);
+
+						if (newDistrict)
 						{
-							allowedTiles.push_back(hex);
-						}
-					}
-
-					if (allowedTiles.empty())
-					{
-						CCLOG("No valid tiles to build district");
-						return;
-					}
-
-					// 启用地块选择模式
-					_mapLayer->enableTileSelection(allowedTiles,
-						[this, currentCity, toWhichList, program, gameScene](Hex selectedHex) {
-							// 创建新的区域对象
-							District* newDistrict = new District(
-								currentPlayer,
-								selectedHex,
-								District::DistrictType::TO_BE_DEFINED,
-								program->getName()
-							);
-
-							if (newDistrict)
+							if (toWhichList == PanelItem::ItemType::PRODUCT)
 							{
-								if (toWhichList == PanelItem::ItemType::PRODUCT)
-								{
-									currentCity->addNewProduction(newDistrict);
-								}
-								else
-								{
-									currentCity->purchaseDirectly(newDistrict);
-								}
+								currentCity->addNewProduction(newDistrict);
 							}
-						},
-						[this, gameScene]() {
-							CCLOG("Building location selection cancelled");
-							// 这里可以添加取消选择后的清理工作
+							else
+							{
+								currentCity->purchaseDirectly(newDistrict);
+							}
 						}
-					);
-				}
-				else
-				{
-					// 如果已经在选择模式，取消它
-					gameScene->cancelTileSelection(true);
-				}
+					},
+					[this, gameScene]() {
+						CCLOG("Building location selection cancelled");
+						// 这里可以添加取消选择后的清理工作
+					}
+				);
 			}
-			// 处理其他类型的建筑（不需要选择位置）
 			else
 			{
-				// 直接添加到城市，不需要选择位置
-				if (toWhichList == PanelItem::ItemType::PRODUCT)
-				{
-					currentCity->addNewProduction(new ProductionProgram(*program));
-				}
-				else
-				{
-					currentCity->purchaseDirectly(new ProductionProgram(*program));
-				}
+				// 如果已经在选择模式，取消它
+				gameScene->cancelTileSelection(true);
 			}
-			});
+			delete newProgram;
+		}
+		// 处理其他类型的建筑（不需要选择位置）
+		else
+		{
+			// 直接添加到城市，不需要选择位置
+			if (toWhichList == PanelItem::ItemType::PRODUCT)
+			{
+				currentCity->addNewProduction(new ProductionProgram(*program));
+			}
+			else
+			{
+				currentCity->purchaseDirectly(new ProductionProgram(*program));
+			}
+		}
+		this->updateCurrentPanel(currentCity);
 	});
 
 
@@ -658,20 +665,39 @@ void ProductionPanel::createNewButtonItem(int playerID, BaseCity* currentCity, P
 
 	if (program->getType() == ProductionProgram::ProductionType::BUILDING)
 	{
-		auto newItemTopBar = ui::Layout::create();
-		auto building = new Building(currentPlayer, program->getName());
-		auto newItemTopBarName = Label::createWithSystemFont(building->getDistrictName(), "Arial", 20);
-		newItemTopBarName->setTextColor(Color4B::BLUE);
-		newItemTopBarName->setAlignment(TextHAlignment::LEFT);
-		newItemTopBarName->setContentSize(Size(panelSize.width - 80, 40));
-		newItemTopBarName->setPosition(Vec2(45, newItem->getContentSize().height + bg->getContentSize().height / 2));
-		newItemTopBar->setContentSize(Size(panelSize.width - 80, 40));
-		newItemTopBar->setPosition(Vec2(0, 0));
-		newItemTopBar->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-		newItemTopBar->setBackGroundColor(Color3B(204, 204, 0)); // 土黄色
-		newItemTopBarName->addChild(newItemTopBar, -10);
-		bg->addChild(newItemTopBarName, 5);
-		delete building;
+		// 获取建筑所属区域名称（不创建实际建筑对象）
+		std::string districtName = dynamic_cast<Building*>(program)->getDistrictName();
+
+		// 创建顶部条
+		auto topBar = ui::Layout::create();
+		topBar->setContentSize(Size(panelSize.width - 80, 30));
+		topBar->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
+		topBar->setBackGroundColor(Color3B(204, 204, 0)); // 土黄色
+
+		// 添加区域名称标签 - 设置正确的尺寸和属性
+		auto districtLabel = Label::createWithSystemFont(
+			"For: " + districtName, "Arial", 18);
+
+		// 关键修复：设置标签尺寸和溢出处理
+		districtLabel->setDimensions(topBar->getContentSize().width - 20, 30); // 留出左右边距
+		districtLabel->setOverflow(Label::Overflow::SHRINK); // 文本过长时自动缩小
+		districtLabel->setHorizontalAlignment(TextHAlignment::LEFT);
+		districtLabel->setVerticalAlignment(TextVAlignment::CENTER);
+		districtLabel->setTextColor(Color4B::BLUE);
+
+		// 设置锚点和位置
+		districtLabel->setAnchorPoint(Vec2::ZERO); // 左上角对齐
+		districtLabel->setPosition(Vec2(10, 0)); // 距离左边10px
+
+		topBar->addChild(districtLabel);
+
+		// 将顶部条添加到背景
+		topBar->setPosition(Vec2(0, bg->getContentSize().height - 30));
+		bg->addChild(topBar);
+
+		// 调整按钮位置
+		newItem->setPosition(Vec2(bg->getContentSize().width / 2,
+			bg->getContentSize().height / 2 - 15));
 	}
 
 
@@ -708,24 +734,72 @@ void ProductionPanel::createNewLabelItem(int player, BaseCity* currentCity, std:
 
 void ProductionPanel::updateCurrentPanel(BaseCity* currentCity)
 {
-	if (!currentCity->currentProduction)
-		return;
+	// 移除旧的标签（防止重复添加）
+	if (currentProductionInfo) {
+		currentProductionInfo->removeFromParent();
+		currentProductionInfo = nullptr;
+	}
+
 	auto visibleSize = Director::getInstance()->getVisibleSize();
 	auto panelSize = Size(visibleSize.width / 5, visibleSize.height);
 
-	currentProductionInfo = Label::createWithSystemFont("Program Producing :" + 
-		currentCity->currentProduction->getName() + 
-		", " + std::to_string(currentCity->currentProduction->getCost() / currentCity->getCityYield().productionYield + 1) + 
-		"turns left", "Arial", 20);
-	currentProductionInfo->setColor(Color3B::BLACK); // 白色文字
+	std::string productionInfo;
+
+	// 检查是否有当前生产
+	if (currentCity->currentProduction)
+	{
+		int cost = currentCity->currentProduction->getCost();
+		int progress = currentCity->currentProduction->getProgress();
+		int productionPerTurn = currentCity->getCityYield().productionYield;
+
+		// 计算剩余回合数（使用向上取整）
+		int remainingCost = cost - progress;
+		int remainingTurns = 0;
+
+		if (productionPerTurn > 0) {
+			// 向上取整除法：(a + b - 1) / b
+			remainingTurns = (remainingCost + productionPerTurn - 1) / productionPerTurn;
+		}
+		else {
+			remainingTurns = 999; // 生产为0，显示极大值
+		}
+
+		// 如果剩余回合为0，说明已经完成（或即将完成）
+		if (remainingTurns <= 0) {
+			productionInfo = "Program Producing: " +
+				currentCity->currentProduction->getName() +
+				", completing this turn";
+		}
+		else {
+			productionInfo = "Program Producing: " +
+				currentCity->currentProduction->getName() +
+				", " + std::to_string(remainingTurns) +
+				" turns left";
+		}
+	}
+	else
+	{
+		productionInfo = "No Production Program Now.";
+	}
+
+	// 创建新标签
+	currentProductionInfo = Label::createWithSystemFont(productionInfo, "Arial", 20);
+	currentProductionInfo->setColor(Color3B::BLACK);
 	currentProductionInfo->setPosition(0, 0);
 	currentProductionInfo->setAnchorPoint(Vec2(0, 0));
-	currentProductionInfo->setContentSize(Size(this->ProductList->getContentSize().width - 20, 50));
+	currentProductionInfo->setDimensions(panelSize.width - 20, 50);
+	currentProductionInfo->setHorizontalAlignment(TextHAlignment::LEFT);
+	currentProductionInfo->setVerticalAlignment(TextVAlignment::CENTER);
+
 	auto bg = ui::Layout::create();
 	bg->setBackGroundColorType(ui::Layout::BackGroundColorType::SOLID);
 	bg->setBackGroundColor(Color3B(153, 204, 255)); // 浅蓝色背景
-	bg->setContentSize(Size(panelSize.width, currentProductionInfo->getContentSize().height));
-	currentProductionInfo->addChild(bg, -1);
+	bg->setContentSize(Size(panelSize.width, 50));
+	bg->setAnchorPoint(Vec2(0, 0));
+	bg->setPosition(Vec2(0, 0));
+
+	// 将背景添加到this，而不是标签添加到背景
+	this->addChild(bg, -1);
 	this->addChild(currentProductionInfo, 50);
 }
 
@@ -733,7 +807,7 @@ void ProductionPanel::clear() {
 	// 遍历移除
 	auto container1 = ProductList->getInnerContainer();
 	container1->removeAllChildrenWithCleanup(true); // true表示同时清理内存
-
+	
 	// 如果使用了自定义布局，需要重置内容大小
 	container1->setContentSize(ProductList->getContentSize());
 

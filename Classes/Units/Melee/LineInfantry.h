@@ -31,9 +31,8 @@
 class LineInfantry : public AbstractUnit {
 public:
 
-    LineInfantry() { cost = 60; purchaseCost = 600; }
+    LineInfantry() : AbstractUnit() { cost = 60; purchaseCost = 600; prereqTechID = 12;} // 前置科技：学徒制(ID 12)
 
-    LineInfantry() : AbstractUnit() { prereqTechID = 12; } // 前置科技：学徒制(ID 12)
     /**
      * @brief 获取单位名称
      * @return 列兵名称

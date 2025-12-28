@@ -195,12 +195,6 @@ bool District::addBuilding(std::string buildingName)
 		delete newBuilding;
 		return false;
 	}
-
-	if (status != ProductionStatus::COMPLETED)
-	{
-		return false; // 未建造完成不能添加建筑
-	}
-
 	// 创建建筑实例
 	if (!newBuilding)
 		return false; // 创建失败
