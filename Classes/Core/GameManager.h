@@ -167,6 +167,8 @@ private:
     void notifyTurnEnd(int playerId);
     void notifyVictory(VictoryType victoryType, int winnerPlayerId);
 
+    void GameManager::endTurnWithDelay();
+
 private:
     static GameManager* s_instance;
 

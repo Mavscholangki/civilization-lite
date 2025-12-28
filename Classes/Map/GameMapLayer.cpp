@@ -670,67 +670,50 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
     _lastClickHex = clickHex;
 
     // ============================================================
-    // 分支 A: 双击事件（执行移动/攻击）
+    // 分支 A: 双击事件，执行移动 / 攻击
     // ============================================================
     if (isDoubleTap) {
-        // 只有当前选中的我方单位才能执行
         if (_selectedUnit && _selectedUnit->getOwnerId() == 0) {
-
-            // 排除攻击自己目标
             if (clickHex != _selectedUnit->getGridPos()) {
 
-                // 1. 检查攻击
+                // 1. 若双击到敌方单位，直接攻击
                 AbstractUnit* enemy = getUnitAt(clickHex);
-                if (enemy && enemy->getOwnerId() != 0) {
-                    // handleAttack(enemy);
-                    CCLOG("Double Tap -> Attack Enemy!");
-
-                    // 重置双击状态以防止再次触发
+                if (enemy && enemy->getOwnerId() != _selectedUnit->getOwnerId()) {
+                    handleUnitAttack(_selectedUnit, clickHex);
                     _lastClickHex = Hex(-999, -999);
                     return;
                 }
 
-                // 2. 执行移动 【核心修复】
+                // 2. 否则尝试移动
                 auto costFunc = [this](Hex h) { return this->getTerrainCost(h); };
                 std::vector<Hex> path = PathFinder::findPath(_selectedUnit->getGridPos(), clickHex, costFunc);
 
                 if (!path.empty()) {
-                    // 【修复：从索引0开始计算，因为findPath返回的路径不包含起点】
                     int pathCost = 0;
                     for (size_t i = 0; i < path.size(); i++) {
                         int tileCost = getTerrainCost(path[i]);
-                        if (tileCost < 0) {
-                            // 路径无法通过
-                            pathCost = INT_MAX;
-                            break;
-                        }
+                        if (tileCost < 0) { pathCost = INT_MAX; break; }
                         pathCost += tileCost;
                     }
 
-                    // 【修复：检查移动力是否足够】
                     if (pathCost <= _selectedUnit->getCurrentMoves()) {
-                        // 执行移动，传递计算好的路径成本
                         _selectedUnit->moveTo(clickHex, _layout, pathCost);
-
-                        // 移动成功更新视觉状态
                         updateSelection(clickHex);
                         _selectedUnit->hideMoveRange();
-
-                        // 重置双击状态
                         _lastClickHex = Hex(-999, -999);
-                        CCLOG("Double Tap Move -> Cost: %d, Remaining: %d", 
-                              pathCost, _selectedUnit->getCurrentMoves());
+                        CCLOG("Double Tap Move -> Cost: %d, Remaining: %d",
+                            pathCost, _selectedUnit->getCurrentMoves());
                     }
                     else {
-                        CCLOG("移动力不足！需要：%d，当前：%d", pathCost, _selectedUnit->getCurrentMoves());
+                        CCLOG("移动力不足! 需要%d，剩余%d", pathCost, _selectedUnit->getCurrentMoves());
                     }
                 }
                 else {
-                    CCLOG("无法找到路径到目标");
+                    CCLOG("无法找到到目标的路径");
                 }
             }
         }
-        return; // 双击事件处理完毕，直接返回
+        return; // 双击事件处理完毕
     }
 
     // ============================================================
@@ -1192,4 +1175,34 @@ void GameMapLayer::showInvalidSelectionFeedback(Hex hex) {
         });
 
     feedbackNode->runAction(Sequence::create(fadeOut, remove, nullptr));
+}
+
+void GameMapLayer::handleUnitAttack(AbstractUnit* attacker, Hex targetHex) {
+    if (!attacker || !attacker->isAlive()) return;
+
+    AbstractUnit* target = getUnitAt(targetHex);
+    if (!target || !target->isAlive()) return;
+    if (target->getOwnerId() == attacker->getOwnerId()) return;
+
+    // 范围与行动力检查
+    int distance = attacker->getGridPos().distance(targetHex);
+    if (distance > attacker->getAttackRange()) {
+        CCLOG("Attack failed: target out of range. dist=%d, range=%d", distance, attacker->getAttackRange());
+        return;
+    }
+    if (attacker->getCurrentMoves() <= 0) {
+        CCLOG("Attack failed: no moves left.");
+        return;
+    }
+    if (attacker->getState() != UnitState::IDLE) {
+        CCLOG("Attack failed: attacker not idle.");
+        return;
+    }
+
+    // 执行攻击
+    attacker->attack(target, _layout);
+    attacker->hideMoveRange();
+
+    // 清一次双击记录，避免重复触发
+    _lastClickHex = Hex(-999, -999);
 }

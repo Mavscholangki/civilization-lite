@@ -6,7 +6,9 @@
 // 【修复】包含 AbstractUnit 以便创建单位
 #include "../Units/Base/AbstractUnit.h"
 #include <algorithm>
-
+#include "../Scene/GameScene.h" 
+#include "../Map/GameMapLayer.h" 
+#include <set>                       // 必需：用于防重叠
 USING_NS_CC;
 
 GameManager* GameManager::s_instance = nullptr;
@@ -335,49 +337,252 @@ bool GameManager::hasPendingDecisions(int playerId) const {
 
 // ==================== AI 逻辑 ====================
 
+// ==================== AI 逻辑完整代码 ====================
+
 void GameManager::processAITurn(Player* aiPlayer) {
     if (!aiPlayer || aiPlayer->getIsHuman()) {
         return;
     }
 
-    CCLOG("Processing AI turn for player %d", aiPlayer->getPlayerId());
+    CCLOG("=== AI Player %d Turn Start ===", aiPlayer->getPlayerId());
 
-    // 1. 获取所有城市
-    const std::vector<BaseCity*>& cities = aiPlayer->getCities();
+    // 0. 获取必要的环境对象
+    auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
+    // 如果没有获取到地图层，无法进行可视化操作，直接结束
+    if (!gameScene || !gameScene->getMapLayer()) {
+        endTurnWithDelay();
+        return;
+    }
 
-    for (BaseCity* city : cities) {
-        if (!city) continue;
+    // 获取 HexLayout，用于单位移动和攻击的坐标转换
+    HexLayout* layout = gameScene->getMapLayer()->getLayout();
+    if (!layout) {
+        endTurnWithDelay();
+        return;
+    }
 
-        // 2. 检查城市是否空闲
-        // 使用 getCurrentProduction 判断，如果为 nullptr 则表示闲置
-        if (city->getCurrentProduction() == nullptr) {
-
-            CCLOG("AI: City %s is idle, starting production", city->getCityName().c_str());
-
-            // 3. 创建单位
-            // 直接创建 AbstractUnit，使用字符串构造函数
-            // "Warrior" 必须匹配 AbstractUnit 构造函数中的字符串判断
-            AbstractUnit* newWarrior = new AbstractUnit("Warrior");
-
-            // 4. 加入生产队列
-            // BaseCity 负责管理这个指针的生命周期
-            city->addNewProduction(newWarrior);
+    // 1. 寻找攻击目标（人类玩家）
+    Player* humanPlayer = nullptr;
+    for (auto p : m_players) {
+        if (p->getIsHuman()) {
+            humanPlayer = p;
+            break;
         }
     }
 
-    // 5. 自动结束回合
-    // 使用 Scheduler 延迟1秒执行，模拟 AI 思考时间
+    // 如果找不到人类玩家（比如都死光了），也要继续执行（比如建城），不能直接 return
+    // 但战斗逻辑会依赖 humanPlayer
+
+    // ==================== 2. AI 开局建城逻辑 ====================
+    // 如果没有城市，优先遍历寻找 Settler 建城
+    if (aiPlayer->getCityCount() == 0) {
+        // 获取单位列表副本
+        std::vector<AbstractUnit*> units = aiPlayer->getUnits();
+
+        for (auto unit : units) {
+            // 找到移民单位
+            if (unit && unit->canFoundCity()) {
+                Hex unitPos = unit->getGridPos();
+
+                // 简单的合法性检查（可选）
+                bool canSettle = true;
+                if (aiPlayer->m_checkCityFunc) {
+                    if (aiPlayer->m_checkCityFunc(unitPos)) canSettle = false;
+                }
+
+                if (canSettle) {
+                    CCLOG("AI Player %d founding Capital at (%d, %d)", aiPlayer->getPlayerId(), unitPos.q, unitPos.r);
+
+                    // 创建城市
+                    std::string cityName = "City " + std::to_string(aiPlayer->getPlayerId());
+                    BaseCity* newCity = BaseCity::create(aiPlayer->getPlayerId(), unitPos, cityName);
+
+                    if (newCity) {
+                        // 可视化：设置位置并添加到地图层
+                        Vec2 pixelPos = layout->hexToPixel(unitPos);
+                        newCity->setPosition(pixelPos);
+                        gameScene->getMapLayer()->addChild(newCity, 10); // Z-Order 10
+
+                        // 逻辑注册
+                        this->registerCapital(aiPlayer->getPlayerId(), newCity);
+                        aiPlayer->addCity(newCity);
+
+                        // 移除移民
+                        aiPlayer->removeUnit(unit);
+                        unit->removeFromParent();
+
+                        // 建城后跳出单位循环，防止指针失效
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // ==================== 3. AI 单位战斗与移动逻辑 ====================
+
+    // --- 3.1 预备防重叠集合 ---
+    // occupiedOrReservedHexes 用于记录本回合某个格子是否“有人了”或者“即将有人去”
+    std::set<Hex> occupiedOrReservedHexes;
+
+    // 将所有活着的单位和城市位置加入占用列表
+    for (auto p : m_players) {
+        for (auto u : p->getUnits()) {
+            if (u->isAlive()) occupiedOrReservedHexes.insert(u->getGridPos());
+        }
+        for (auto c : p->getCities()) {
+            occupiedOrReservedHexes.insert(c->gridPos);
+        }
+    }
+
+    // --- 3.2 预备死亡名单 ---
+    // 防止多个 AI 单位对同一个必死的敌人进行“鞭尸”
+    std::set<AbstractUnit*> dyingUnits;
+
+    // --- 3.3 遍历 AI 单位执行行动 ---
+    std::vector<AbstractUnit*> myUnits = aiPlayer->getUnits();
+
+    for (auto unit : myUnits) {
+        // 跳过无效单位、死单位、和移民（移民逻辑上面处理过了，或者让它呆在原地）
+        if (!unit || !unit->isAlive() || unit->canFoundCity()) {
+            if (unit && unit->isAlive()) occupiedOrReservedHexes.insert(unit->getGridPos());
+            continue;
+        }
+
+        Hex currentPos = unit->getGridPos();
+        // 既然轮到我动了，先把我的当前位置从占用表中移除
+        occupiedOrReservedHexes.erase(currentPos);
+
+        // 如果没有人类玩家，AI 就呆在原地
+        if (!humanPlayer) {
+            occupiedOrReservedHexes.insert(currentPos);
+            continue;
+        }
+
+        // A. 寻找最近的且活着的敌人
+        AbstractUnit* targetEnemy = nullptr;
+        int minDistance = 9999;
+
+        for (auto enemyUnit : humanPlayer->getUnits()) {
+            // 忽略已死或即将被打死的敌人
+            if (!enemyUnit->isAlive() || dyingUnits.count(enemyUnit)) continue;
+
+            int dist = currentPos.distance(enemyUnit->getGridPos());
+            if (dist < minDistance) {
+                minDistance = dist;
+                targetEnemy = enemyUnit;
+            }
+        }
+
+        // B. 决策：攻击 还是 移动
+        // 注意：这里假设 AbstractUnit 有 getAttackRange() 接口，默认近战为1
+        int attackRange = unit->getAttackRange();
+        if (attackRange <= 0) attackRange = 1; // 保底
+
+        // 情况 1: 敌人在射程内 -> 发动攻击
+        if (targetEnemy && minDistance <= attackRange) {
+            CCLOG("AI Unit %s ATTACK -> %s", unit->getUnitName().c_str(), targetEnemy->getUnitName().c_str());
+
+            // 执行攻击 (传入 layout 以便播放动画)
+            unit->attack(targetEnemy, layout);
+
+            // 伤害预估：防止鞭尸
+            // 虽然伤害是延迟结算的，但我们假定本次攻击会造成面板伤害
+            int predictedDamage = unit->getCombatPower();
+            if (targetEnemy->getCurrentHp() - predictedDamage <= 0) {
+                dyingUnits.insert(targetEnemy);
+            }
+
+            // 攻击后留在原地
+            occupiedOrReservedHexes.insert(currentPos);
+        }
+        // 情况 2: 敌人在远处 -> 移动接近
+        else if (targetEnemy) {
+            Hex targetPos = targetEnemy->getGridPos();
+            Hex bestMove = currentPos;
+            int bestDist = minDistance;
+
+            // 遍历周围 6 个格子寻找最佳移动点
+            for (int i = 0; i < 6; i++) {
+                Hex neighbor = currentPos.getNeighbor(i);
+
+                // 【核心】检查格子是否被占用或预定
+                if (occupiedOrReservedHexes.count(neighbor)) continue;
+
+                // 可选：检查地形消耗 (如果你的 getTerrainCostFunc 可用)
+                // if (aiPlayer->m_getTerrainCostFunc && aiPlayer->m_getTerrainCostFunc(neighbor) < 0) continue;
+
+                // 贪心算法：找离敌人最近的格子
+                int dist = neighbor.distance(targetPos);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestMove = neighbor;
+                }
+            }
+
+            // 如果找到了合法的移动目标
+            if (bestMove != currentPos) {
+                CCLOG("AI Unit %s MOVE -> (%d, %d)", unit->getUnitName().c_str(), bestMove.q, bestMove.r);
+
+                // 计算消耗 (简单逻辑：1格消耗1点，或者直接取距离)
+                int cost = 1;
+
+                // 执行移动
+                unit->moveTo(bestMove, layout, cost);
+
+                // 【核心】锁定新位置，防止后续单位重叠
+                occupiedOrReservedHexes.insert(bestMove);
+            }
+            else {
+                // 无路可走，留在原地
+                occupiedOrReservedHexes.insert(currentPos);
+            }
+        }
+        // 情况 3: 没有敌人 (虽然前面check了humanPlayer，但可能所有单位都死了)
+        else {
+            occupiedOrReservedHexes.insert(currentPos);
+        }
+    }
+
+    // ==================== 4. AI 城市生产逻辑 ====================
+    // 使用 ProductionProgram 避免 AbstractUnit 堆内存崩溃问题
+
+    const std::vector<BaseCity*>& cities = aiPlayer->getCities();
+    for (BaseCity* city : cities) {
+        if (!city) continue;
+
+        // 如果城市闲置
+        if (city->getCurrentProduction() == nullptr) {
+            CCLOG("AI: City %s starting production of Warrior", city->getCityName().c_str());
+
+            // 创建生产项目 (注意参数匹配你的 ProductionProgram 构造函数)
+            // 参数: Type, Name, Pos, Cost, canPurchase, purchaseCost
+            ProductionProgram* warriorProd = new ProductionProgram(
+                ProductionProgram::ProductionType::UNIT,
+                "Warrior",
+                Hex(), 0, true, 200 // 这里的cost和purchaseCost最好跟配置表一致
+            );
+
+            city->addNewProduction(warriorProd);
+        }
+    }
+
+    // ==================== 5. 结束回合 ====================
+    endTurnWithDelay();
+}
+
+// 辅助函数：延迟结束回合，让动画飞一会儿
+void GameManager::endTurnWithDelay() {
     Director::getInstance()->getScheduler()->schedule(
         [this](float dt) {
-            // 确保游戏还在运行
             if (this->m_gameState == GameState::PLAYING) {
                 this->endTurn();
             }
         },
         this,           // target
-        0,              // interval (0 = 一次)
+        0,              // interval
         0,              // repeat
-        1.0f,           // delay
+        1.5f,           // delay (1.5秒，给移动和攻击动画留时间)
         false,          // paused
         "ai_turn_end"   // key
     );

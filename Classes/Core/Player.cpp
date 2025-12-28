@@ -136,8 +136,11 @@ void Player::cleanupResources() {
     }
     m_cities.clear();
 
+    // 【修复】对于仍在列表中的单位，需要 release
     for (auto unit : m_units) {
-        unit->release();
+        if (unit) {
+            unit->release();
+        }
     }
     m_units.clear();
 }
@@ -379,8 +382,9 @@ void Player::addUnit(AbstractUnit* unit) {
 void Player::removeUnit(AbstractUnit* unit) {
     auto it = std::find(m_units.begin(), m_units.end(), unit);
     if (it != m_units.end()) {
-        (*it)->release();
         m_units.erase(it);
+        // 【注意】不在这里 release()
+        // release() 由调用者负责（如 onDeath 或 cleanupResources）
     }
 }
 
@@ -446,8 +450,8 @@ AbstractUnit* Player::createStartingSettler(cocos2d::Node* parentNode,
 
         m_startingSettler = unit;
 
-        // 添加到玩家单位列表
-        addUnit(unit);
+        // 注意：不要在这里调用 addUnit(unit)
+        // 因为 initUnit() 内部已经调用了 player->addUnit(this)
 
         // 通过回调函数添加到地图
         m_addToMapFunc(unit);
@@ -958,3 +962,4 @@ void Player::debugPrintStatus() const {
         if (card) CCLOG(" - %s", card->name.c_str());
     }
 }
+

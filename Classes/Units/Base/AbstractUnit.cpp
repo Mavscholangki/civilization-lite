@@ -520,24 +520,24 @@ void AbstractUnit::onDeath() {
 
     auto fade = FadeOut::create(0.5f);
     auto scale = ScaleTo::create(0.5f, 0.1f);
-    
-    // 从玩家列表中移除
-    auto removeFromPlayer = CallFunc::create([this]() {
+
+    auto removeCallback = CallFunc::create([this]() {
+        // 从玩家列表移除并释放引用
         if (GameManager::getInstance()) {
             auto player = GameManager::getInstance()->getPlayer(_ownerId);
             if (player) {
                 player->removeUnit(this);
-                CCLOG("Unit %s removed from Player %d", getUnitName().c_str(), _ownerId);
             }
         }
+        // release 对应 addUnit 时的 retain
+        this->release();
     });
 
-    auto remove = RemoveSelf::create();
-
+    // 使用 RemoveSelf(false) 不调用 cleanup，让 removeCallback 先执行
     this->runAction(Sequence::create(
-        Spawn::create(fade, scale, nullptr), 
-        removeFromPlayer,
-        remove,
+        Spawn::create(fade, scale, nullptr),
+        removeCallback,
+        RemoveSelf::create(true),
         nullptr
     ));
 
