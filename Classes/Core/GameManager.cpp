@@ -316,23 +316,42 @@ bool GameManager::hasPendingDecisions(int playerId) const {
     Player* player = getPlayer(playerId);
     if (!player) return false;
 
-    // 检查科技树：如果没有当前研究，则有待决事项
-    bool techIdle = (player->getCurrentResearchTechId() == -1);
+    // --- 1. 科技检查 ---
+    bool techNeedsAttention = false;
+    // 如果当前没有研究任务
+    if (player->getCurrentResearchTechId() == -1) {
+        // 检查科技树是否还有“可研究”的项目
+        auto researchableTechs = player->getTechTree()->getResearchableTechList();
+        if (!researchableTechs.empty()) {
+            techNeedsAttention = true; // 既没在研究，又有得研，这才叫“待决”
+        }
+    }
 
-    // 检查文化树：如果没有当前研究，则有待决事项
-    bool cultureIdle = (player->getCurrentResearchCivicId() == -1);
+    // --- 2. 文化检查 ---
+    bool cultureNeedsAttention = false;
+    // 如果当前没有市政研究任务
+    if (player->getCurrentResearchCivicId() == -1) {
+        // 检查文化树是否还有“可解锁”的项目
+        auto unlockableCultures = player->getCultureTree()->getUnlockableCultureList();
+        if (!unlockableCultures.empty()) {
+            cultureNeedsAttention = true; // 既没在研究，又有得研
+        }
+    }
 
-    bool productionIdle = false;
-    for (auto city : player->getCities())
-    {
-        if (city->currentProduction == nullptr && city->getSuspendedProductions().empty())
-        {
-            productionIdle = true;
+    // --- 3. 城市生产检查 ---
+    bool productionNeedsAttention = false;
+    for (auto city : player->getCities()) {
+        // 如果城市当前没有生产项目，且没有被挂起的生产
+        if (city->getCurrentProduction() == nullptr && city->getSuspendedProductions().empty()) {
+            // 这里可以根据需要增加：如果城市已经造完了所有能造的东西（极后期），
+            // 可以像科技一样加个判断。但在模拟中，通常认为城市必须一直在生产（如转化资源）
+            productionNeedsAttention = true;
             break;
         }
     }
-    // 注意：这里只检查了“未选择研究”，未来可以扩展其他待决事项（如政策卡、单位指令）
-    return (techIdle || cultureIdle || productionIdle);
+
+    // 只有当科技、文化、生产中任意一个“真正需要处理”时，才返回 true
+    return (techNeedsAttention || cultureNeedsAttention || productionNeedsAttention);
 }
 
 // ==================== AI 逻辑 ====================

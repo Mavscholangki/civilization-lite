@@ -90,10 +90,10 @@ bool CultureTreePanel::init() {
     _controlPanel->addChild(_policySlotsLabel);
 
     // 每回合文化标签
-    _culturePerTurnLabel = Label::createWithSystemFont(u8"每回合文化：0", "Arial", 22);
+    /*_culturePerTurnLabel = Label::createWithSystemFont(u8"每回合文化：0", "Arial", 22);
     _culturePerTurnLabel->setPosition(Vec2(visibleSize.width / 4 * 3, 65));
     _culturePerTurnLabel->setColor(Color3B(200, 220, 255));
-    _controlPanel->addChild(_culturePerTurnLabel);
+    _controlPanel->addChild(_culturePerTurnLabel);*/
 
     // 创建关闭按钮
     auto closeButton = Layout::create();
@@ -135,10 +135,10 @@ void CultureTreePanel::setCultureTree(CultureTree* tree) {
 }
 
 void CultureTreePanel::setCulturePerTurn(int culture) {
-    if (_culturePerTurnLabel) {
+    /*if (_culturePerTurnLabel) {
         std::string text = u8"每回合文化：" + std::to_string(culture);
         _culturePerTurnLabel->setString(text);
-    }
+    }*/
 }
 
 void CultureTreePanel::setAsCurrentResearch(int cultureId) {
@@ -586,6 +586,24 @@ void CultureTreePanel::showCultureDetail(int cultureId) {
     }
     else if (progress > 0) {
         statusText = u8"有进度";
+
+        // 添加研究按钮
+        auto researchButton = ui::Button::create();
+        researchButton->setTitleText(u8"设为当前研究");
+        researchButton->setTitleFontSize(18);
+        researchButton->setTitleColor(Color3B::WHITE);
+        researchButton->setContentSize(Size(150, 40));
+        researchButton->setPosition(Vec2(200, 20));
+        researchButton->setTag(cultureId);
+        researchButton->addClickEventListener([this](Ref* sender) {
+            auto button = dynamic_cast<ui::Button*>(sender);
+            if (button) {
+                int cultureId = button->getTag();
+                this->setAsCurrentResearch(cultureId);
+                this->hideCultureDetail();
+            }
+            });
+        _detailPanel->addChild(researchButton);
     }
     else if (_cultureTree->isUnlockable(cultureId)) {
         statusText = u8"可解锁";
