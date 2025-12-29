@@ -306,7 +306,7 @@ bool CultureTree::isGovernmentUnlocked(GovernmentType government) const {
 	return false;
 }
 
-// 新增：获取所有已解锁的政策ID
+// 获取所有已解锁的政策ID
 std::vector<int> CultureTree::getUnlockedPolicyIds() const {
 	std::vector<int> allPolicyIds;
 	for (int cultureId : activatedCultureList) {
@@ -326,7 +326,7 @@ std::vector<int> CultureTree::getUnlockedPolicyIds() const {
 	return allPolicyIds;
 }
 
-// 新增：根据文化ID获取解锁的政策
+// 根据文化ID获取解锁的政策
 std::vector<int> CultureTree::getPoliciesUnlockedByCulture(int cultureId) const {
 	auto it = cultureList.find(cultureId);
 	if (it != cultureList.end() && it->second.activated) {

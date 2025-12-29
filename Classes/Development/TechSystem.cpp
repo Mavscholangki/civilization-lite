@@ -94,10 +94,9 @@ void TechTree::initializeTechTree() {
 	techList[21].dstTechList = { 22 };
 	techList[23].dstTechList = { 24 };
 
-	// 添加一些跨时代的直接连接，让科技树更丰富
-	techList[10].dstTechList.push_back(16); // 数学 -> 制图学
-	techList[14].dstTechList.push_back(21); // 火药 -> 火箭学
-	techList[17].dstTechList.push_back(21); // 工业化 -> 火箭学
+	techList[10].dstTechList.push_back(16);
+	techList[14].dstTechList.push_back(21);
+	techList[17].dstTechList.push_back(21);
 }
 
 // 设置当前研究的科技

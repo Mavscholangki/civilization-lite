@@ -45,18 +45,11 @@ bool CivChina::isUniqueUnitUnlocked(const std::string& unitName) const {
         return false;
     }
 
-    // 虎蹲炮需要机械科技（ID:11）解锁
-    // 注意：这里需要访问科技树，但文明类通常不直接持有科技树
-    // 这个检查应该在Player类中完成，使用Player的科技树
-    // 这里暂时返回true，实际应在Player中判断
     return true;
 }
 
 cocos2d::Ref* CivChina::createUniqueUnit(const std::string& unitName, void* position) {
     if (unitName == "虎蹲炮") {
-        // 这里应该创建虎蹲炮单位
-        // TigerCannonUnit::create(position);
-        // 暂时返回nullptr，待单位系统完善
         return nullptr;
     }
     return nullptr;

@@ -27,10 +27,8 @@ CivilizationTrait CivGermany::getTraits() const {
 }
 
 float CivGermany::calculateDistrictCost(const std::string& districtType) const {
-    // 检查是否为工业区（需要根据实际项目中的区域类型标识调整）
-    if (districtType == "INDUSTRY_ZONE" ||
-        districtType == "IndustrialZone" ||
-        districtType == "工业区") {
+    // 检查是否为工业区
+    if (districtType == "IndustryZone") {
         return 0.5f; // 半价
     }
 
@@ -40,7 +38,6 @@ float CivGermany::calculateDistrictCost(const std::string& districtType) const {
 
 int CivGermany::calculateMaxDistricts(int population) const {
     // 德国特殊能力：区域上限+1
-    // 默认公式：人口除以3（向下取整）再加1，德国额外+1
     int baseDistricts = BaseCiv::calculateMaxDistricts(population);
     return baseDistricts + 1; // 德国额外+1
 }

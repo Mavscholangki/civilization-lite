@@ -35,7 +35,6 @@ public:
     virtual Yield calculateDistrictBonus(const District* district) const override;
 
 private:
-    // 俄罗斯没有特殊单位
 };
 
 #endif // __CIV_RUSSIA_H__
