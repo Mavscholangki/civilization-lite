@@ -524,40 +524,61 @@ void GameScene::setupCallbacks() {
     // 下一回合按钮回调 - 直接调用GameManager
     _hudLayer->setNextTurnCallback([this]() {
         Player* currentPlayer = m_gameManager->getCurrentPlayer();
-        if (!currentPlayer || !currentPlayer->getIsHuman()) {
-            //return; // 不是人类玩家回合，理论上按钮应不可点，此处做安全保护
-        }
-        // --- 新增：快捷研究逻辑 ---
-        if (currentPlayer->getIsHuman() && m_gameManager->hasPendingDecisions(currentPlayer->getPlayerId()))
+        bool foundSpecificDecision = false;
+        if (!currentPlayer || !currentPlayer->getIsHuman())
         {
-            // 有待决事项，优先处理
-            if (currentPlayer->getCurrentResearchTechId() == -1) {
-                CCLOG("Tech tree idle. Opening tech panel...");
-                _hudLayer->openTechTree(); // 打开科技树面板
-                return; // 不进入下一回合
-            }
-            else if (currentPlayer->getCurrentResearchCivicId() == -1) {
-                CCLOG("Culture tree idle. Opening culture panel...");
-                _hudLayer->openCultureTree(); // 打开文化树面板
-                return; // 不进入下一回合
-            }
-            else
+            //return;
+        }
+        else
+        {
+            // 标志位：是否真的找到了需要玩家操作的具体项目
+            foundSpecificDecision = false;
+
+            // 只有当管理器认为有待决事项时才进入细节检查
+            if (m_gameManager->hasPendingDecisions(currentPlayer->getPlayerId()))
             {
-                for (auto city : currentPlayer->getCities())
-                {
-                    if (city->currentProduction == nullptr && city->suspendedProductions.empty())
-                    {
-                        _productionPanelLayer->setVisible(true);
-                        updateProductionPanel(currentPlayer->getPlayerId(), city);
-                        _mapLayer->updateSelection(city->gridPos);
-                        return;
+                // 1. 检查科技：没在研究 且 还有东西可以研究
+                if (currentPlayer->getCurrentResearchTechId() == -1) {
+                    auto list = currentPlayer->getTechTree()->getResearchableTechList();
+                    if (!list.empty()) {
+                        CCLOG("Decision: Tech Panel Required");
+                        _hudLayer->openTechTree();
+                        foundSpecificDecision = true;
                     }
                 }
-                _productionPanelLayer->setVisible(false);
+
+                // 2. 检查文化：没在研究 且 还有东西可以研究 (如果还没弹出科技面板)
+                if (!foundSpecificDecision && currentPlayer->getCurrentResearchCivicId() == -1) {
+                    auto list = currentPlayer->getCultureTree()->getUnlockableCultureList();
+                    if (!list.empty()) {
+                        CCLOG("Decision: Culture Panel Required");
+                        _hudLayer->openCultureTree();
+                        foundSpecificDecision = true;
+                    }
+                }
+
+                // 3. 检查城市生产 (如果还没弹出前两个)
+                if (!foundSpecificDecision) {
+                    for (auto city : currentPlayer->getCities()) {
+                        if (city->currentProduction == nullptr && city->getSuspendedProductions().empty()) {
+                            CCLOG("Decision: City Production Required for %s", city->getCityName().c_str());
+                            _productionPanelLayer->setVisible(true);
+                            updateProductionPanel(currentPlayer->getPlayerId(), city);
+                            _mapLayer->updateSelection(city->gridPos);
+                            foundSpecificDecision = true;
+                            break;
+                        }
+                    }
+                }
             }
         }
-        // 没有待决事项，正常结束回合
-        m_gameManager->endTurn();
+
+        // --- 核心逻辑：如果没有找到任何具体的阻塞项，或者管理器认为没有事项，则进入下一回合 ---
+        if (!foundSpecificDecision) {
+            CCLOG("No pending decisions found or all lists empty. Advancing turn...");
+            _productionPanelLayer->setVisible(false);
+            m_gameManager->endTurn();
+        }
         });
 
     _mapLayer->setOnInvalidSeletedCallback([this]() {

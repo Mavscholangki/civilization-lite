@@ -99,10 +99,10 @@ bool TechTreePanel::init() {
     _controlPanel->addChild(_researchProgressBar);
 
     // 每回合科研标签 - 增大字体
-    _sciencePerTurnLabel = Label::createWithSystemFont(u8"每回合科研：0", "Arial", 22);
+    /*_sciencePerTurnLabel = Label::createWithSystemFont(u8"每回合科研：0", "Arial", 22);
     _sciencePerTurnLabel->setPosition(Vec2(visibleSize.width / 2, 25));
     _sciencePerTurnLabel->setColor(Color3B(150, 220, 255));
-    _controlPanel->addChild(_sciencePerTurnLabel);
+    _controlPanel->addChild(_sciencePerTurnLabel);*/
 
     // 创建关闭按钮 - 使用Layout作为按钮，增大按钮
     auto closeButton = Layout::create();
@@ -150,10 +150,10 @@ void TechTreePanel::setTechTree(TechTree* tree) {
 }
 
 void TechTreePanel::setSciencePerTurn(int science) {
-    if (_sciencePerTurnLabel) {
+    /*if (_sciencePerTurnLabel) {
         std::string text = "每回合科研：" + std::to_string(science);
         _sciencePerTurnLabel->setString(text);
-    }
+    }*/
 }
 
 Node* TechTreePanel::createTechNodeUI(const TechNode* techData) {
@@ -1101,6 +1101,25 @@ void TechTreePanel::showTechDetail(int techId) {
     }
     else if (_techTree->getTechProgress(techId) > 0) {
         statusText = u8"已有进度 (" + std::to_string(percent) + "%)";
+
+        // 添加研究按钮
+        auto researchButton = ui::Button::create();
+        researchButton->setTitleText(u8"设为当前研究");
+        researchButton->setTitleFontSize(18);
+        researchButton->setTitleColor(Color3B::WHITE);
+        researchButton->setContentSize(Size(150, 40));
+        researchButton->setPosition(Vec2(200, 40));
+        researchButton->setTag(techId);
+        researchButton->addClickEventListener([this](Ref* sender) {
+            auto button = dynamic_cast<ui::Button*>(sender);
+            if (button) {
+                int techId = button->getTag();
+                CCLOG("Set research button clicked for tech: %d", techId);
+                this->setAsCurrentResearch(techId);
+                this->hideTechDetail();
+            }
+            });
+        _detailPanel->addChild(researchButton);
     }
     else if (_techTree->isResearchable(techId)) {
         statusText = u8"可研究";
