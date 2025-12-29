@@ -152,6 +152,10 @@ void Player::onTurnBegin() {
 
     // 更新单位状态
     for (auto unit : m_units) {
+        if (unit == nullptr)
+        {
+            continue;
+        }
         unit->onTurnStart();
     }
 

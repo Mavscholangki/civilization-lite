@@ -339,3 +339,36 @@ void HUDLayer::closePolicyPanel() {
 }
 
 void HUDLayer::setPolicyManager(PolicyManager* policyManager) { _policyManager = policyManager; }
+
+void HUDLayer::setNextTurnButtonEnabled(bool enabled) {
+    if (!_btnNextTurn) return;
+
+    _btnNextTurn->setCascadeColorEnabled(true);
+    _btnNextTurn->setCascadeOpacityEnabled(true);
+
+    _btnNextTurn->setEnabled(enabled);
+    _btnNextTurn->setBright(enabled); // 显式设置明亮状态
+
+    if (enabled) {
+        // 恢复：恢复原色 (白色代表不染色)
+        _btnNextTurn->setColor(Color3B::WHITE);
+        _btnNextTurn->setOpacity(255);
+
+        // 恢复时的显眼动画
+        _btnNextTurn->stopAllActions();
+        auto scaleUp = ScaleTo::create(0.1f, 1.15f);
+        auto scaleBack = ScaleTo::create(0.1f, 1.0f);
+        _btnNextTurn->runAction(Sequence::create(scaleUp, scaleBack, nullptr));
+    }
+    else {
+        // 禁用
+        _btnNextTurn->setColor(Color3B(120, 40, 40));
+        _btnNextTurn->setOpacity(150);
+        _btnNextTurn->setScale(0.95f);
+    }
+
+    auto label = _btnNextTurn->getChildByName<Label*>("next_turn_label");
+    if (label) {
+        label->setString(enabled ? "NEXT TURN" : "AI BUSY");
+    }
+}

@@ -50,6 +50,7 @@ bool GameScene::initGameData() {
         CCLOG("Failed to initialize GameManager");
         return false;
     }
+    m_gameManager->setGameState(GameState::PLAYING);
 
     // 2. 创建人类玩家
     CivilizationType playerCiv = CivilizationType::CHINA;
@@ -162,12 +163,33 @@ bool GameScene::initGraphics() {
     // 6. 设置游戏管理器回调
     if (m_gameManager) {
         m_gameManager->setOnTurnStartCallback([this](int playerId) {
-            Player* currentPlayer = m_gameManager->getCurrentPlayer();
-            if (currentPlayer && currentPlayer->getIsHuman()) {
-                CCLOG("Human player turn started");
-                _hudLayer->setTechTree(currentPlayer->getTechTree());
-                _hudLayer->setCultureTree(currentPlayer->getCultureTree());
-                _hudLayer->setPolicyManager(currentPlayer->getPolicyManager());
+            Player* currentPlayer = m_gameManager->getPlayer(playerId);
+            if (!currentPlayer) return;
+
+            bool isHuman = currentPlayer->getIsHuman();
+
+            // 【核心修复 A】：无论什么时候开始新回合，UI 必须同步按钮状态
+            if (_hudLayer) {
+                _hudLayer->setNextTurnButtonEnabled(isHuman);
+
+                if (isHuman) {
+                    // 轮到人类：同步所有系统引用
+                    _hudLayer->setTechTree(currentPlayer->getTechTree());
+                    _hudLayer->setCultureTree(currentPlayer->getCultureTree());
+                    _hudLayer->setPolicyManager(currentPlayer->getPolicyManager());
+
+                    // 刷新资源 UI 顶部栏
+                    _hudLayer->updateResources(
+                        currentPlayer->getGold(),
+                        currentPlayer->getSciencePerTurn(),
+                        currentPlayer->getCulturePerTurn(),
+                        m_gameManager->getGameStats().currentTurn
+                    );
+                    CCLOG("Turn Start: Human Player's turn. Button Enabled.");
+                }
+                else {
+                    CCLOG("Turn Start: AI Player %d's turn. Button Disabled.", playerId);
+                }
             }
             });
     }
@@ -509,75 +531,90 @@ void GameScene::setupCallbacks() {
         _mapLayer->onBuildCityAction();
 
         // 2. 立即通知 HUD 隐藏单位信息（包含 Found City 按钮）
-        // 这解决了你提到的“可以无限点击”的问题
         _hudLayer->hideUnitInfo();
 
         // 3. 激活并显示生产面板（文明6风格：建城后右侧面板呼出按钮应该可见）
         if (_productionPanelLayer) {
             _productionPanelLayer->setVisible(true);
-            // 如果你的 CityProductionPanel 有拉出的动画接口，可以在这里调用
-            // _productionPanelLayer->slideIn(); 
             CCLOG("GameScene: City Production Panel is now visible");
         }
         });
 
-    // 下一回合按钮回调 - 直接调用GameManager
+    // 下一回合按钮回调
     _hudLayer->setNextTurnCallback([this]() {
+        // 1. 获取当前玩家
         Player* currentPlayer = m_gameManager->getCurrentPlayer();
-        bool foundSpecificDecision = false;
-        if (!currentPlayer || !currentPlayer->getIsHuman())
-        {
-            //return;
+        if (!currentPlayer) return;
+
+        // 如果是 AI 的回合
+        if (!currentPlayer->getIsHuman()) {
+            CCLOG("HUD: Ignoring click - AI Player %d is thinking.", currentPlayer->getPlayerId());
+            return;
         }
-        else
-        {
-            // 标志位：是否真的找到了需要玩家操作的具体项目
-            foundSpecificDecision = false;
 
-            // 只有当管理器认为有待决事项时才进入细节检查
-            if (m_gameManager->hasPendingDecisions(currentPlayer->getPlayerId()))
-            {
-                // 1. 检查科技：没在研究 且 还有东西可以研究
-                if (currentPlayer->getCurrentResearchTechId() == -1) {
-                    auto list = currentPlayer->getTechTree()->getResearchableTechList();
-                    if (!list.empty()) {
-                        CCLOG("Decision: Tech Panel Required");
-                        _hudLayer->openTechTree();
-                        foundSpecificDecision = true;
-                    }
+        // 2. 决策检查逻辑
+        bool foundSpecificDecision = false;
+        int pid = currentPlayer->getPlayerId();
+
+        // 检查是否有挂起的待办事项
+        if (m_gameManager->hasPendingDecisions(pid)) {
+
+            //优先检查科技
+            if (currentPlayer->getCurrentResearchTechId() == -1) {
+                auto techTree = currentPlayer->getTechTree();
+                if (techTree && !techTree->getResearchableTechList().empty()) {
+                    CCLOG("Decision blocked: Opening Tech Tree.");
+                    _hudLayer->openTechTree();
+                    foundSpecificDecision = true;
                 }
+            }
 
-                // 2. 检查文化：没在研究 且 还有东西可以研究 (如果还没弹出科技面板)
-                if (!foundSpecificDecision && currentPlayer->getCurrentResearchCivicId() == -1) {
-                    auto list = currentPlayer->getCultureTree()->getUnlockableCultureList();
-                    if (!list.empty()) {
-                        CCLOG("Decision: Culture Panel Required");
-                        _hudLayer->openCultureTree();
-                        foundSpecificDecision = true;
-                    }
+            // 检查文化
+            if (!foundSpecificDecision && currentPlayer->getCurrentResearchCivicId() == -1) {
+                auto cultureTree = currentPlayer->getCultureTree();
+                if (cultureTree && !cultureTree->getUnlockableCultureList().empty()) {
+                    CCLOG("Decision blocked: Opening Culture Tree.");
+                    _hudLayer->openCultureTree();
+                    foundSpecificDecision = true;
                 }
+            }
 
-                // 3. 检查城市生产 (如果还没弹出前两个)
-                if (!foundSpecificDecision) {
-                    for (auto city : currentPlayer->getCities()) {
-                        if (city->currentProduction == nullptr && city->getSuspendedProductions().empty()) {
-                            CCLOG("Decision: City Production Required for %s", city->getCityName().c_str());
-                            _productionPanelLayer->setVisible(true);
-                            updateProductionPanel(currentPlayer->getPlayerId(), city);
-                            _mapLayer->updateSelection(city->gridPos);
-                            foundSpecificDecision = true;
-                            break;
-                        }
+            // 检查城市生产
+            if (!foundSpecificDecision) {
+                for (auto city : currentPlayer->getCities()) {
+                    if (city->getCurrentProduction() == nullptr) {
+                        CCLOG("Decision blocked: City %s needs production.", city->getCityName().c_str());
+
+                        // 自动选择该城市并打开生产面板
+                        _productionPanelLayer->setVisible(true);
+                        this->updateProductionPanel(pid, city);
+                        _mapLayer->updateSelection(city->gridPos);
+
+                        foundSpecificDecision = true;
+                        break;
                     }
                 }
             }
         }
 
-        // --- 核心逻辑：如果没有找到任何具体的阻塞项，或者管理器认为没有事项，则进入下一回合 ---
+        // 3. 执行回合切换
         if (!foundSpecificDecision) {
-            CCLOG("No pending decisions found or all lists empty. Advancing turn...");
+            CCLOG("Decision Check Passed. Player %d ending turn.", pid);
+
+            // A. 立即关闭所有可能干扰的 UI 面板
             _productionPanelLayer->setVisible(false);
+
+            // B. 禁用按钮防止重复点击，文字变为 AI BUSY
+            _hudLayer->setNextTurnButtonEnabled(false);
+
+            // C. 通知逻辑层结束回合
+            // 这将触发所有 AI 的顺序执行，直到轮到下一个人类玩家
             m_gameManager->endTurn();
+        }
+        else {
+            // 如果是因为有事没做被拦截，确保按钮依然是亮的
+            _hudLayer->setNextTurnButtonEnabled(true);
+            CCLOG("Human decision required before ending turn.");
         }
         });
 
