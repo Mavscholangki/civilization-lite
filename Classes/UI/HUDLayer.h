@@ -18,6 +18,8 @@ public:
     // 更新顶部资源
     void updateResources(int gold, int science, int culture, int turn);
 
+    void setNextTurnButtonEnabled(bool enabled);
+
     // 显示单位详情面板
     void showUnitInfo(AbstractUnit* unit);
     // 隐藏单位详情面板

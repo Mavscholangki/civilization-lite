@@ -100,7 +100,6 @@ void GameMapLayer::initGameManagerAndPlayers() {
         if (player) gameManager->addPlayer(player);
 
         // 【新增】：自动创建几个 AI 玩家 (例如 3 个 AI) 用于测试
-        // 如果你的 GameManager 外部已经创建了 AI，这部分可以去掉
         for (int i = 1; i <= 3; i++) {
             auto aiPlayer = Player::create(i, CivilizationType::BASIC);
             gameManager->addPlayer(aiPlayer);
@@ -263,9 +262,6 @@ void GameMapLayer::initGameManagerAndPlayers() {
         return finalHex;
         };
 
-    // ===========================================================================
-    // 下面的代码保持原样
-    // ===========================================================================
     auto addUnitToMap = [this](AbstractUnit* unit) {
         if (unit) {
             this->addChild(unit, 10);
@@ -788,7 +784,6 @@ void GameMapLayer::setOnUnitSelectedCallback(const std::function<void(AbstractUn
 void GameMapLayer::onBuildCityAction() {
     if (!_selectedUnit) return;
 
-    // 【核心修复】：检查单位是否属于人类玩家
     if (_selectedUnit->getOwnerId() != 0) {
         CCLOG("只有玩家 0 的单位可以建城！当前单位属于玩家 %d", _selectedUnit->getOwnerId());
         return;
@@ -798,7 +793,6 @@ void GameMapLayer::onBuildCityAction() {
 
     auto city = BaseCity::create(0, pos, "Rome");
 
-    // 关键修复2：获取像素位置时确保使用正确的转换
     Vec2 pixelPos = _layout->hexToPixel(pos);
     city->setPosition(pixelPos);
     this->addChild(city, 5);
@@ -820,17 +814,26 @@ void GameMapLayer::onBuildCityAction() {
         }
     }
 
+    if (gameManager) {
+        Player* currentPlayer = gameManager->getCurrentPlayer();
+        if (currentPlayer) {
+            // 从玩家逻辑列表中移除该开拓者
+            currentPlayer->removeUnit(_selectedUnit);
+
+            city->ownerPlayer = currentPlayer->getPlayerId();
+            currentPlayer->addCity(city);
+        }
+    }
+
+    // 从地图渲染列表移除
     auto it = std::find(_allUnits.begin(), _allUnits.end(), _selectedUnit);
     if (it != _allUnits.end()) {
         _allUnits.erase(it);
     }
 
-    // 然后再进行删除和重置
+    // 彻底销毁 UI 和内存
     _selectedUnit->removeFromParent();
     _selectedUnit = nullptr;
-
-    if (_onUnitSelected) _onUnitSelected(nullptr);
-    _selectionNode->clear();
 
     CCLOG("城市建立成功！");
 }
@@ -933,8 +936,6 @@ bool GameMapLayer::isValidStartingPosition(Hex centerHex) {
 
 // =========================地块选择模式======================== //
 
-// 实现 enableTileSelection 函数
-// 修改 enableTileSelection 函数，添加取消回调参数
 void GameMapLayer::enableTileSelection(const std::vector<Hex>& allowedTiles,
     const std::function<void(Hex)>& callback,
     const std::function<void()>& cancelCallback) {

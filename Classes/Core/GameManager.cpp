@@ -153,49 +153,32 @@ Player* GameManager::getNextPlayer() const {
 
 void GameManager::endTurn() {
     Player* currentPlayer = getCurrentPlayer();
-    if (!currentPlayer) {
-        CCLOG("No current player to end turn");
-        return;
-    }
+    if (!currentPlayer) return;
 
     CCLOG("=== Ending turn for Player %d ===", currentPlayer->getPlayerId());
 
-    // 1. 当前玩家回合结束
+    // 1. 当前玩家回合结束结算
     currentPlayer->onTurnEnd();
     notifyTurnEnd(currentPlayer->getPlayerId());
 
-    // 2. 检查当前玩家是否被击败（没有城市）
-    if (currentPlayer->getState() == Player::PlayerState::DEFEATED) {
-        CCLOG("Player %d is defeated, removing from turn order",
-            currentPlayer->getPlayerId());
-        // 处理玩家失败逻辑...
-    }
-
-    // 3. 切换到下一个玩家
+    // 2. 切换到下一个玩家
     advanceToNextPlayer();
 
-    // 4. 如果一轮结束，增加回合数
+    // 3. 如果一轮结束，增加回合数
     if (m_currentPlayerIndex == 0) {
         beginNewTurn();
     }
 
-    // 5. 新玩家回合开始
+    // 4. 新玩家回合开始初始化
     Player* nextPlayer = getCurrentPlayer();
     if (nextPlayer) {
         CCLOG("=== Beginning turn for Player %d ===", nextPlayer->getPlayerId());
 
-        // 5.1 玩家回合开始（这里会计算和更新资源）
+        // 计算资源产出
         nextPlayer->onTurnBegin();
-
-        // 5.2 通知UI玩家切换
         notifyTurnStart(nextPlayer->getPlayerId());
 
-        // 5.3 发送玩家切换事件（UI会监听这个事件来更新显示）
-        ValueMap switchData;
-        switchData["player_id"] = nextPlayer->getPlayerId();
-        switchData["turn"] = m_gameStats.currentTurn;
-
-        // 【新增】发送资源更新事件
+        // 发送 UI 更新事件 (保持你原有的逻辑)
         ValueMap resourceData;
         resourceData["player_id"] = nextPlayer->getPlayerId();
         resourceData["gold"] = nextPlayer->getGold();
@@ -206,19 +189,23 @@ void GameManager::endTurn() {
             "player_turn_resource_update", &resourceData
         );
 
-        // ==================== 【AI 逻辑触发点】 ====================
+        // ==================== 【关键：AI 触发决策】 ====================
         if (!nextPlayer->getIsHuman()) {
+            // 只调用 AI 处理函数，不要在这里再次 schedule 延时
+            // 延时应该在 AI 逻辑执行完后再触发，以确保动画播完
             this->processAITurn(nextPlayer);
         }
-        // ========================================================
+        else {
+            // 人类玩家：逻辑在此中断，等待 UI 按钮触发下一次 endTurn()
+            CCLOG("Waiting for Human Player...");
+        }
     }
 
     // 6. 检查胜利条件
     VictoryType victoryType = checkVictoryConditions();
     if (victoryType != VictoryType::NONE) {
         int winnerId = -1;
-        for (Player* checked : m_players)
-        {
+        for (Player* checked : m_players) {
             if (checked->m_vicprogress.hasDominationVictory || checked->m_vicprogress.hasLaunchedSatellite)
                 winnerId = checked->getPlayerId();
         }
@@ -592,19 +579,15 @@ void GameManager::processAITurn(Player* aiPlayer) {
 
 // 辅助函数：延迟结束回合，让动画飞一会儿
 void GameManager::endTurnWithDelay() {
-    Director::getInstance()->getScheduler()->schedule(
-        [this](float dt) {
-            if (this->m_gameState == GameState::PLAYING) {
-                this->endTurn();
-            }
-        },
-        this,           // target
-        0,              // interval
-        0,              // repeat
-        1.5f,           // delay (1.5秒，给移动和攻击动画留时间)
-        false,          // paused
-        "ai_turn_end"   // key
-    );
+    // 使用 scheduleOnce 更加安全，防止重复触发
+    std::string key = "ai_turn_end_" + std::to_string(m_currentPlayerIndex);
+
+    Director::getInstance()->getScheduler()->schedule([this](float dt) {
+        // 只有在游戏进行中才推进
+        if (this->m_gameState == GameState::PLAYING) {
+            this->endTurn();
+        }
+        }, this, 0, 0, 1.2f, false, key);
 }
 
 // ==================== 胜利条件检查 ====================
@@ -646,53 +629,35 @@ bool GameManager::checkScienceVictory() const {
 }
 
 bool GameManager::checkDominationVictory() const {
-    if (m_gameState != GameState::PLAYING || !m_gameConfig.enableDominationVictory) {
-        return false;
-    }
+    // 保护期：前5回合不判定统治胜利，给所有玩家拍城的时间
+    if (m_gameStats.currentTurn < 5) return false;
 
-    // 找出所有活跃玩家的首都信息
-    std::map<int, int> controllerCount; // 控制者ID -> 控制的首都数量
+    int activePlayersCount = 0;
+    Player* lastStandPlayer = nullptr;
 
-    for (const auto& pair : m_capitalInfo) {
-        const CapitalInfo& info = pair.second;
+    for (auto player : m_players) {
+        // 判定准则：拥有城市 OR 拥有开拓者
+        bool hasCity = !player->getCities().empty();
+        bool hasSettler = false;
 
-        // 只考虑活跃玩家的首都
-        Player* owner = getPlayer(info.ownerPlayerId);
-        if (!owner || owner->getState() != Player::PlayerState::ACTIVE) {
-            continue;
-        }
-
-        int controllerId = info.currentControllerId;
-        controllerCount[controllerId]++;
-    }
-
-    // 检查是否有玩家控制了所有首都
-    int totalActiveCapitals = 0;
-    for (const auto& pair : m_capitalInfo) {
-        const CapitalInfo& info = pair.second;
-        Player* owner = getPlayer(info.ownerPlayerId);
-        if (owner && owner->getState() == Player::PlayerState::ACTIVE) {
-            totalActiveCapitals++;
-        }
-    }
-
-    for (const auto& pair : controllerCount) {
-        int controllerId = pair.first;
-        int controlledCapitals = pair.second;
-
-        if (controlledCapitals == totalActiveCapitals && totalActiveCapitals > 0) {
-            // 该玩家控制了所有活跃玩家的首都！
-            Player* winner = getPlayer(controllerId);
-            if (winner) {
-                CCLOG("Player %d controls all %d active capitals! Domination victory!",
-                    controllerId, totalActiveCapitals);
-
-                // 标记胜利玩家
-                winner->m_vicprogress.hasDominationVictory = true;
-
-                return true;
+        // 遍历单位检查是否有开拓者
+        for (auto unit : player->getUnits()) {
+            if (unit->getUnitName() == "Settler") {
+                hasSettler = true;
+                break;
             }
         }
+
+        if (hasCity || hasSettler) {
+            activePlayersCount++;
+            lastStandPlayer = player;
+        }
+    }
+
+    // 如果存活玩家只剩一个，且总玩家数大于1，则判定胜利
+    if (activePlayersCount == 1 && m_players.size() > 1) {
+        CCLOG("Domination Victory: Player %d is the sole survivor!", lastStandPlayer->getPlayerId());
+        return true;
     }
 
     return false;
