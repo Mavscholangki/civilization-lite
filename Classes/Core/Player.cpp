@@ -2,17 +2,18 @@
 #include "../City/BaseCity.h"
 #include "../Units/Base/AbstractUnit.h"
 #include "GameConfig.h"
-#include <Civilizations/CivChina.h>
-#include <Civilizations/CivGermany.h>
-#include <Civilizations/CivRussia.h>
+#include "Civilizations/CivChina.h"
+#include "Civilizations/CivGermany.h"
+#include "Civilizations/CivRussia.h"
 #include "Scene/GameScene.h"
 #include "../Units/Civilian/Settler.h"
 
 USING_NS_CC;
 
-// ==================== 构造函数 ====================
-// 关键修改：PolicyManager 需要 CultureTree 指针作为参数
-// 由于头文件中 CultureTree 在 PolicyManager 之前声明，这里可以直接传地址
+/**
+ * 构造函数 - 初始化玩家对象
+ * PolicyManager需要CultureTree指针作为参数
+ */
 Player::Player()
     : m_policyManager(&m_cultureTree)
     , m_civilization(nullptr)
@@ -20,8 +21,9 @@ Player::Player()
 {
 }
 
-// ==================== 创建和初始化 ====================
-
+/**
+ * 创建玩家静态方法
+ */
 Player* Player::create(int playerId, CivilizationType civType) {
     Player* player = new Player();
     if (player && player->init(playerId, civType)) {
@@ -32,6 +34,9 @@ Player* Player::create(int playerId, CivilizationType civType) {
     return nullptr;
 }
 
+/**
+ * 初始化玩家
+ */
 bool Player::init(int playerId, CivilizationType civType) {
     m_playerId = playerId;
     m_playerName = "Player " + std::to_string(playerId);
@@ -68,16 +73,14 @@ bool Player::init(int playerId, CivilizationType civType) {
     m_techTree.addEventListener(this);
     m_cultureTree.addEventListener(this);
 
-    // 政策管理器已在构造函数中初始化，并在构造函数中自动注册了监听器（在新版PolicySystem中）
-    // 这里只需确保游戏数据初始化（通常构造函数里已经调了，这里保险起见不用再调）
-
-    // 初始化回合统计
+    // 政策管理器已在构造函数中初始化
     m_turnStats = TurnStats();
 
     CCLOG("Player %d (%s) initialized with civilization %s",
         m_playerId, m_playerName.c_str(),
         m_civilization ? typeid(*m_civilization).name() : "Unknown");
 
+    // 初始化回调函数
     m_getStartHexFunc = nullptr;
     m_addToMapFunc = nullptr;
     m_checkCityFunc = nullptr;
@@ -86,6 +89,9 @@ bool Player::init(int playerId, CivilizationType civType) {
     return true;
 }
 
+/**
+ * 析构函数
+ */
 Player::~Player() {
     CCLOG("Player %d destructor called", m_playerId);
 
@@ -93,27 +99,28 @@ Player::~Player() {
     m_techTree.removeEventListener(this);
     m_cultureTree.removeEventListener(this);
 
-    // PolicyManager 会在自己的析构函数中移除监听器，无需手动处理
-
     // 清理资源
     cleanupResources();
 }
 
+/**
+ * 创建文明对象
+ */
 void Player::createCivilization(CivilizationType civType) {
     switch (civType) {
-    case CivilizationType::CHINA:
-        m_civilization = CivChina::create();
-        break;
-    case CivilizationType::GERMANY:
-        m_civilization = CivGermany::create();
-        break;
-    case CivilizationType::RUSSIA:
-        m_civilization = CivRussia::create();
-        break;
-    default:  // 处理意外情况
-        CCLOG("Warning: Unknown civilization type %d, using default", (int)civType);
-        m_civilization = BaseCiv::create();
-        break;
+        case CivilizationType::CHINA:
+            m_civilization = CivChina::create();
+            break;
+        case CivilizationType::GERMANY:
+            m_civilization = CivGermany::create();
+            break;
+        case CivilizationType::RUSSIA:
+            m_civilization = CivRussia::create();
+            break;
+        default:
+            CCLOG("Warning: Unknown civilization type %d, using default", (int)civType);
+            m_civilization = BaseCiv::create();
+            break;
     }
 
     if (m_civilization) {
@@ -125,18 +132,22 @@ void Player::createCivilization(CivilizationType civType) {
     }
 }
 
+/**
+ * 清理资源
+ */
 void Player::cleanupResources() {
     if (m_civilization) {
         m_civilization->release();
         m_civilization = nullptr;
     }
 
+    // 清理城市
     for (auto city : m_cities) {
         city->release();
     }
     m_cities.clear();
 
-    // 【修复】对于仍在列表中的单位，需要 release
+    // 清理单位
     for (auto unit : m_units) {
         if (unit) {
             unit->release();
@@ -145,8 +156,9 @@ void Player::cleanupResources() {
     m_units.clear();
 }
 
-// ==================== 回合管理 ====================
-
+/**
+ * 回合开始处理
+ */
 void Player::onTurnBegin() {
     m_turnStats = TurnStats();
 
@@ -185,7 +197,7 @@ void Player::onTurnBegin() {
         totalYield.goldYield = static_cast<int>(totalYield.goldYield * m_civilization->getGoldBonus());
     }
 
-    // 3. 应用政策卡加成 (新API：getYieldModifier返回百分比数值，例如10.0f)
+    // 3. 应用政策卡加成
     float prodMod = m_policyManager.getYieldModifier(EffectType::MODIFIER_PRODUCTION);
     float goldMod = m_policyManager.getYieldModifier(EffectType::MODIFIER_GOLD);
     float sciMod = m_policyManager.getYieldModifier(EffectType::MODIFIER_SCIENCE);
@@ -205,9 +217,7 @@ void Player::onTurnBegin() {
     // 5. 更新研究进度
     updateResearchProgress();
 
-    
-
-    // 7. 计算维护费
+    // 6. 计算维护费
     int maintenance = calculateMaintenanceCost();
     m_gold -= maintenance;
     if (m_gold < 0) {
@@ -215,7 +225,7 @@ void Player::onTurnBegin() {
         CCLOG("Player %d has negative gold after maintenance!", m_playerId);
     }
 
-    // 8. 发送事件
+    // 7. 发送事件
     dispatchResourceChangedEvent();
 
     CCLOG("Player %d turn begin: Gold=%d(+%d-%d), Science=%d(+%d), Culture=%d(+%d)",
@@ -224,6 +234,9 @@ void Player::onTurnBegin() {
         m_cultureStock, totalYield.cultureYield);
 }
 
+/**
+ * 分发资源变化事件
+ */
 void Player::dispatchResourceChangedEvent() {
     ValueMap data;
     data["player_id"] = m_playerId;
@@ -243,6 +256,9 @@ void Player::dispatchResourceChangedEvent() {
     );
 }
 
+/**
+ * 更新研究进度
+ */
 void Player::updateResearchProgress() {
     // 科技研究
     int currentTechId = m_techTree.getCurrentResearch();
@@ -273,8 +289,7 @@ void Player::updateResearchProgress() {
                 m_cultureTree.updateProgress(cultureToUse);
                 m_cultureStock -= cultureToUse;
 
-                // 文化完成时，政策槽位由PolicyManager监听CultureUnlocked事件自动更新
-                // 但为了确保UI同步，可以调用一次 updatePolicySlots (实际上它调用updateGovernmentSlots)
+                // 文化完成时更新政策槽位
                 if (cultureToUse >= remaining) {
                     updatePolicySlots();
                 }
@@ -283,6 +298,9 @@ void Player::updateResearchProgress() {
     }
 }
 
+/**
+ * 回合结束处理
+ */
 void Player::onTurnEnd() {
     for (auto city : m_cities) {
         city->onTurnEnd();
@@ -290,15 +308,17 @@ void Player::onTurnEnd() {
     CCLOG("Player %d turn end - Final Gold: %d", m_playerId, m_gold);
 }
 
-// ... (城市管理、单位管理 部分代码省略，因为不需要修改) ...
-// 请保留原有的 addCity, removeCity, getCapital, calculateTotalYield 等函数
-// 它们不需要变动，直接复制原代码即可
-
+/**
+ * 获取首都
+ */
 BaseCity* Player::getCapital() const {
     if (m_cities.empty()) return nullptr;
     return m_cities[0];
 }
 
+/**
+ * 计算所有城市的总产出
+ */
 Yield Player::calculateTotalYield() const {
     Yield total{};
     for (auto city : m_cities) {
@@ -309,6 +329,9 @@ Yield Player::calculateTotalYield() const {
     return total;
 }
 
+/**
+ * 计算基础产出
+ */
 Yield Player::calculateBaseYield() const {
     Yield base{};
     for (auto city : m_cities) {
@@ -323,8 +346,9 @@ Yield Player::calculateBaseYield() const {
     return base;
 }
 
-// ... (省略 addUnit, removeUnit 等标准函数) ...
-
+/**
+ * 添加城市
+ */
 void Player::addCity(BaseCity* city) {
     if (city) {
         m_cities.push_back(city);
@@ -336,6 +360,9 @@ void Player::addCity(BaseCity* city) {
     }
 }
 
+/**
+ * 移除城市
+ */
 void Player::removeCity(BaseCity* city) {
     auto it = std::find(m_cities.begin(), m_cities.end(), city);
     if (it != m_cities.end()) {
@@ -348,11 +375,17 @@ void Player::removeCity(BaseCity* city) {
     }
 }
 
+/**
+ * 检查城市是否是首都
+ */
 bool Player::isCapital(BaseCity* city) const {
     if (m_cities.empty() || !city) return false;
     return city == m_cities[0];
 }
 
+/**
+ * 添加控制的玩家首都ID
+ */
 void Player::addControlledCapital(int playerId) {
     auto it = std::find(m_vicprogress.controlledCapitals.begin(), m_vicprogress.controlledCapitals.end(), playerId);
     if (it == m_vicprogress.controlledCapitals.end()) {
@@ -360,6 +393,9 @@ void Player::addControlledCapital(int playerId) {
     }
 }
 
+/**
+ * 移除控制的玩家首都ID
+ */
 void Player::removeControlledCapital(int playerId) {
     auto it = std::find(m_vicprogress.controlledCapitals.begin(), m_vicprogress.controlledCapitals.end(), playerId);
     if (it != m_vicprogress.controlledCapitals.end()) {
@@ -367,15 +403,24 @@ void Player::removeControlledCapital(int playerId) {
     }
 }
 
+/**
+ * 获取控制的首都列表
+ */
 std::vector<int> Player::getControlledCapitals() const {
     return m_vicprogress.controlledCapitals;
 }
 
+/**
+ * 检查是否控制指定玩家的首都
+ */
 bool Player::controlsCapitalOf(int playerId) const {
     auto it = std::find(m_vicprogress.controlledCapitals.begin(), m_vicprogress.controlledCapitals.end(), playerId);
     return it != m_vicprogress.controlledCapitals.end();
 }
 
+/**
+ * 添加单位
+ */
 void Player::addUnit(AbstractUnit* unit) {
     if (unit) {
         m_units.push_back(unit);
@@ -383,15 +428,19 @@ void Player::addUnit(AbstractUnit* unit) {
     }
 }
 
+/**
+ * 移除单位
+ */
 void Player::removeUnit(AbstractUnit* unit) {
     auto it = std::find(m_units.begin(), m_units.end(), unit);
     if (it != m_units.end()) {
         m_units.erase(it);
-        // 【注意】不在这里 release()
-        // release() 由调用者负责（如 onDeath 或 cleanupResources）
     }
 }
 
+/**
+ * 设置地图回调函数
+ */
 void Player::setMapCallbacks(std::function<Hex()> getStartHexFunc,
     std::function<void(AbstractUnit*)> addToMapFunc,
     std::function<bool(Hex)> checkCityFunc,
@@ -404,12 +453,15 @@ void Player::setMapCallbacks(std::function<Hex()> getStartHexFunc,
     CCLOG("Player %d map callbacks set", m_playerId);
 }
 
+/**
+ * 创建起始开拓者单位
+ */
 AbstractUnit* Player::createStartingSettler(cocos2d::Node* parentNode,
     std::function<Hex()> getStartHexFunc,
     std::function<void(AbstractUnit*)> addToMapFunc,
     std::function<bool(Hex)> checkCityFunc) {
 
-    // 如果提供了参数，更新回调函数
+    // 更新回调函数
     if (getStartHexFunc) m_getStartHexFunc = getStartHexFunc;
     if (addToMapFunc) m_addToMapFunc = addToMapFunc;
     if (checkCityFunc) m_checkCityFunc = checkCityFunc;
@@ -454,9 +506,6 @@ AbstractUnit* Player::createStartingSettler(cocos2d::Node* parentNode,
 
         m_startingSettler = unit;
 
-        // 注意：不要在这里调用 addUnit(unit)
-        // 因为 initUnit() 内部已经调用了 player->addUnit(this)
-
         // 通过回调函数添加到地图
         m_addToMapFunc(unit);
 
@@ -470,24 +519,34 @@ AbstractUnit* Player::createStartingSettler(cocos2d::Node* parentNode,
     return nullptr;
 }
 
-// ==================== 科技系统接口 ====================
-
+/**
+ * 科技激活回调
+ */
 void Player::onTechActivated(int techId, const std::string& techName, const std::string& effect) {
     CCLOG("Player %d: Tech activated - %s (ID: %d)", m_playerId, techName.c_str(), techId);
     if (techId == 22) m_vicprogress.hasSatelliteTech = true;
 }
 
+/**
+ * 研究进度回调
+ */
 void Player::onResearchProgress(int techId, int currentProgress, int totalCost) {
     // UI更新事件发送
 }
 
+/**
+ * 尤里卡触发回调
+ */
 void Player::onEurekaTriggered(int techId, const std::string& techName) {
     applyEurekaBonus(techId);
 }
 
+/**
+ * 更新解锁的生产项目
+ */
 void Player::updateUnlockedProduction()
 {
-    // 1. 先释放原有内存
+    // 1. 释放原有内存
     for (auto* building : unlockedBuildings) delete building;
     for (auto* district : unlockedDistricts) delete district;
     for (auto* unit : unlockedUnits) delete unit;
@@ -546,16 +605,11 @@ void Player::updateUnlockedProduction()
         addIfNotExists(newProgram);
         };
 
-    // 5. 按设计意图应该只解锁已激活的科技和文化对应的项目
-    // 假设初始解锁项目有特殊处理，这里保留原始逻辑但注释说明
-
-    // 初始解锁的项目（如果需要的话）
-    
-    auto initialSearch = ProductionProgram::findProgram(-1, -1);  // 可能需要改为 findInitialPrograms()
+    // 5. 初始解锁的项目
+    auto initialSearch = ProductionProgram::findProgram(-1, -1);
     for (auto program : initialSearch) {
         processProgram(program);
     }
-    
 
     // 6. 解锁科技对应的项目
     auto activatedTech = m_techTree.getActivatedTechList();
@@ -566,7 +620,7 @@ void Player::updateUnlockedProduction()
         }
     }
 
-    // 7. 解锁文化对应的项目（之前漏掉的！）
+    // 7. 解锁文化对应的项目
     auto activatedCivic = m_cultureTree.getActivatedCultureList();
     for (int civic : activatedCivic) {
         auto search = ProductionProgram::findProgram(-1, civic);
@@ -575,6 +629,10 @@ void Player::updateUnlockedProduction()
         }
     }
 }
+
+/**
+ * 获取解锁的生产项目
+ */
 void Player::getUnlockedProduction(std::vector<ProductionProgram*>& Units,
     std::vector<ProductionProgram*>& Districts,
     std::vector<ProductionProgram*>& Buildings)
@@ -585,6 +643,9 @@ void Player::getUnlockedProduction(std::vector<ProductionProgram*>& Units,
     Buildings = unlockedBuildings;
 }
 
+/**
+ * 添加科技值
+ */
 void Player::addScience(int amount) {
     if (amount > 0) {
         m_scienceStock += amount;
@@ -592,41 +653,54 @@ void Player::addScience(int amount) {
     }
 }
 
+/**
+ * 获取每回合科技产出
+ */
 int Player::getSciencePerTurn() const {
     int total = 0;
     for (auto city : m_cities) {
         if (city) total += city->cityYield.scienceYield;
     }
-    // 可以在这里累加百分比加成后的总值
+    // 累加百分比加成后的总值
     float mod = m_policyManager.getYieldModifier(EffectType::MODIFIER_SCIENCE);
     total = static_cast<int>(total * (1.0f + mod / 100.0f));
     return total;
 }
 
+/**
+ * 设置当前研究科技
+ */
 void Player::setCurrentResearch(int techId) {
     m_techTree.setCurrentResearch(techId);
 }
 
-// ==================== 文化系统接口 ====================
-
+/**
+ * 文化解锁回调
+ */
 void Player::onCultureUnlocked(int cultureId, const std::string& cultureName, const std::string& effect) {
     CCLOG("Player %d: Culture unlocked - %s", m_playerId, cultureName.c_str());
 
-    // 关键修改：不需要手动调用 unlockPoliciesForCulture
-    // PolicyManager 也是 Listener，它会自动处理解锁逻辑
-
-    // 如果该市政解锁了新政体，需要更新槽位
+    // PolicyManager会自动处理解锁逻辑
     updatePolicySlots();
 }
 
+/**
+ * 文化进度回调
+ */
 void Player::onCultureProgress(int cultureId, int currentProgress, int totalCost) {
     // UI更新
 }
 
+/**
+ * 灵感触发回调
+ */
 void Player::onInspirationTriggered(int cultureId, const std::string& cultureName) {
     applyInspirationBonus(cultureId);
 }
 
+/**
+ * 添加文化值
+ */
 void Player::addCulture(int amount) {
     if (amount > 0) {
         m_cultureStock += amount;
@@ -634,6 +708,9 @@ void Player::addCulture(int amount) {
     }
 }
 
+/**
+ * 获取每回合文化产出
+ */
 int Player::getCulturePerTurn() const {
     int total = 0;
     for (auto city : m_cities) {
@@ -644,13 +721,16 @@ int Player::getCulturePerTurn() const {
     return total;
 }
 
+/**
+ * 设置当前研究市政
+ */
 void Player::setCurrentCivic(int cultureId) {
     m_cultureTree.setCurrentResearch(cultureId);
 }
 
-// ==================== 政策系统集成 ====================
-
-// 关键修改：新版API是 updateGovernmentSlots，无需参数
+/**
+ * 更新政策槽位
+ */
 void Player::updatePolicySlots() {
     m_policyManager.updateGovernmentSlots();
 
@@ -660,22 +740,20 @@ void Player::updatePolicySlots() {
         m_playerId, config.militarySlots, config.economicSlots, config.wildcardSlots);
 }
 
-// ==================== 经济系统 ====================
-
+/**
+ * 计算维护费用
+ */
 int Player::calculateMaintenanceCost() const {
     int totalCost = 0;
     totalCost += m_units.size(); // 基础维护费
 
     // 应用政策卡减免
-    // 假设 getYieldModifier 返回正数，这里可能是 MAINTENANCE_DISCOUNT 类型的累加值
-    // 新版PolicySystem中 EffectType::MAINTENANCE_DISCOUNT 是单位减免数值
-    // 我们这里假设是百分比或固定值，先用简单逻辑
-    // 如果PolicySystem实现了 MAINTENANCE_DISCOUNT，可以通过 getYieldModifier 获取
-
-    // 这里暂时不做复杂处理
     return totalCost;
 }
 
+/**
+ * 计算每回合净金币收入
+ */
 int Player::calculateNetGoldPerTurn() const {
     int income = 0;
     for (auto city : m_cities) if (city) income += city->cityYield.goldYield;
@@ -687,30 +765,39 @@ int Player::calculateNetGoldPerTurn() const {
     return income - calculateMaintenanceCost();
 }
 
+/**
+ * 花费金币
+ */
 void Player::spendGold(int amount) {
     if (amount > 0 && canAfford(amount)) {
         m_gold -= amount;
     }
 }
 
-// ==================== 文明加成 ====================
-
+/**
+ * 应用科技加成
+ */
 int Player::applyScienceBonus(int baseScience) const {
     if (!m_civilization) return baseScience;
     return m_civilization->applyScienceBonus(baseScience);
 }
 
+/**
+ * 应用文化加成
+ */
 int Player::applyCultureBonus(int baseCulture) const {
     if (!m_civilization) return baseCulture;
     return m_civilization->applyCultureBonus(baseCulture);
 }
 
+/**
+ * 应用尤里卡加成
+ */
 void Player::applyEurekaBonus(int techId) {
     if (!m_civilization) return;
     const TechNode* node = m_techTree.getTechInfo(techId);
     if (!node || node->activated) return;
 
-    // 注意：Civilization::applyEurekaBonus 需要 TechTree 指针
     int boost = m_civilization->applyEurekaBonus(techId, const_cast<TechTree*>(&m_techTree));
     if (boost > 0) {
         int current = m_techTree.getCurrentResearch();
@@ -722,6 +809,9 @@ void Player::applyEurekaBonus(int techId) {
     }
 }
 
+/**
+ * 应用灵感加成
+ */
 void Player::applyInspirationBonus(int cultureId) {
     if (!m_civilization) return;
     const CultureNode* node = m_cultureTree.getCultureInfo(cultureId);
@@ -738,51 +828,67 @@ void Player::applyInspirationBonus(int cultureId) {
     }
 }
 
+/**
+ * 获取文明特性名称
+ */
 std::string Player::getCivilizationTraitName() const {
     if (!m_civilization) return "Unknown";
     return m_civilization->getTraits().name;
 }
 
+/**
+ * 获取文明特性描述
+ */
 std::string Player::getCivilizationTraitDescription() const {
     if (!m_civilization) return "No traits";
     return m_civilization->getTraits().description;
 }
 
+/**
+ * 检查是否有指定文明加成
+ */
 bool Player::hasCivilizationBonus(const std::string& bonusName) const {
     if (!m_civilization) return false;
-    // 简化的检查逻辑，具体取决于 CivilizationTrait 的定义
     auto traits = m_civilization->getTraits();
     if (bonusName == "science_bonus") return traits.scienceBonus > 1.0f;
     if (bonusName == "culture_bonus") return traits.cultureBonus > 1.0f;
     return false;
 }
 
+/**
+ * 应用所有文明加成
+ */
 void Player::applyAllCivilizationBonuses() {
-    // 这里的具体实现依赖于 BaseCiv 的具体逻辑
-    // 主要是为了在加载游戏后刷新状态
     updateCivilizationBonusState();
 }
 
+/**
+ * 更新文明加成状态
+ */
 void Player::updateCivilizationBonusState() {
     if (!m_civilization) return;
-    // 示例：检查特殊单位解锁
     if (dynamic_cast<CivChina*>(m_civilization)) {
-        // ... 特定文明逻辑
+        // 特定文明逻辑
     }
 }
 
-// ==================== 胜利条件 ====================
-
+/**
+ * 检查是否达成科技胜利
+ */
 bool Player::checkScienceVictory() const {
     return m_vicprogress.hasSatelliteTech && m_vicprogress.hasLaunchedSatellite;
 }
 
+/**
+ * 检查是否达成征服胜利
+ */
 bool Player::checkDominationVictory() const {
     return m_vicprogress.hasDominationVictory;
 }
 
-// ==================== 序列化 ====================
-
+/**
+ * 将玩家状态序列化为ValueMap
+ */
 ValueMap Player::toValueMap() const {
     ValueMap data;
 
@@ -816,10 +922,6 @@ ValueMap Player::toValueMap() const {
         activeTechs.push_back(Value(id));
     }
     techData["activatedTechs"] = activeTechs;
-
-    // 保存进度
-    // 注意：简化版TechTree可能没有直接遍历所有节点的接口，这里假设通过激活列表和当前研究保存
-    // 实际项目中应遍历所有节点保存进度
     data["techTree"] = techData;
 
     // 3. 文化树状态
@@ -835,7 +937,6 @@ ValueMap Player::toValueMap() const {
     data["cultureTree"] = cultureData;
 
     // 4. 政策状态
-    // 我们保存已装备的政策 ID
     ValueVector equippedPolicies;
     auto equippedList = m_policyManager.getEquippedPolicies();
     for (const auto& info : equippedList) {
@@ -856,6 +957,9 @@ ValueMap Player::toValueMap() const {
     return data;
 }
 
+/**
+ * 从ValueMap反序列化玩家状态
+ */
 bool Player::fromValueMap(const ValueMap& data) {
     // 1. 基础属性
     if (data.count("playerId")) m_playerId = data.at("playerId").asInt();
@@ -887,7 +991,6 @@ bool Player::fromValueMap(const ValueMap& data) {
             auto vec = techData.at("activatedTechs").asValueVector();
             for (const auto& v : vec) {
                 int techId = v.asInt();
-                // 模拟研究完成
                 m_techTree.setCurrentResearch(techId);
                 m_techTree.updateProgress(99999);
             }
@@ -923,7 +1026,6 @@ bool Player::fromValueMap(const ValueMap& data) {
     }
 
     // 4. 恢复政策
-    // 先更新槽位以匹配政体
     m_policyManager.updateGovernmentSlots();
 
     if (data.count("equippedPolicies")) {
@@ -947,6 +1049,9 @@ bool Player::fromValueMap(const ValueMap& data) {
     return true;
 }
 
+/**
+ * 调试输出玩家状态
+ */
 void Player::debugPrintStatus() const {
     CCLOG("--- Player %d Status ---", m_playerId);
     CCLOG("Gold: %d, Sci: %d, Cul: %d", m_gold, m_scienceStock, m_cultureStock);
@@ -966,4 +1071,3 @@ void Player::debugPrintStatus() const {
         if (card) CCLOG(" - %s", card->name.c_str());
     }
 }
-

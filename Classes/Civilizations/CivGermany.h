@@ -34,8 +34,6 @@ public:
     virtual int calculateMaxDistricts(int population) const override;
 
 private:
-    // 德国特色建筑：汉萨商站（工业区特色建筑）
-    // 可以在后续添加相关方法
 };
 
 #endif // __CIV_GERMANY_H__

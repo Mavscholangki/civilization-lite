@@ -1,20 +1,19 @@
 // GameManager.cpp
 #include "GameManager.h"
 #include "Player.h"
-// 【修复】必须包含 BaseCity 的头文件，因为我们要调用它的方法
 #include "../City/BaseCity.h" 
-// 【修复】包含 AbstractUnit 以便创建单位
 #include "../Units/Base/AbstractUnit.h"
 #include <algorithm>
 #include "../Scene/GameScene.h" 
 #include "../Map/GameMapLayer.h" 
-#include <set>                       // 必需：用于防重叠
+#include <set>
 USING_NS_CC;
 
 GameManager* GameManager::s_instance = nullptr;
 
-// ==================== 单例模式 ====================
-
+/**
+ * 获取游戏管理器单例实例
+ */
 GameManager* GameManager::getInstance() {
     if (!s_instance) {
         s_instance = new GameManager();
@@ -22,18 +21,25 @@ GameManager* GameManager::getInstance() {
     return s_instance;
 }
 
+/**
+ * 构造函数
+ */
 GameManager::GameManager()
     : m_gameState(GameState::INITIALIZING) {
     CCLOG("GameManager created");
 }
 
+/**
+ * 析构函数
+ */
 GameManager::~GameManager() {
     cleanup();
     CCLOG("GameManager destroyed");
 }
 
-// ==================== 游戏初始化 ====================
-
+/**
+ * 初始化游戏
+ */
 bool GameManager::initialize(const GameConfig& config) {
     m_gameConfig = config;
     m_gameState = GameState::INITIALIZING;
@@ -47,8 +53,9 @@ bool GameManager::initialize(const GameConfig& config) {
     return true;
 }
 
-// ==================== 玩家管理 ====================
-
+/**
+ * 添加玩家到游戏
+ */
 void GameManager::addPlayer(Player* player) {
     if (!player) {
         CCLOG("Cannot add null player");
@@ -63,8 +70,8 @@ void GameManager::addPlayer(Player* player) {
         }
     }
 
-    // ========== 关键：增加引用计数 ==========
-    player->retain();  // 防止被自动释放
+    // 增加引用计数，防止被自动释放
+    player->retain();
 
     m_players.push_back(player);
     m_playerOrder.push_back(player->getPlayerId());
@@ -82,6 +89,9 @@ void GameManager::addPlayer(Player* player) {
         player->getPlayerId(), m_players.size());
 }
 
+/**
+ * 从游戏中移除玩家
+ */
 void GameManager::removePlayer(int playerId) {
     auto it = std::find_if(m_players.begin(), m_players.end(),
         [playerId](Player* player) {
@@ -100,8 +110,8 @@ void GameManager::removePlayer(int playerId) {
             }
         }
 
-        // ========== 关键：减少引用计数 ==========
-        (*it)->release();  // 对应上面的retain
+        // 减少引用计数，对应上面的retain
+        (*it)->release();
 
         m_players.erase(it);
 
@@ -116,6 +126,9 @@ void GameManager::removePlayer(int playerId) {
     }
 }
 
+/**
+ * 获取指定ID的玩家
+ */
 Player* GameManager::getPlayer(int playerId) const {
     for (auto player : m_players) {
         if (player->getPlayerId() == playerId) {
@@ -125,6 +138,9 @@ Player* GameManager::getPlayer(int playerId) const {
     return nullptr;
 }
 
+/**
+ * 获取当前回合的玩家
+ */
 Player* GameManager::getCurrentPlayer() const {
     if (m_playerOrder.empty() || m_currentPlayerIndex >= m_playerOrder.size()) {
         return nullptr;
@@ -134,11 +150,17 @@ Player* GameManager::getCurrentPlayer() const {
     return getPlayer(currentPlayerId);
 }
 
+/**
+ * 设置当前玩家索引
+ */
 void GameManager::setCurrentPlayer(int index)
 {
     m_currentPlayerIndex = 0;
 }
 
+/**
+ * 获取下一个玩家
+ */
 Player* GameManager::getNextPlayer() const {
     if (m_playerOrder.empty()) {
         return nullptr;
@@ -149,8 +171,9 @@ Player* GameManager::getNextPlayer() const {
     return getPlayer(nextPlayerId);
 }
 
-// ==================== 回合管理 ====================
-
+/**
+ * 结束当前玩家回合，切换到下一个玩家
+ */
 void GameManager::endTurn() {
     Player* currentPlayer = getCurrentPlayer();
     if (!currentPlayer) return;
@@ -178,7 +201,7 @@ void GameManager::endTurn() {
         nextPlayer->onTurnBegin();
         notifyTurnStart(nextPlayer->getPlayerId());
 
-        // 发送 UI 更新事件 (保持你原有的逻辑)
+        // 发送 UI 更新事件
         ValueMap resourceData;
         resourceData["player_id"] = nextPlayer->getPlayerId();
         resourceData["gold"] = nextPlayer->getGold();
@@ -189,19 +212,18 @@ void GameManager::endTurn() {
             "player_turn_resource_update", &resourceData
         );
 
-        // ==================== 【关键：AI 触发决策】 ====================
+        // AI玩家回合处理
         if (!nextPlayer->getIsHuman()) {
-            // 只调用 AI 处理函数，不要在这里再次 schedule 延时
-            // 延时应该在 AI 逻辑执行完后再触发，以确保动画播完
+            // 调用AI处理函数
             this->processAITurn(nextPlayer);
         }
         else {
-            // 人类玩家：逻辑在此中断，等待 UI 按钮触发下一次 endTurn()
+            // 人类玩家：等待UI按钮触发下一次endTurn()
             CCLOG("Waiting for Human Player...");
         }
     }
 
-    // 6. 检查胜利条件
+    // 5. 检查胜利条件
     VictoryType victoryType = checkVictoryConditions();
     if (victoryType != VictoryType::NONE) {
         int winnerId = -1;
@@ -216,6 +238,9 @@ void GameManager::endTurn() {
     }
 }
 
+/**
+ * 初始化玩家起始单位
+ */
 void GameManager::initializePlayerStartingUnits(cocos2d::Node* parentNode,
     std::function<Hex(int)> getStartHexForPlayerFunc,
     std::function<void(AbstractUnit*)> addToMapFunc,
@@ -258,6 +283,9 @@ void GameManager::initializePlayerStartingUnits(cocos2d::Node* parentNode,
     }
 }
 
+/**
+ * 前进到下一个玩家
+ */
 void GameManager::advanceToNextPlayer() {
     if (m_playerOrder.empty()) {
         return;
@@ -288,6 +316,9 @@ void GameManager::advanceToNextPlayer() {
     } while (true);
 }
 
+/**
+ * 开始新回合
+ */
 void GameManager::beginNewTurn() {
     m_gameStats.currentTurn++;
     CCLOG("=== Beginning Turn %d ===", m_gameStats.currentTurn);
@@ -299,52 +330,50 @@ void GameManager::beginNewTurn() {
     }
 }
 
+/**
+ * 检查玩家是否有待处理决策
+ */
 bool GameManager::hasPendingDecisions(int playerId) const {
     Player* player = getPlayer(playerId);
     if (!player) return false;
 
-    // --- 1. 科技检查 ---
+    // 1. 科技检查
     bool techNeedsAttention = false;
-    // 如果当前没有研究任务
     if (player->getCurrentResearchTechId() == -1) {
-        // 检查科技树是否还有“可研究”的项目
+        // 检查科技树是否还有"可研究"的项目
         auto researchableTechs = player->getTechTree()->getResearchableTechList();
         if (!researchableTechs.empty()) {
-            techNeedsAttention = true; // 既没在研究，又有得研，这才叫“待决”
+            techNeedsAttention = true;
         }
     }
 
-    // --- 2. 文化检查 ---
+    // 2. 文化检查
     bool cultureNeedsAttention = false;
-    // 如果当前没有市政研究任务
     if (player->getCurrentResearchCivicId() == -1) {
-        // 检查文化树是否还有“可解锁”的项目
+        // 检查文化树是否还有"可解锁"的项目
         auto unlockableCultures = player->getCultureTree()->getUnlockableCultureList();
         if (!unlockableCultures.empty()) {
-            cultureNeedsAttention = true; // 既没在研究，又有得研
+            cultureNeedsAttention = true;
         }
     }
 
-    // --- 3. 城市生产检查 ---
+    // 3. 城市生产检查
     bool productionNeedsAttention = false;
     for (auto city : player->getCities()) {
         // 如果城市当前没有生产项目，且没有被挂起的生产
         if (city->getCurrentProduction() == nullptr && city->getSuspendedProductions().empty()) {
-            // 这里可以根据需要增加：如果城市已经造完了所有能造的东西（极后期），
-            // 可以像科技一样加个判断。但在模拟中，通常认为城市必须一直在生产（如转化资源）
             productionNeedsAttention = true;
             break;
         }
     }
 
-    // 只有当科技、文化、生产中任意一个“真正需要处理”时，才返回 true
+    // 只有当科技、文化、生产中任意一个需要处理时，才返回true
     return (techNeedsAttention || cultureNeedsAttention || productionNeedsAttention);
 }
 
-// ==================== AI 逻辑 ====================
-
-// ==================== AI 逻辑完整代码 ====================
-
+/**
+ * 处理AI玩家回合
+ */
 void GameManager::processAITurn(Player* aiPlayer) {
     if (!aiPlayer || aiPlayer->getIsHuman()) {
         return;
@@ -352,22 +381,21 @@ void GameManager::processAITurn(Player* aiPlayer) {
 
     CCLOG("=== AI Player %d Turn Start ===", aiPlayer->getPlayerId());
 
-    // 0. 获取必要的环境对象
+    // 1. 获取必要的环境对象
     auto gameScene = dynamic_cast<GameScene*>(Director::getInstance()->getRunningScene());
-    // 如果没有获取到地图层，无法进行可视化操作，直接结束
     if (!gameScene || !gameScene->getMapLayer()) {
         endTurnWithDelay();
         return;
     }
 
-    // 获取 HexLayout，用于单位移动和攻击的坐标转换
+    // 获取HexLayout，用于单位移动和攻击的坐标转换
     HexLayout* layout = gameScene->getMapLayer()->getLayout();
     if (!layout) {
         endTurnWithDelay();
         return;
     }
 
-    // 1. 寻找攻击目标（人类玩家）
+    // 2. 寻找攻击目标（人类玩家）
     Player* humanPlayer = nullptr;
     for (auto p : m_players) {
         if (p->getIsHuman()) {
@@ -376,11 +404,7 @@ void GameManager::processAITurn(Player* aiPlayer) {
         }
     }
 
-    // 如果找不到人类玩家（比如都死光了），也要继续执行（比如建城），不能直接 return
-    // 但战斗逻辑会依赖 humanPlayer
-
-    // ==================== 2. AI 开局建城逻辑 ====================
-    // 如果没有城市，优先遍历寻找 Settler 建城
+    // 3. AI开局建城逻辑
     if (aiPlayer->getCityCount() == 0) {
         // 获取单位列表副本
         std::vector<AbstractUnit*> units = aiPlayer->getUnits();
@@ -390,7 +414,7 @@ void GameManager::processAITurn(Player* aiPlayer) {
             if (unit && unit->canFoundCity()) {
                 Hex unitPos = unit->getGridPos();
 
-                // 简单的合法性检查（可选）
+                // 简单的合法性检查
                 bool canSettle = true;
                 if (aiPlayer->m_checkCityFunc) {
                     if (aiPlayer->m_checkCityFunc(unitPos)) canSettle = false;
@@ -425,10 +449,9 @@ void GameManager::processAITurn(Player* aiPlayer) {
         }
     }
 
-    // ==================== 3. AI 单位战斗与移动逻辑 ====================
+    // 4. AI单位战斗与移动逻辑
 
-    // --- 3.1 预备防重叠集合 ---
-    // occupiedOrReservedHexes 用于记录本回合某个格子是否“有人了”或者“即将有人去”
+    // 4.1 预备防重叠集合
     std::set<Hex> occupiedOrReservedHexes;
 
     // 将所有活着的单位和城市位置加入占用列表
@@ -441,25 +464,24 @@ void GameManager::processAITurn(Player* aiPlayer) {
         }
     }
 
-    // --- 3.2 预备死亡名单 ---
-    // 防止多个 AI 单位对同一个必死的敌人进行“鞭尸”
+    // 4.2 预备死亡名单
     std::set<AbstractUnit*> dyingUnits;
 
-    // --- 3.3 遍历 AI 单位执行行动 ---
+    // 4.3 遍历AI单位执行行动
     std::vector<AbstractUnit*> myUnits = aiPlayer->getUnits();
 
     for (auto unit : myUnits) {
-        // 跳过无效单位、死单位、和移民（移民逻辑上面处理过了，或者让它呆在原地）
+        // 跳过无效单位、死单位、和移民
         if (!unit || !unit->isAlive() || unit->canFoundCity()) {
             if (unit && unit->isAlive()) occupiedOrReservedHexes.insert(unit->getGridPos());
             continue;
         }
 
         Hex currentPos = unit->getGridPos();
-        // 既然轮到我动了，先把我的当前位置从占用表中移除
+        // 将当前位置从占用表中移除
         occupiedOrReservedHexes.erase(currentPos);
 
-        // 如果没有人类玩家，AI 就呆在原地
+        // 如果没有人类玩家，AI就呆在原地
         if (!humanPlayer) {
             occupiedOrReservedHexes.insert(currentPos);
             continue;
@@ -480,20 +502,18 @@ void GameManager::processAITurn(Player* aiPlayer) {
             }
         }
 
-        // B. 决策：攻击 还是 移动
-        // 注意：这里假设 AbstractUnit 有 getAttackRange() 接口，默认近战为1
+        // B. 决策：攻击还是移动
         int attackRange = unit->getAttackRange();
         if (attackRange <= 0) attackRange = 1; // 保底
 
-        // 情况 1: 敌人在射程内 -> 发动攻击
+        // 情况1: 敌人在射程内 -> 发动攻击
         if (targetEnemy && minDistance <= attackRange) {
             CCLOG("AI Unit %s ATTACK -> %s", unit->getUnitName().c_str(), targetEnemy->getUnitName().c_str());
 
-            // 执行攻击 (传入 layout 以便播放动画)
+            // 执行攻击（传入layout以便播放动画）
             unit->attack(targetEnemy, layout);
 
             // 伤害预估：防止鞭尸
-            // 虽然伤害是延迟结算的，但我们假定本次攻击会造成面板伤害
             int predictedDamage = unit->getCombatPower();
             if (targetEnemy->getCurrentHp() - predictedDamage <= 0) {
                 dyingUnits.insert(targetEnemy);
@@ -502,23 +522,19 @@ void GameManager::processAITurn(Player* aiPlayer) {
             // 攻击后留在原地
             occupiedOrReservedHexes.insert(currentPos);
         }
-        // 情况 2: 敌人在远处 -> 移动接近
+        // 情况2: 敌人在远处 -> 移动接近
         else if (targetEnemy) {
             Hex targetPos = targetEnemy->getGridPos();
             Hex bestMove = currentPos;
             int bestDist = minDistance;
 
-            // 遍历周围 6 个格子寻找最佳移动点
+            // 遍历周围6个格子寻找最佳移动点
             for (int i = 0; i < 6; i++) {
                 Hex neighbor = currentPos.getNeighbor(i);
 
-                // 【核心】检查格子是否被占用或预定
+                // 检查格子是否被占用或预定
                 if (occupiedOrReservedHexes.count(neighbor)) continue;
 
-                // 可选：检查地形消耗 (如果你的 getTerrainCostFunc 可用)
-                // if (aiPlayer->m_getTerrainCostFunc && aiPlayer->m_getTerrainCostFunc(neighbor) < 0) continue;
-
-                // 贪心算法：找离敌人最近的格子
                 int dist = neighbor.distance(targetPos);
                 if (dist < bestDist) {
                     bestDist = dist;
@@ -530,13 +546,13 @@ void GameManager::processAITurn(Player* aiPlayer) {
             if (bestMove != currentPos) {
                 CCLOG("AI Unit %s MOVE -> (%d, %d)", unit->getUnitName().c_str(), bestMove.q, bestMove.r);
 
-                // 计算消耗 (简单逻辑：1格消耗1点，或者直接取距离)
+                // 计算消耗（简单逻辑：1格消耗1点）
                 int cost = 1;
 
                 // 执行移动
                 unit->moveTo(bestMove, layout, cost);
 
-                // 【核心】锁定新位置，防止后续单位重叠
+                // 锁定新位置，防止后续单位重叠
                 occupiedOrReservedHexes.insert(bestMove);
             }
             else {
@@ -544,15 +560,13 @@ void GameManager::processAITurn(Player* aiPlayer) {
                 occupiedOrReservedHexes.insert(currentPos);
             }
         }
-        // 情况 3: 没有敌人 (虽然前面check了humanPlayer，但可能所有单位都死了)
+        // 情况3: 没有敌人（虽然前面check了humanPlayer，但可能所有单位都死了）
         else {
             occupiedOrReservedHexes.insert(currentPos);
         }
     }
 
-    // ==================== 4. AI 城市生产逻辑 ====================
-    // 使用 ProductionProgram 避免 AbstractUnit 堆内存崩溃问题
-
+    // 5. AI城市生产逻辑
     const std::vector<BaseCity*>& cities = aiPlayer->getCities();
     for (BaseCity* city : cities) {
         if (!city) continue;
@@ -561,25 +575,26 @@ void GameManager::processAITurn(Player* aiPlayer) {
         if (city->getCurrentProduction() == nullptr) {
             CCLOG("AI: City %s starting production of Warrior", city->getCityName().c_str());
 
-            // 创建生产项目 (注意参数匹配你的 ProductionProgram 构造函数)
-            // 参数: Type, Name, Pos, Cost, canPurchase, purchaseCost
+            // 创建生产项目
             ProductionProgram* warriorProd = new ProductionProgram(
                 ProductionProgram::ProductionType::UNIT,
                 "Warrior",
-                Hex(), 0, true, 200 // 这里的cost和purchaseCost最好跟配置表一致
+                Hex(), 0, true, 200
             );
 
             city->addNewProduction(warriorProd);
         }
     }
 
-    // ==================== 5. 结束回合 ====================
+    // 6. 结束回合
     endTurnWithDelay();
 }
 
-// 辅助函数：延迟结束回合，让动画飞一会儿
+/**
+ * 延迟结束回合，让动画飞一会儿
+ */
 void GameManager::endTurnWithDelay() {
-    // 使用 scheduleOnce 更加安全，防止重复触发
+    // 使用scheduleOnce防止重复触发
     std::string key = "ai_turn_end_" + std::to_string(m_currentPlayerIndex);
 
     Director::getInstance()->getScheduler()->schedule([this](float dt) {
@@ -590,8 +605,9 @@ void GameManager::endTurnWithDelay() {
         }, this, 0, 0, 1.2f, false, key);
 }
 
-// ==================== 胜利条件检查 ====================
-
+/**
+ * 检查胜利条件
+ */
 VictoryType GameManager::checkVictoryConditions() {
     if (m_gameState != GameState::PLAYING) {
         return VictoryType::NONE;
@@ -615,8 +631,11 @@ VictoryType GameManager::checkVictoryConditions() {
     return VictoryType::NONE;
 }
 
+/**
+ * 检查科技胜利条件
+ */
 bool GameManager::checkScienceVictory() const {
-    if (m_gameState != GameState::PLAYING) {  // 添加状态检查
+    if (m_gameState != GameState::PLAYING) {
         return false;
     }
 
@@ -628,8 +647,11 @@ bool GameManager::checkScienceVictory() const {
     return false;
 }
 
+/**
+ * 检查征服胜利条件
+ */
 bool GameManager::checkDominationVictory() const {
-    // 保护期：前5回合不判定统治胜利，给所有玩家拍城的时间
+    // 保护期：前5回合不判定征服胜利，给所有玩家拍城的时间
     if (m_gameStats.currentTurn < 5) return false;
 
     int activePlayersCount = 0;
@@ -663,6 +685,9 @@ bool GameManager::checkDominationVictory() const {
     return false;
 }
 
+/**
+ * 注册首都信息
+ */
 void GameManager::registerCapital(int playerId, BaseCity* capitalCity) {
     if (!capitalCity) {
         CCLOG("Cannot register null capital for player %d", playerId);
@@ -673,6 +698,9 @@ void GameManager::registerCapital(int playerId, BaseCity* capitalCity) {
     m_capitalInfo[playerId] = info;
 }
 
+/**
+ * 更新首都控制权
+ */
 void GameManager::updateCapitalControl(int capitalOwnerId, int newControllerId) {
     auto it = m_capitalInfo.find(capitalOwnerId);
     if (it != m_capitalInfo.end()) {
@@ -697,7 +725,7 @@ void GameManager::updateCapitalControl(int capitalOwnerId, int newControllerId) 
         CCLOG("Capital of player %d is now controlled by player %d",
             capitalOwnerId, newControllerId);
 
-        // 检查是否达成统治胜利
+        // 检查是否达成征服胜利
         checkDominationVictory();
     }
     else {
@@ -705,6 +733,9 @@ void GameManager::updateCapitalControl(int capitalOwnerId, int newControllerId) 
     }
 }
 
+/**
+ * 获取指定玩家的首都信息
+ */
 CapitalInfo GameManager::getCapitalInfoForPlayer(int playerId) const {
     auto it = m_capitalInfo.find(playerId);
     if (it != m_capitalInfo.end()) {
@@ -713,20 +744,27 @@ CapitalInfo GameManager::getCapitalInfoForPlayer(int playerId) const {
     return CapitalInfo();
 }
 
-// ==================== 事件通知 ====================
-
+/**
+ * 通知回合开始
+ */
 void GameManager::notifyTurnStart(int playerId) {
     if (m_onTurnStartCallback) {
         m_onTurnStartCallback(playerId);
     }
 }
 
+/**
+ * 通知回合结束
+ */
 void GameManager::notifyTurnEnd(int playerId) {
     if (m_onTurnEndCallback) {
         m_onTurnEndCallback(playerId);
     }
 }
 
+/**
+ * 通知胜利
+ */
 void GameManager::notifyVictory(VictoryType victoryType, int winnerPlayerId) {
     if (m_onVictoryCallback) {
         m_onVictoryCallback(victoryType, winnerPlayerId);
@@ -739,8 +777,9 @@ void GameManager::notifyVictory(VictoryType victoryType, int winnerPlayerId) {
     CCLOG("Winner: Player %d", winnerPlayerId);
 }
 
-// ==================== 序列化 ====================
-
+/**
+ * 将游戏状态序列化为ValueMap
+ */
 ValueMap GameManager::toValueMap() const {
     ValueMap data;
 
@@ -767,6 +806,9 @@ ValueMap GameManager::toValueMap() const {
     return data;
 }
 
+/**
+ * 从ValueMap反序列化游戏状态
+ */
 bool GameManager::fromValueMap(const ValueMap& data) {
     if (data.find("gameState") != data.end()) {
         m_gameState = static_cast<GameState>(data.at("gameState").asInt());
@@ -815,8 +857,9 @@ bool GameManager::fromValueMap(const ValueMap& data) {
     return true;
 }
 
-// ==================== 调试和清理 ====================
-
+/**
+ * 调试输出游戏状态
+ */
 void GameManager::debugPrintGameState() const {
     CCLOG("=== GameManager State ===");
     CCLOG("Game State: %d", (int)m_gameState);
@@ -867,10 +910,13 @@ void GameManager::debugPrintGameState() const {
     CCLOG("=== End GameManager State ===");
 }
 
+/**
+ * 清理游戏管理器资源
+ */
 void GameManager::cleanup() {
     CCLOG("GameManager cleanup started");
 
-    // 注意：不删除玩家对象，由创建者管理
+    // 不删除玩家对象，由创建者管理
     m_players.clear();
     m_playerOrder.clear();
 
@@ -886,6 +932,9 @@ void GameManager::cleanup() {
     CCLOG("GameManager cleanup completed");
 }
 
+/**
+ * 设置游戏状态
+ */
 void GameManager::setGameState(GameState state) {
     m_gameState = state;
     CCLOG("Game state changed to: %d", (int)state);
