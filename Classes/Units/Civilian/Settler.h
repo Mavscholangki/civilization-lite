@@ -16,6 +16,8 @@
 class Settler : public AbstractUnit {
 public:
 
+    using AbstractUnit::AbstractUnit;
+
     Settler() { cost = 80; purchaseCost = 400; }
 
     /**
