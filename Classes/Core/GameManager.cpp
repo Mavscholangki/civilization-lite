@@ -527,6 +527,7 @@ void GameManager::processAITurn(Player* aiPlayer) {
             Hex targetPos = targetEnemy->getGridPos();
             Hex bestMove = currentPos;
             int bestDist = minDistance;
+            int bestCost = 999;  // 记录最佳移动的地形消耗
 
             // 遍历周围6个格子寻找最佳移动点
             for (int i = 0; i < 6; i++) {
@@ -535,22 +536,35 @@ void GameManager::processAITurn(Player* aiPlayer) {
                 // 检查格子是否被占用或预定
                 if (occupiedOrReservedHexes.count(neighbor)) continue;
 
+                // 【修复】检查地形是否可通行
+                int terrainCost = -1;
+                if (aiPlayer->m_getTerrainCostFunc) {
+                    terrainCost = aiPlayer->m_getTerrainCostFunc(neighbor);
+                }
+                
+                // 地形不可通行（海洋、山脉等，cost < 0）则跳过
+                if (terrainCost < 0) continue;
+
+                // 检查单位是否有足够移动力
+                if (terrainCost > unit->getCurrentMoves()) continue;
+
                 int dist = neighbor.distance(targetPos);
-                if (dist < bestDist) {
+                
+                // 优先选择距离更近的，距离相同则选择消耗更低的
+                if (dist < bestDist || (dist == bestDist && terrainCost < bestCost)) {
                     bestDist = dist;
                     bestMove = neighbor;
+                    bestCost = terrainCost;
                 }
             }
 
             // 如果找到了合法的移动目标
             if (bestMove != currentPos) {
-                CCLOG("AI Unit %s MOVE -> (%d, %d)", unit->getUnitName().c_str(), bestMove.q, bestMove.r);
+                CCLOG("AI Unit %s MOVE -> (%d, %d), cost: %d", 
+                      unit->getUnitName().c_str(), bestMove.q, bestMove.r, bestCost);
 
-                // 计算消耗（简单逻辑：1格消耗1点）
-                int cost = 1;
-
-                // 执行移动
-                unit->moveTo(bestMove, layout, cost);
+                // 执行移动（使用实际地形消耗）
+                unit->moveTo(bestMove, layout, bestCost);
 
                 // 锁定新位置，防止后续单位重叠
                 occupiedOrReservedHexes.insert(bestMove);
@@ -568,21 +582,57 @@ void GameManager::processAITurn(Player* aiPlayer) {
 
     // 5. AI城市生产逻辑
     const std::vector<BaseCity*>& cities = aiPlayer->getCities();
+    
+    // 限制AI单位数量
+    int maxUnitsPerCity = 3;
+    int currentMilitaryUnits = 0;
+    
+    for (auto unit : aiPlayer->getUnits()) {
+        if (unit && unit->ismilitary()) {
+            currentMilitaryUnits++;
+        }
+    }
+    
+    int maxTotalUnits = cities.size() * maxUnitsPerCity;
+    
+    // 生产间隔：每5回合才允许开始新的单位生产
+    int productionInterval = 5;
+    bool canStartNewProduction = (m_gameStats.currentTurn % productionInterval == 0);
+    
     for (BaseCity* city : cities) {
         if (!city) continue;
 
         // 如果城市闲置
         if (city->getCurrentProduction() == nullptr) {
+            // 检查是否已达到单位上限
+            if (currentMilitaryUnits >= maxTotalUnits) {
+                CCLOG("AI: City %s skipping production - unit cap reached (%d/%d)", 
+                      city->getCityName().c_str(), currentMilitaryUnits, maxTotalUnits);
+                continue;
+            }
+            
+            // 检查生产间隔
+            if (!canStartNewProduction) {
+                CCLOG("AI: City %s waiting for production interval (turn %d)", 
+                      city->getCityName().c_str(), m_gameStats.currentTurn);
+                continue;
+            }
+            
             CCLOG("AI: City %s starting production of Warrior", city->getCityName().c_str());
 
             // 创建生产项目
             ProductionProgram* warriorProd = new ProductionProgram(
                 ProductionProgram::ProductionType::UNIT,
                 "Warrior",
-                Hex(), 0, true, 200
+                Hex(),
+                0,
+                true,
+                200
             );
 
             city->addNewProduction(warriorProd);
+            currentMilitaryUnits++;
+            canStartNewProduction = false; // 本回合只允许一个城市开始生产
         }
     }
 

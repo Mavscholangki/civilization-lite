@@ -191,60 +191,105 @@ void GameMapLayer::initGameManagerAndPlayers() {
             }
         }
         // ---------------------------------------------------
-        // 策略 B: AI 玩家 -> 随机寻找满足条件的点
+        // 策略 B: AI 玩家 -> 在人类玩家附近 8-12 格范围内寻找出生点
         // ---------------------------------------------------
         else {
-            CCLOG("Finding perfect start for AI Player %d...", playerId);
-            int maxAttempts = 500; // 尝试 500 次
-            int mapW = 120;
-            int mapH = 50;
+            CCLOG("Finding start for AI Player %d near human player...", playerId);
+            
+            // 获取人类玩家的出生点（第一个占用点）
+            Hex humanSpawn = occupiedSpawns->empty() ? Hex(55, 15) : (*occupiedSpawns)[0];
+            
+            int minDistFromHuman = 8;   // 距离人类玩家最小 8 格
+            int maxDistFromHuman = 12;  // 距离人类玩家最大 12 格
+            int minDistFromAI = 6;      // AI 之间至少 6 格
+            
+            int maxAttempts = 500;
 
             for (int i = 0; i < maxAttempts; i++) {
-                // 随机坐标 (稍微避开地图最边缘)
-                int q = cocos2d::random(5, mapW - 5);
-                int r = cocos2d::random(5, mapH - 5);
-                Hex randHex(q, r);
-
-                // 1. 地形检查 (和玩家一样严格)
-                if (!isPerfectSpawn(randHex)) continue;
-
-                // 2. 距离检查 (必须离所有已存在的出生点至少 12 格远)
-                bool isTooClose = false;
-                for (const auto& occupied : *occupiedSpawns) {
-                    if (getHexDistance(randHex, occupied) < 12) {
-                        isTooClose = true;
+                // 在人类玩家周围的环形区域随机选点
+                // 随机选择一个距离 (8-12)
+                int targetDist = minDistFromHuman + (rand() % (maxDistFromHuman - minDistFromHuman + 1));
+                
+                // 随机选择一个方向角度 (0-5 对应六边形的6个方向)
+                int startDir = rand() % 6;
+                
+                // 从人类出生点出发，按照随机方向走 targetDist 步
+                Hex candidate = humanSpawn;
+                for (int step = 0; step < targetDist; step++) {
+                    // 每步稍微偏移方向，增加随机性
+                    int dir = (startDir + (rand() % 3) - 1 + 6) % 6;
+                    candidate = candidate.getNeighbor(dir);
+                }
+                
+                // 1. 地形检查
+                if (!isPerfectSpawn(candidate)) continue;
+                
+                // 2. 验证距离人类玩家在 8-12 范围内
+                int actualDistFromHuman = getHexDistance(candidate, humanSpawn);
+                if (actualDistFromHuman < minDistFromHuman || actualDistFromHuman > maxDistFromHuman) {
+                    continue;
+                }
+                
+                // 3. 检查是否离其他 AI 出生点足够远（至少 6 格）
+                bool tooCloseToOtherAI = false;
+                for (size_t j = 1; j < occupiedSpawns->size(); j++) { // 从 1 开始，跳过人类玩家
+                    if (getHexDistance(candidate, (*occupiedSpawns)[j]) < minDistFromAI) {
+                        tooCloseToOtherAI = true;
                         break;
                     }
                 }
-                if (isTooClose) continue;
-
+                if (tooCloseToOtherAI) continue;
+                
                 // 找到合适位置
-                finalHex = randHex;
+                finalHex = candidate;
                 found = true;
+                CCLOG("AI Player %d found spawn at (%d, %d), distance from human: %d",
+                      playerId, finalHex.q, finalHex.r, actualDistFromHuman);
                 break;
             }
         }
 
         // ---------------------------------------------------
-        // 兜底逻辑：如果实在找不到完美点 (地图太挤或太烂)
+        // 兜底逻辑：如果实在找不到完美点
         // ---------------------------------------------------
         if (!found) {
-            CCLOG("Warning: Perfect spawn not found for Player %d. Relaxing criteria.", playerId);
-            // 降级策略：只找是个陆地的地方，且尽量远一点
+            CCLOG("Warning: Perfect spawn not found for Player %d. Using fallback.", playerId);
+            
+            Hex humanSpawn = occupiedSpawns->empty() ? Hex(55, 15) : (*occupiedSpawns)[0];
+            
+            // 降级策略：放宽地形要求，只需是陆地即可
             int safeGuard = 0;
             while (safeGuard < 200) {
-                int q = cocos2d::random(5, 115);
-                int r = cocos2d::random(5, 45);
-                Hex h(q, r);
-
-                // 只要不是水和山就行 (忽略周围环境)
-                if (getTerrainCost(h) > 0) {
-                    // 距离稍微放宽到 5
-                    bool close = false;
-                    for (const auto& occ : *occupiedSpawns) {
-                        if (getHexDistance(h, occ) < 5) close = true;
+                // AI 玩家：在人类附近 8-12 格找陆地
+                if (playerId > 0) {
+                    int targetDist = 8 + (rand() % 5);
+                    int dir = rand() % 6;
+                    Hex h = humanSpawn;
+                    for (int step = 0; step < targetDist; step++) {
+                        h = h.getNeighbor((dir + (rand() % 3) - 1 + 6) % 6);
                     }
-                    if (!close) {
+                    
+                    if (getTerrainCost(h) > 0) {
+                        bool close = false;
+                        for (size_t j = 1; j < occupiedSpawns->size(); j++) {
+                            if (getHexDistance(h, (*occupiedSpawns)[j]) < 4) {
+                                close = true;
+                                break;
+                            }
+                        }
+                        if (!close) {
+                            finalHex = h;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                else {
+                    // 人类玩家保底
+                    int q = cocos2d::random(5, 115);
+                    int r = cocos2d::random(5, 45);
+                    Hex h(q, r);
+                    if (getTerrainCost(h) > 0) {
                         finalHex = h;
                         found = true;
                         break;
@@ -252,12 +297,31 @@ void GameMapLayer::initGameManagerAndPlayers() {
                 }
                 safeGuard++;
             }
-            // 绝望的保底
-            if (!found) finalHex = Hex(10 + playerId * 5, 10);
+            
+            // 绝望保底
+            if (!found) {
+                if (playerId == 0) {
+                    finalHex = Hex(55, 15);
+                }
+                else {
+                    // AI 在人类附近固定位置
+                    int offset = 10;
+                    int dir = playerId % 6;
+                    finalHex = humanSpawn;
+                    for (int i = 0; i < offset; i++) {
+                        finalHex = finalHex.getNeighbor(dir);
+                    }
+                }
+            }
         }
 
         // 记录并返回
-        CCLOG("Player %d spawn at (%d, %d)", playerId, finalHex.q, finalHex.r);
+        int distFromHuman = 0;
+        if (!occupiedSpawns->empty()) {
+            distFromHuman = getHexDistance(finalHex, (*occupiedSpawns)[0]);
+        }
+        CCLOG("Player %d spawn at (%d, %d), distance from human: %d", 
+              playerId, finalHex.q, finalHex.r, distFromHuman);
         occupiedSpawns->push_back(finalHex);
         return finalHex;
         };
@@ -597,57 +661,10 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
         handleTileSelection(touch);
         return;
     }
-    // 如果在选择模式下，处理特殊取消手势
-    if (_isSelectingTile) {
-        Vec2 clickPos = this->convertToNodeSpace(touch->getLocation());
-        Hex clickHex = _layout->pixelToHex(clickPos);
-
-        // 检查是否是双击取消（双击非可选地块）
-        auto now = std::chrono::steady_clock::now();
-        long long diff = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now - _lastClickTime).count();
-
-        bool isDoubleTap = false;
-        if (clickHex == _lastClickHex && diff < 300) {
-            isDoubleTap = true;
-        }
-
-        _lastClickTime = now;
-        _lastClickHex = clickHex;
-
-        // 如果是双击并且点击的是非可选地块，则取消选择
-        if (isDoubleTap) {
-            // 检查是否在允许列表中
-            bool isAllowed = false;
-            for (const Hex& allowedHex : _allowedTiles) {
-                if (allowedHex == clickHex) {
-                    isAllowed = true;
-                    break;
-                }
-            }
-
-            if (!isAllowed) {
-                CCLOG("Double tap on invalid tile, canceling selection");
-                cancelTileSelection(true);  // 触发取消回调
-                return;
-            }
-        }
-
-        // 正常处理选择
-        handleTileSelection(touch);
-        return;
-    }
 
     // 1. 将触摸转换 (Touch -> NodeSpace -> Hex)
     Vec2 clickPos = this->convertToNodeSpace(touch->getLocation());
     Hex clickHex = _layout->pixelToHex(clickPos);
-
-    CCLOG("Touch Hex: %d, %d", clickHex.q, clickHex.r);
-
-    // 【修复：添加调试日志】
-    CCLOG("SelectedUnit: %s, moves: %d", 
-          _selectedUnit ? _selectedUnit->getUnitName().c_str() : "NULL",
-          _selectedUnit ? _selectedUnit->getCurrentMoves() : -1);
 
     // ============================================================
     // 双击逻辑处理
@@ -655,112 +672,157 @@ void GameMapLayer::onTouchEnded(Touch* touch, Event* event) {
     auto now = std::chrono::steady_clock::now();
     long long diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastClickTime).count();
 
-    bool isDoubleTap = false;
-    // 检查是否同一个六边形，且间隔小于 300ms
-    if (clickHex == _lastClickHex && diff < 300) {
-        isDoubleTap = true;
-    }
+    // 同格双击标记
+    bool isSameHexDoubleTap = (clickHex == _lastClickHex && diff < 300);
 
-    // 更新记录
-    _lastClickTime = now;
-    _lastClickHex = clickHex;
+    // 获取点击位置的单位
+    AbstractUnit* clickedUnit = getUnitAt(clickHex);
+    
+    // 检查是否点击了敌方单位
+    bool clickedOnEnemy = (clickedUnit != nullptr && 
+                           _selectedUnit != nullptr && 
+                           _selectedUnit->getOwnerId() == 0 &&
+                           clickedUnit->getOwnerId() != _selectedUnit->getOwnerId());
+
+    CCLOG("=== Touch Debug ===");
+    CCLOG("Touch Hex: (%d, %d)", clickHex.q, clickHex.r);
+    CCLOG("LastClickHex: (%d, %d)", _lastClickHex.q, _lastClickHex.r);
+    CCLOG("Time diff: %lld ms", diff);
+    CCLOG("isSameHexDoubleTap: %d", isSameHexDoubleTap);
+    CCLOG("SelectedUnit: %s (owner=%d)", 
+          _selectedUnit ? _selectedUnit->getUnitName().c_str() : "NULL",
+          _selectedUnit ? _selectedUnit->getOwnerId() : -1);
+    CCLOG("ClickedUnit: %s (owner=%d)", 
+          clickedUnit ? clickedUnit->getUnitName().c_str() : "NULL",
+          clickedUnit ? clickedUnit->getOwnerId() : -1);
+    CCLOG("clickedOnEnemy: %d", clickedOnEnemy);
 
     // ============================================================
-    // 分支 A: 双击事件，执行移动 / 攻击
+    // 分支 A: 双击同格 + 已选中己方单位 -> 执行移动或攻击
     // ============================================================
-    if (isDoubleTap) {
-        if (_selectedUnit && _selectedUnit->getOwnerId() == 0) {
-            if (clickHex != _selectedUnit->getGridPos()) {
+    if (isSameHexDoubleTap && _selectedUnit && _selectedUnit->getOwnerId() == 0) {
+        CCLOG(">>> Entering DOUBLE TAP branch");
+        
+        // 不能双击自己所在的格子
+        if (clickHex == _selectedUnit->getGridPos()) {
+            CCLOG("Double tap on self position, ignored.");
+            _lastClickTime = now;
+            _lastClickHex = clickHex;
+            return;
+        }
 
-                // 1. 若双击到敌方单位，直接攻击
-                AbstractUnit* enemy = getUnitAt(clickHex);
-                if (enemy && enemy->getOwnerId() != _selectedUnit->getOwnerId()) {
-                    handleUnitAttack(_selectedUnit, clickHex);
-                    _lastClickHex = Hex(-999, -999);
-                    return;
+        // 【优先处理】目标位置有敌方单位 -> 攻击
+        if (clickedOnEnemy) {
+            CCLOG(">>> ATTACK: Double tap on enemy at (%d, %d)", clickHex.q, clickHex.r);
+            handleUnitAttack(_selectedUnit, clickHex);
+            _lastClickHex = Hex(-999, -999);  // 清除双击记录
+            _lastClickTime = now;
+            return;
+        }
+
+        // 目标位置是空地 -> 移动
+        CCLOG(">>> MOVE: Double tap on empty hex at (%d, %d)", clickHex.q, clickHex.r);
+        auto costFunc = [this](Hex h) { return this->getTerrainCost(h); };
+        std::vector<Hex> path = PathFinder::findPath(_selectedUnit->getGridPos(), clickHex, costFunc);
+
+        if (!path.empty()) {
+            int pathCost = 0;
+            for (size_t i = 0; i < path.size(); i++) {
+                int tileCost = getTerrainCost(path[i]);
+                if (tileCost < 0) {
+                    pathCost = INT_MAX;
+                    break;
                 }
+                pathCost += tileCost;
+            }
 
-                // 2. 否则尝试移动
-                auto costFunc = [this](Hex h) { return this->getTerrainCost(h); };
-                std::vector<Hex> path = PathFinder::findPath(_selectedUnit->getGridPos(), clickHex, costFunc);
-
-                if (!path.empty()) {
-                    int pathCost = 0;
-                    for (size_t i = 0; i < path.size(); i++) {
-                        int tileCost = getTerrainCost(path[i]);
-                        if (tileCost < 0) { pathCost = INT_MAX; break; }
-                        pathCost += tileCost;
-                    }
-
-                    if (pathCost <= _selectedUnit->getCurrentMoves()) {
-                        _selectedUnit->moveTo(clickHex, _layout, pathCost);
-                        updateSelection(clickHex);
-                        _selectedUnit->hideMoveRange();
-                        _lastClickHex = Hex(-999, -999);
-                        CCLOG("Double Tap Move -> Cost: %d, Remaining: %d",
-                            pathCost, _selectedUnit->getCurrentMoves());
-                    }
-                    else {
-                        CCLOG("移动力不足! 需要%d，剩余%d", pathCost, _selectedUnit->getCurrentMoves());
-                    }
-                }
-                else {
-                    CCLOG("无法找到到目标的路径");
-                }
+            if (pathCost <= _selectedUnit->getCurrentMoves()) {
+                _selectedUnit->moveTo(clickHex, _layout, pathCost);
+                updateSelection(clickHex);
+                _selectedUnit->hideMoveRange();
+                CCLOG("Move success! Cost: %d", pathCost);
+            }
+            else {
+                CCLOG("移动力不足! 需要%d，剩余%d", pathCost, _selectedUnit->getCurrentMoves());
             }
         }
-        return; // 双击事件处理完毕
+        else {
+            CCLOG("无法找到到目标的路径");
+        }
+        
+        _lastClickHex = Hex(-999, -999);
+        _lastClickTime = now;
+        return;  // 双击事件处理完毕
     }
+
+    CCLOG(">>> Entering SINGLE CLICK branch");
 
     // ============================================================
     // 分支 B: 单击事件（执行选择/切换）
     // ============================================================
 
-    // 更新浅蓝色背景选中框框提示用户
+    // 【重要】先更新时间和位置记录，这样下次点击才能检测双击
+    _lastClickTime = now;
+    _lastClickHex = clickHex;
+
+    // 更新选中框框
     updateSelection(clickHex);
 
-    AbstractUnit* clickedUnit = getUnitAt(clickHex);
     BaseCity* clickedCity = getCityAt(clickHex);
 
     if (clickedUnit) {
         // --- 情况1: 点击单位 ---
+        
+        // 【关键】如果已选中己方单位，且点击的是敌方单位
+        // 不切换选中，保持己方单位选中状态，等待双击攻击
+        if (clickedOnEnemy) {
+            CCLOG("Single click on enemy. Waiting for double-tap to attack.");
+            // 不切换 _selectedUnit，不做任何事，等待下一次点击
+            if (_onInvalidSelected) _onInvalidSelected();
+            return;  // 这里 return 是对的，因为 _lastClickHex 已经更新了
+        }
+        
+        // 如果点击的是同一个已选中的单位，取消选中
         if (_selectedUnit == clickedUnit) {
+            CCLOG("Deselecting unit.");
             _selectedUnit->hideMoveRange();
             _selectedUnit = nullptr;
-            _selectionNode->clear(); // 清除框
+            _selectionNode->clear();
             if (_onUnitSelected) _onUnitSelected(nullptr);
-            return; // 退出
+            return;
         }
 
-        if (_selectedUnit != clickedUnit) {
-            // 切换选中目标
-            if (_selectedUnit) _selectedUnit->hideMoveRange();
-            _selectedUnit = clickedUnit;
+        // 切换选中目标（己方单位）
+        CCLOG("Selecting unit: %s", clickedUnit->getUnitName().c_str());
+        if (_selectedUnit) _selectedUnit->hideMoveRange();
+        _selectedUnit = clickedUnit;
 
-            // 通知 UI
-            if (_onUnitSelected) _onUnitSelected(_selectedUnit);
+        // 通知 UI
+        if (_onUnitSelected) _onUnitSelected(_selectedUnit);
 
-            // 显示移动范围
+        // 只有己方单位才显示移动范围
+        if (_selectedUnit->getOwnerId() == 0) {
             auto costFunc = [this](Hex h) { return this->getTerrainCost(h); };
             _selectedUnit->showMoveRange(_layout, costFunc);
         }
-        // 单击单位时关闭城市面板
+
+        // 关闭城市面板
         if (_onInvalidSelected) _onInvalidSelected();
     }
     else if (clickedCity) {
         // --- 情况2: 点击城市 ---
+        CCLOG("Clicked on city.");
         if (_selectedUnit) {
             _selectedUnit->hideMoveRange();
             _selectedUnit = nullptr;
             if (_onUnitSelected) _onUnitSelected(nullptr);
         }
-        // 打开城市面板
         if (_onCitySelected) _onCitySelected(clickedCity);
     }
     else {
         // --- 情况3: 点击空地 ---
-        // 空地位置可以通过点击移动，或需要再次点击(双击)来移动。
-        // 只关闭城市面板
+        CCLOG("Clicked on empty hex.");
+        // 不取消己方单位选中，以便双击移动
         if (_onInvalidSelected) _onInvalidSelected();
     }
 }
